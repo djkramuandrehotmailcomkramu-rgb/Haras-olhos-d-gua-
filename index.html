@@ -49,7 +49,6 @@
     <div id="app"></div>
 
     <script>
-        // Sistema de armazenamento local
         const storage = {
             get: (key) => {
                 try {
@@ -68,23 +67,17 @@
                     console.error('Erro ao salvar dados:', e);
                     return false;
                 }
-            },
-            remove: (key) => {
-                localStorage.removeItem(key);
             }
         };
 
-        // Estado da aplicação
         let state = {
             horses: [],
             selectedHorse: null,
             showForm: false,
-            activeTab: 'list',
             saving: false,
             showBackupMenu: false
         };
 
-        // Dados do formulário
         let formData = {
             name: '', breed: '', age: '', gender: 'Macho',
             color: '', registration: '', photo: '', notes: ''
@@ -95,8 +88,7 @@
         let newExpense = { date: '', description: '', amount: '', category: 'Alimentação' };
         let newShoeing = { date: '', nextDate: '', farrier: '', notes: '' };
 
-        // Converter imagem para Base64
-        function handleImageUpload(event) {
+        window.handleImageUpload = function(event) {
             const file = event.target.files[0];
             if (file) {
                 if (file.size > 2000000) {
@@ -110,9 +102,8 @@
                 };
                 reader.readAsDataURL(file);
             }
-        }
+        };
 
-        // Carregar dados ao iniciar
         function loadData() {
             const saved = storage.get('haras-horses');
             if (saved && Array.isArray(saved)) {
@@ -127,18 +118,10 @@
                     color: 'Alazão',
                     registration: 'QM-12345',
                     photo: '',
-                    vaccines: [
-                        { date: '2024-01-15', vaccine: 'Influenza', nextDate: '2025-01-15' }
-                    ],
-                    medications: [
-                        { date: '2024-11-01', medication: 'Vermífugo', dosage: '10ml', vet: 'Dr. Silva' }
-                    ],
-                    expenses: [
-                        { date: '2024-11-01', description: 'Ração', amount: 250, category: 'Alimentação' }
-                    ],
-                    shoeing: [
-                        { date: '2024-10-15', nextDate: '2025-01-15', farrier: 'João Ferrador', notes: 'Ferrageamento completo' }
-                    ],
+                    vaccines: [{ date: '2024-01-15', vaccine: 'Influenza', nextDate: '2025-01-15' }],
+                    medications: [{ date: '2024-11-01', medication: 'Vermífugo', dosage: '10ml', vet: 'Dr. Silva' }],
+                    expenses: [{ date: '2024-11-01', description: 'Ração', amount: 250, category: 'Alimentação' }],
+                    shoeing: [{ date: '2024-10-15', nextDate: '2025-01-15', farrier: 'João Ferrador', notes: 'Ferrageamento completo' }],
                     notes: 'Cavalo de competição, excelente temperamento'
                 }];
                 saveData();
@@ -155,7 +138,7 @@
             }, 800);
         }
 
-        function exportData() {
+        window.exportData = function() {
             const dataStr = JSON.stringify(state.horses, null, 2);
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(dataBlob);
@@ -167,12 +150,12 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-            alert('✅ Backup salvo com sucesso!\n\nGuarde este arquivo em local seguro.');
+            alert('✅ Backup salvo com sucesso!');
             state.showBackupMenu = false;
             render();
-        }
+        };
 
-        function importData() {
+        window.importData = function() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
@@ -185,7 +168,7 @@
                     try {
                         const imported = JSON.parse(event.target.result);
                         if (Array.isArray(imported)) {
-                            if (confirm('⚠️ ATENÇÃO!\n\nImportar dados irá SUBSTITUIR todos os cavalos atuais.\n\nDeseja continuar?')) {
+                            if (confirm('⚠️ Importar dados irá SUBSTITUIR todos os cavalos atuais.\n\nDeseja continuar?')) {
                                 state.horses = imported;
                                 saveData();
                                 alert('✅ Dados importados com sucesso!');
@@ -201,14 +184,20 @@
                 reader.readAsText(file);
             };
             input.click();
-        }
+        };
 
-        function addHorse() {
+        window.addHorse = function() {
             if (formData.name && formData.breed) {
                 const newHorse = {
                     id: Date.now(),
-                    ...formData,
+                    name: formData.name,
+                    breed: formData.breed,
                     age: parseInt(formData.age) || 0,
+                    gender: formData.gender,
+                    color: formData.color,
+                    registration: formData.registration,
+                    photo: formData.photo,
+                    notes: formData.notes,
                     vaccines: [],
                     medications: [],
                     expenses: [],
@@ -218,75 +207,139 @@
                 formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' };
                 state.showForm = false;
                 saveData();
+            } else {
+                alert('⚠️ Preencha ao menos o Nome e a Raça!');
             }
-        }
+        };
 
-        function deleteHorse(id) {
+        window.deleteHorse = function(id) {
             if (confirm('Tem certeza que deseja excluir este cavalo?')) {
                 state.horses = state.horses.filter(h => h.id !== id);
                 if (state.selectedHorse?.id === id) state.selectedHorse = null;
                 saveData();
             }
-        }
+        };
 
-        function addVaccine() {
-            if (state.selectedHorse && newVaccine.date && newVaccine.vaccine) {
+        window.selectHorse = function(id) {
+            state.selectedHorse = state.horses.find(h => h.id === id);
+            render();
+        };
+
+        window.backToList = function() {
+            state.selectedHorse = null;
+            render();
+        };
+
+        window.toggleForm = function() {
+            state.showForm = !state.showForm;
+            render();
+        };
+
+        window.toggleBackup = function() {
+            state.showBackupMenu = !state.showBackupMenu;
+            render();
+        };
+
+        window.removePhoto = function() {
+            formData.photo = '';
+            render();
+        };
+
+        window.addVaccine = function() {
+            const date = document.getElementById('vaccineDate').value;
+            const vaccine = document.getElementById('vaccineName').value;
+            const nextDate = document.getElementById('vaccineNext').value;
+
+            if (state.selectedHorse && date && vaccine) {
                 state.horses = state.horses.map(h => {
                     if (h.id === state.selectedHorse.id) {
-                        return { ...h, vaccines: [...h.vaccines, {...newVaccine}] };
+                        return { ...h, vaccines: [...h.vaccines, { date, vaccine, nextDate }] };
                     }
                     return h;
                 });
                 state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                newVaccine = { date: '', vaccine: '', nextDate: '' };
+                document.getElementById('vaccineDate').value = '';
+                document.getElementById('vaccineName').value = '';
+                document.getElementById('vaccineNext').value = '';
                 saveData();
+            } else {
+                alert('⚠️ Preencha ao menos a data e o nome da vacina!');
             }
-        }
+        };
 
-        function addMedication() {
-            if (state.selectedHorse && newMedication.date && newMedication.medication) {
+        window.addMedication = function() {
+            const date = document.getElementById('medDate').value;
+            const medication = document.getElementById('medName').value;
+            const dosage = document.getElementById('medDosage').value;
+            const vet = document.getElementById('medVet').value;
+
+            if (state.selectedHorse && date && medication) {
                 state.horses = state.horses.map(h => {
                     if (h.id === state.selectedHorse.id) {
-                        return { ...h, medications: [...h.medications, {...newMedication}] };
+                        return { ...h, medications: [...h.medications, { date, medication, dosage, vet }] };
                     }
                     return h;
                 });
                 state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                newMedication = { date: '', medication: '', dosage: '', vet: '' };
+                document.getElementById('medDate').value = '';
+                document.getElementById('medName').value = '';
+                document.getElementById('medDosage').value = '';
+                document.getElementById('medVet').value = '';
                 saveData();
+            } else {
+                alert('⚠️ Preencha ao menos a data e a medicação!');
             }
-        }
+        };
 
-        function addExpense() {
-            if (state.selectedHorse && newExpense.date && newExpense.description && newExpense.amount) {
+        window.addExpense = function() {
+            const date = document.getElementById('expDate').value;
+            const description = document.getElementById('expDesc').value;
+            const amount = document.getElementById('expAmount').value;
+            const category = document.getElementById('expCategory').value;
+
+            if (state.selectedHorse && date && description && amount) {
                 state.horses = state.horses.map(h => {
                     if (h.id === state.selectedHorse.id) {
-                        return { ...h, expenses: [...h.expenses, {...newExpense, amount: parseFloat(newExpense.amount)}] };
+                        return { ...h, expenses: [...h.expenses, { date, description, amount: parseFloat(amount), category }] };
                     }
                     return h;
                 });
                 state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                newExpense = { date: '', description: '', amount: '', category: 'Alimentação' };
+                document.getElementById('expDate').value = '';
+                document.getElementById('expDesc').value = '';
+                document.getElementById('expAmount').value = '';
                 saveData();
+            } else {
+                alert('⚠️ Preencha todos os campos do gasto!');
             }
-        }
+        };
 
-        function addShoeing() {
-            if (state.selectedHorse && newShoeing.date) {
+        window.addShoeing = function() {
+            const date = document.getElementById('shoeDate').value;
+            const nextDate = document.getElementById('shoeNext').value;
+            const farrier = document.getElementById('shoeFarrier').value;
+            const notes = document.getElementById('shoeNotes').value;
+
+            if (state.selectedHorse && date) {
                 state.horses = state.horses.map(h => {
                     if (h.id === state.selectedHorse.id) {
-                        return { ...h, shoeing: [...h.shoeing, {...newShoeing}] };
+                        return { ...h, shoeing: [...h.shoeing, { date, nextDate, farrier, notes }] };
                     }
                     return h;
                 });
                 state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                newShoeing = { date: '', nextDate: '', farrier: '', notes: '' };
+                document.getElementById('shoeDate').value = '';
+                document.getElementById('shoeNext').value = '';
+                document.getElementById('shoeFarrier').value = '';
+                document.getElementById('shoeNotes').value = '';
                 saveData();
+            } else {
+                alert('⚠️ Preencha ao menos a data do ferrageamento!');
             }
-        }
+        };
 
-        function deleteItem(type, horseId, index) {
-            if (confirm(`Deseja excluir este(a) ${type}?`)) {
+        window.deleteItem = function(type, horseId, index) {
+            if (confirm(`Deseja excluir?`)) {
                 state.horses = state.horses.map(h => {
                     if (h.id === horseId) {
                         const items = [...h[type]];
@@ -298,7 +351,11 @@
                 state.selectedHorse = state.horses.find(h => h.id === horseId);
                 saveData();
             }
-        }
+        };
+
+        window.updateFormData = function(field, value) {
+            formData[field] = value;
+        };
 
         function getTotalExpenses(horse) {
             return horse.expenses.reduce((sum, exp) => sum + exp.amount, 0);
@@ -328,7 +385,7 @@
                             <p class="text-emerald-600 font-semibold">${horse.breed}</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="state.selectedHorse = state.horses.find(h => h.id === ${horse.id}); render();" 
+                            <button onclick="selectHorse(${horse.id})" 
                                 class="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-md">
                                 ✏️
                             </button>
@@ -387,11 +444,11 @@
                         </div>
 
                         <div class="flex gap-3 flex-wrap">
-                            <button onclick="state.showForm = !state.showForm; render();" 
+                            <button onclick="toggleForm()" 
                                 class="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition shadow-lg flex items-center gap-2">
                                 ➕ Novo Cavalo
                             </button>
-                            <button onclick="state.showBackupMenu = !state.showBackupMenu; render();" 
+                            <button onclick="toggleBackup()" 
                                 class="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition shadow-lg flex items-center gap-2">
                                 🔒 Backup
                             </button>
@@ -399,27 +456,23 @@
 
                         ${state.showBackupMenu ? `
                             <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-2xl mt-6 border-2 border-purple-200 fade-in">
-                                <h3 class="text-2xl font-bold text-purple-900 mb-4 flex items-center gap-2">
-                                    🔒 Gerenciar Backup
-                                </h3>
+                                <h3 class="text-2xl font-bold text-purple-900 mb-4">🔒 Gerenciar Backup</h3>
                                 <p class="text-gray-700 mb-4 text-sm bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                                    <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente para não perder suas informações!
+                                    <strong>⚠️ IMPORTANTE:</strong> Faça backup regularmente!
                                 </p>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <button onclick="exportData()" 
                                         class="px-6 py-4 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition shadow-lg">
                                         <div class="text-2xl mb-1">📥</div>
                                         <div>Exportar Dados</div>
-                                        <div class="text-xs opacity-80">Salvar backup</div>
                                     </button>
                                     <button onclick="importData()" 
                                         class="px-6 py-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg">
                                         <div class="text-2xl mb-1">📤</div>
                                         <div>Importar Dados</div>
-                                        <div class="text-xs opacity-80">Restaurar backup</div>
                                     </button>
                                 </div>
-                                <button onclick="state.showBackupMenu = false; render();" 
+                                <button onclick="toggleBackup()" 
                                     class="w-full mt-4 px-4 py-2 bg-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-400 transition">
                                     Fechar
                                 </button>
@@ -433,7 +486,7 @@
                                 ${formData.photo ? `
                                     <div class="mb-4 text-center">
                                         <img src="${formData.photo}" alt="Preview" class="image-preview mx-auto shadow-lg">
-                                        <button onclick="formData.photo = ''; render();" class="mt-2 text-sm text-red-600 hover:text-red-800">
+                                        <button onclick="removePhoto()" class="mt-2 text-sm text-red-600 hover:text-red-800">
                                             🗑️ Remover foto
                                         </button>
                                     </div>
@@ -447,37 +500,36 @@
                                 `}
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <input type="text" placeholder="Nome do cavalo *" id="horseName" value="${formData.name}"
-                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                                    <input type="text" placeholder="Raça *" id="horseBreed" value="${formData.breed}"
-                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                                    <input type="number" placeholder="Idade" id="horseAge" value="${formData.age}"
-                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                                    <select id="horseGender" class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                    <input type="text" placeholder="Nome *" id="horseName" 
+                                        oninput="updateFormData('name', this.value)" value="${formData.name}"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                                    <input type="text" placeholder="Raça *" id="horseBreed" 
+                                        oninput="updateFormData('breed', this.value)" value="${formData.breed}"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                                    <input type="number" placeholder="Idade" id="horseAge" 
+                                        oninput="updateFormData('age', this.value)" value="${formData.age}"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                                    <select id="horseGender" onchange="updateFormData('gender', this.value)"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
                                         <option ${formData.gender === 'Macho' ? 'selected' : ''}>Macho</option>
                                         <option ${formData.gender === 'Fêmea' ? 'selected' : ''}>Fêmea</option>
                                     </select>
-                                    <input type="text" placeholder="Pelagem" id="horseColor" value="${formData.color}"
-                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
-                                    <input type="text" placeholder="Registro" id="horseRegistration" value="${formData.registration}"
-                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                    <input type="text" placeholder="Pelagem" id="horseColor" 
+                                        oninput="updateFormData('color', this.value)" value="${formData.color}"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                                    <input type="text" placeholder="Registro" id="horseRegistration" 
+                                        oninput="updateFormData('registration', this.value)" value="${formData.registration}"
+                                        class="p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
                                 </div>
                                 <textarea placeholder="Observações" id="horseNotes" rows="3"
-                                    class="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">${formData.notes}</textarea>
+                                    oninput="updateFormData('notes', this.value)"
+                                    class="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">${formData.notes}</textarea>
                                 <div class="flex gap-3 mt-6">
-                                    <button onclick="
-                                        formData.name = document.getElementById('horseName').value;
-                                        formData.breed = document.getElementById('horseBreed').value;
-                                        formData.age = document.getElementById('horseAge').value;
-                                        formData.gender = document.getElementById('horseGender').value;
-                                        formData.color = document.getElementById('horseColor').value;
-                                        formData.registration = document.getElementById('horseRegistration').value;
-                                        formData.notes = document.getElementById('horseNotes').value;
-                                        addHorse();
-                                    " class="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition shadow-lg">
+                                    <button onclick="addHorse()" 
+                                        class="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition shadow-lg">
                                         ✓ Salvar
                                     </button>
-                                    <button onclick="formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' }; state.showForm = false; render();" 
+                                    <button onclick="toggleForm()" 
                                         class="px-6 py-3 bg-gray-400 text-white rounded-xl font-semibold hover:bg-gray-500 transition">
                                         ✕ Cancelar
                                     </button>
@@ -491,7 +543,7 @@
                             <div class="text-8xl mb-6">🐴</div>
                             <h2 class="text-3xl font-bold text-gray-800 mb-4">Nenhum cavalo cadastrado</h2>
                             <p class="text-gray-600 mb-6">Comece adicionando o primeiro cavalo ao seu haras</p>
-                            <button onclick="state.showForm = true; render();"
+                            <button onclick="toggleForm()"
                                 class="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition shadow-lg text-lg">
                                 ➕ Adicionar Primeiro Cavalo
                             </button>
@@ -522,7 +574,7 @@
                                     <img src="${horse.photo}" alt="${horse.name}" class="w-24 h-24 md:w-32 md:h-32 object-cover rounded-xl border-4 border-white shadow-lg">
                                 ` : ''}
                             </div>
-                            <button onclick="state.selectedHorse = null; render();"
+                            <button onclick="backToList()"
                                 class="px-6 py-2 bg-white text-emerald-600 rounded-xl font-semibold hover:bg-emerald-50 transition shadow-md">
                                 ← Voltar
                             </button>
@@ -560,19 +612,10 @@
                     </h3>
                     <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${vaccinesHTML || '<p class="text-gray-500 text-center py-4">Nenhuma vacina registrada</p>'}</div>
                     <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="vaccineDate" value="${newVaccine.date}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
-                        <input type="text" placeholder="Nome da vacina" id="vaccineName" value="${newVaccine.vaccine}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
-                        <input type="date" id="vaccineNext" value="${newVaccine.nextDate}"
-                            placeholder="Próxima dose"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
-                        <button onclick="
-                            newVaccine.date = document.getElementById('vaccineDate').value;
-                            newVaccine.vaccine = document.getElementById('vaccineName').value;
-                            newVaccine.nextDate = document.getElementById('vaccineNext').value;
-                            addVaccine();
-                        " class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold shadow-md text-sm">
+                        <input type="date" id="vaccineDate" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
+                        <input type="text" placeholder="Nome da vacina" id="vaccineName" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
+                        <input type="date" id="vaccineNext" placeholder="Próxima dose" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 transition text-sm">
+                        <button onclick="addVaccine()" class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold shadow-md text-sm">
                             ➕ Adicionar Vacina
                         </button>
                     </div>
@@ -601,21 +644,11 @@
                     </h3>
                     <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${medsHTML || '<p class="text-gray-500 text-center py-4">Nenhuma medicação registrada</p>'}</div>
                     <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="medDate" value="${newMedication.date}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
-                        <input type="text" placeholder="Medicação" id="medName" value="${newMedication.medication}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
-                        <input type="text" placeholder="Dosagem" id="medDosage" value="${newMedication.dosage}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
-                        <input type="text" placeholder="Veterinário" id="medVet" value="${newMedication.vet}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
-                        <button onclick="
-                            newMedication.date = document.getElementById('medDate').value;
-                            newMedication.medication = document.getElementById('medName').value;
-                            newMedication.dosage = document.getElementById('medDosage').value;
-                            newMedication.vet = document.getElementById('medVet').value;
-                            addMedication();
-                        " class="w-full px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition font-semibold shadow-md text-sm">
+                        <input type="date" id="medDate" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
+                        <input type="text" placeholder="Medicação" id="medName" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
+                        <input type="text" placeholder="Dosagem" id="medDosage" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
+                        <input type="text" placeholder="Veterinário" id="medVet" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 transition text-sm">
+                        <button onclick="addMedication()" class="w-full px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition font-semibold shadow-md text-sm">
                             ➕ Adicionar Medicação
                         </button>
                     </div>
@@ -645,22 +678,11 @@
                     </h3>
                     <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${shoeingHTML || '<p class="text-gray-500 text-center py-4">Nenhum ferrageamento registrado</p>'}</div>
                     <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="shoeDate" value="${newShoeing.date}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
-                        <input type="date" id="shoeNext" value="${newShoeing.nextDate}"
-                            placeholder="Próximo ferrageamento"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
-                        <input type="text" placeholder="Nome do ferrador" id="shoeFarrier" value="${newShoeing.farrier}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
-                        <input type="text" placeholder="Observações" id="shoeNotes" value="${newShoeing.notes}"
-                            class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
-                        <button onclick="
-                            newShoeing.date = document.getElementById('shoeDate').value;
-                            newShoeing.nextDate = document.getElementById('shoeNext').value;
-                            newShoeing.farrier = document.getElementById('shoeFarrier').value;
-                            newShoeing.notes = document.getElementById('shoeNotes').value;
-                            addShoeing();
-                        " class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold shadow-md text-sm">
+                        <input type="date" id="shoeDate" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
+                        <input type="date" id="shoeNext" placeholder="Próximo ferrageamento" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
+                        <input type="text" placeholder="Nome do ferrador" id="shoeFarrier" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
+                        <input type="text" placeholder="Observações" id="shoeNotes" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 transition text-sm">
+                        <button onclick="addShoeing()" class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition font-semibold shadow-md text-sm">
                             ➕ Adicionar Ferrageamento
                         </button>
                     </div>
@@ -700,28 +722,19 @@
                     <div class="space-y-3 mb-4 max-h-80 overflow-y-auto">${expensesHTML || '<p class="text-gray-500 text-center py-4">Nenhum gasto registrado</p>'}</div>
                     <div class="bg-white p-4 rounded-xl">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                            <input type="date" id="expDate" value="${newExpense.date}"
-                                class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
-                            <input type="text" placeholder="Descrição" id="expDesc" value="${newExpense.description}"
-                                class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
-                            <input type="number" step="0.01" placeholder="Valor (R$)" id="expAmount" value="${newExpense.amount}"
-                                class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
+                            <input type="date" id="expDate" class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
+                            <input type="text" placeholder="Descrição" id="expDesc" class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
+                            <input type="number" step="0.01" placeholder="Valor (R$)" id="expAmount" class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
                             <select id="expCategory" class="p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 transition text-sm">
-                                <option ${newExpense.category === 'Alimentação' ? 'selected' : ''}>Alimentação</option>
-                                <option ${newExpense.category === 'Veterinário' ? 'selected' : ''}>Veterinário</option>
-                                <option ${newExpense.category === 'Manutenção' ? 'selected' : ''}>Manutenção</option>
-                                <option ${newExpense.category === 'Medicamentos' ? 'selected' : ''}>Medicamentos</option>
-                                <option ${newExpense.category === 'Ferrageamento' ? 'selected' : ''}>Ferrageamento</option>
-                                <option ${newExpense.category === 'Outros' ? 'selected' : ''}>Outros</option>
+                                <option>Alimentação</option>
+                                <option>Veterinário</option>
+                                <option>Manutenção</option>
+                                <option>Medicamentos</option>
+                                <option>Ferrageamento</option>
+                                <option>Outros</option>
                             </select>
                         </div>
-                        <button onclick="
-                            newExpense.date = document.getElementById('expDate').value;
-                            newExpense.description = document.getElementById('expDesc').value;
-                            newExpense.amount = document.getElementById('expAmount').value;
-                            newExpense.category = document.getElementById('expCategory').value;
-                            addExpense();
-                        " class="w-full px-4 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-semibold shadow-md text-sm">
+                        <button onclick="addExpense()" class="w-full px-4 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-semibold shadow-md text-sm">
                             ➕ Adicionar Gasto
                         </button>
                     </div>
@@ -744,7 +757,6 @@
             `;
         }
 
-        // Inicializar aplicação
         loadData();
         render();
     </script>
