@@ -1,162 +1,613 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Controle Haras Pro</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema de Controle de Haras - Gestão completa de cavalos">
+    <meta name="theme-color" content="#059669">
+    <title>Controle de Haras 🐴</title>
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQ29udHJvbGUgZGUgSGFyYXMiLCJzaG9ydF9uYW1lIjoiSGFyYXMiLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI2ZmZmZmZiIsInRoZW1lX2NvbG9yIjoiIzA1OTY2OSIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeE1qZ2dNVEk0SWo0OGNtVmpkQ0IzYVdSMGFEMGlNVEk0SWlCb1pXbG5hSFE5SWpFeU9DSWdabWxzYkQwaUl6QTFPVFkyT1NJdlBqeDBaWGgwSUhnOUlqWTBJaUI1UFNJMk5DSWdabTl1ZEMxemFYcGxQU0kwT0NJZ1ptbHNiRDBpSTNkb2FYUmxJajQ4TDNSbGVIUStQQzl6ZG1jKyIsInNpemVzIjoiNTEyeDUxMiIsInR5cGUiOiJpbWFnZS9zdmcreG1sIn1dfQ==">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .animate-pulse-slow {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
 </head>
+<body class="bg-gradient-to-br from-green-50 to-emerald-100 min-h-screen">
+    <div id="app"></div>
 
-<body class="bg-green-50 min-h-screen" id="body">
-<div id="app"></div>
+    <script>
+        // Sistema de armazenamento local
+        const storage = {
+            get: (key) => {
+                try {
+                    const data = localStorage.getItem(key);
+                    return data ? JSON.parse(data) : null;
+                } catch (e) {
+                    console.error('Erro ao carregar dados:', e);
+                    return null;
+                }
+            },
+            set: (key, value) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (e) {
+                    console.error('Erro ao salvar dados:', e);
+                    return false;
+                }
+            },
+            remove: (key) => {
+                localStorage.removeItem(key);
+            }
+        };
 
-<script>
-const USER = "admin";
-const PASS = "1234";
+        // Estado da aplicação
+        let state = {
+            horses: [],
+            selectedHorse: null,
+            showForm: false,
+            activeTab: 'list',
+            saving: false,
+            showBackupMenu: false
+        };
 
-const storage = {
-  get: (k) => JSON.parse(localStorage.getItem(k) || "null"),
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
-};
+        // Dados do formulário
+        let formData = {
+            name: '', breed: '', age: '', gender: 'Macho',
+            color: '', registration: '', notes: ''
+        };
 
-let logged = false;
+        let newVaccine = { date: '', vaccine: '', nextDate: '' };
+        let newMedication = { date: '', medication: '', dosage: '', vet: '' };
+        let newExpense = { date: '', description: '', amount: '', category: 'Alimentação' };
 
-let data = storage.get("haras") || [];
+        // Carregar dados ao iniciar
+        function loadData() {
+            const saved = storage.get('haras-horses');
+            if (saved && Array.isArray(saved)) {
+                state.horses = saved;
+            } else {
+                // Criar cavalo de exemplo
+                state.horses = [{
+                    id: Date.now(),
+                    name: 'Thunder',
+                    breed: 'Quarto de Milha',
+                    age: 5,
+                    gender: 'Macho',
+                    color: 'Alazão',
+                    registration: 'QM-12345',
+                    vaccines: [
+                        { date: '2024-01-15', vaccine: 'Influenza', nextDate: '2025-01-15' },
+                        { date: '2024-02-20', vaccine: 'Tétano', nextDate: '2025-02-20' }
+                    ],
+                    medications: [
+                        { date: '2024-11-01', medication: 'Vermífugo', dosage: '10ml', vet: 'Dr. Silva' }
+                    ],
+                    expenses: [
+                        { date: '2024-11-01', description: 'Ração', amount: 250, category: 'Alimentação' },
+                        { date: '2024-11-15', description: 'Ferrageamento', amount: 150, category: 'Manutenção' }
+                    ],
+                    notes: 'Cavalo de competição, excelente temperamento'
+                }];
+                saveData();
+            }
+        }
 
-let state = { selected: null };
+        // Salvar dados
+        function saveData() {
+            state.saving = true;
+            storage.set('haras-horses', state.horses);
+            render();
+            setTimeout(() => {
+                state.saving = false;
+                render();
+            }, 800);
+        }
 
-function loginScreen() {
-  document.getElementById("app").innerHTML = `
-  <div class="max-w-sm mx-auto p-6 mt-20 bg-white rounded-xl shadow">
-    <h2 class="text-xl font-bold mb-4">Login</h2>
-    <input id="user" class="border p-2 w-full mb-2" placeholder="Usuário">
-    <input id="pass" type="password" class="border p-2 w-full mb-4" placeholder="Senha">
-    <button onclick="login()" class="bg-green-600 text-white px-4 py-2 w-full rounded">Entrar</button>
-  </div>`;
-}
+        // Exportar dados
+        function exportData() {
+            const dataStr = JSON.stringify(state.horses, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            const date = new Date().toISOString().split('T')[0];
+            link.download = `haras-backup-${date}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            alert('✅ Backup salvo com sucesso!\n\nGuarde este arquivo em local seguro (Google Drive, WhatsApp, etc.)');
+            state.showBackupMenu = false;
+            render();
+        }
 
-function login() {
-  const u = user.value;
-  const p = pass.value;
-  if (u === USER && p === PASS){
-    logged = true;
-    render();
-  } else {
-    alert("Usuário ou senha incorretos");
-  }
-}
+        // Importar dados
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const imported = JSON.parse(event.target.result);
+                        if (Array.isArray(imported)) {
+                            if (confirm('⚠️ ATENÇÃO!\n\nImportar dados irá SUBSTITUIR todos os cavalos atuais.\n\nDeseja continuar?')) {
+                                state.horses = imported;
+                                saveData();
+                                alert('✅ Dados importados com sucesso!\n\n' + imported.length + ' cavalo(s) restaurado(s).');
+                                state.showBackupMenu = false;
+                            }
+                        } else {
+                            alert('❌ Arquivo inválido!\n\nPor favor, selecione um arquivo de backup válido.');
+                        }
+                    } catch (error) {
+                        alert('❌ Erro ao importar!\n\nArquivo corrompido ou formato inválido.');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
 
-function save() {
-  storage.set("haras", data);
-}
+        // Funções de manipulação
+        function addHorse() {
+            if (formData.name && formData.breed) {
+                const newHorse = {
+                    id: Date.now(),
+                    ...formData,
+                    age: parseInt(formData.age) || 0,
+                    vaccines: [],
+                    medications: [],
+                    expenses: []
+                };
+                state.horses.push(newHorse);
+                formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', notes: '' };
+                state.showForm = false;
+                saveData();
+            }
+        }
 
-function exportData(){
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "backup_haras.json";
-  a.click();
-}
+        function deleteHorse(id) {
+            if (confirm('Tem certeza que deseja excluir este cavalo?')) {
+                state.horses = state.horses.filter(h => h.id !== id);
+                if (state.selectedHorse?.id === id) state.selectedHorse = null;
+                saveData();
+            }
+        }
 
-function render(){
-  if(!logged) return loginScreen();
+        function addVaccine() {
+            if (state.selectedHorse && newVaccine.date && newVaccine.vaccine) {
+                state.horses = state.horses.map(h => {
+                    if (h.id === state.selectedHorse.id) {
+                        return { ...h, vaccines: [...h.vaccines, {...newVaccine}] };
+                    }
+                    return h;
+                });
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                newVaccine = { date: '', vaccine: '', nextDate: '' };
+                saveData();
+            }
+        }
 
-  if(state.selected !== null){
-    return renderDetail();
-  }
+        function addMedication() {
+            if (state.selectedHorse && newMedication.date && newMedication.medication) {
+                state.horses = state.horses.map(h => {
+                    if (h.id === state.selectedHorse.id) {
+                        return { ...h, medications: [...h.medications, {...newMedication}] };
+                    }
+                    return h;
+                });
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                newMedication = { date: '', medication: '', dosage: '', vet: '' };
+                saveData();
+            }
+        }
 
-  const list = data.map((h,i)=>`
-    <div class="bg-white p-4 rounded shadow">
-      <img src="${h.photo || ''}" class="w-full h-48 object-cover rounded mb-2"/>
-      <h3 class="font-bold">${h.name}</h3>
-      <button onclick="openHorse(${i})" class="bg-blue-600 text-white px-3 py-1 mt-2 rounded">Abrir</button>
-    </div>`).join("");
+        function addExpense() {
+            if (state.selectedHorse && newExpense.date && newExpense.description && newExpense.amount) {
+                state.horses = state.horses.map(h => {
+                    if (h.id === state.selectedHorse.id) {
+                        return { ...h, expenses: [...h.expenses, {...newExpense, amount: parseFloat(newExpense.amount)}] };
+                    }
+                    return h;
+                });
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                newExpense = { date: '', description: '', amount: '', category: 'Alimentação' };
+                saveData();
+            }
+        }
 
-  app.innerHTML = `
-  <div class="max-w-6xl mx-auto p-4">
-    <h1 class="text-3xl font-bold mb-4">Controle do Haras</h1>
-    <button onclick="exportData()" class="bg-purple-600 text-white px-4 py-2 mb-4 rounded">Exportar Dados</button>
-    <div class="grid md:grid-cols-3 gap-4">${list}</div>
-    <button onclick="addHorse()" class="bg-green-600 text-white px-4 py-2 mt-6 rounded">Novo Cavalo</button>
-  </div>`;
-}
+        function deleteItem(type, horseId, index) {
+            if (confirm(`Deseja excluir este(a) ${type}?`)) {
+                state.horses = state.horses.map(h => {
+                    if (h.id === horseId) {
+                        const items = [...h[type]];
+                        items.splice(index, 1);
+                        return { ...h, [type]: items };
+                    }
+                    return h;
+                });
+                state.selectedHorse = state.horses.find(h => h.id === horseId);
+                saveData();
+            }
+        }
 
-function addHorse(){
-  const name = prompt("Nome do cavalo:");
-  if(!name) return;
+        function getTotalExpenses(horse) {
+            return horse.expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        }
 
-  const horse = {
-    name,
-    photo:"",
-    trainings:[],
-    injuries:[],
-    farrier:[]
-  };
+        // Renderização
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (state.selectedHorse) {
+                app.innerHTML = renderHorseDetail();
+            } else {
+                app.innerHTML = renderHorseList();
+            }
+        }
 
-  data.push(horse);
-  save();
-  render();
-}
+        function renderHorseList() {
+            const horsesHTML = state.horses.map(horse => `
+                <div class="bg-gradient-to-br from-emerald-50 to-green-50 p-4 md:p-6 rounded-xl border-2 border-emerald-200 hover:shadow-lg transition fade-in">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl md:text-2xl font-bold text-emerald-800">${horse.name}</h3>
+                        <div class="flex gap-2">
+                            <button onclick="state.selectedHorse = state.horses.find(h => h.id === ${horse.id}); render();" 
+                                class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                ✏️
+                            </button>
+                            <button onclick="deleteHorse(${horse.id})" 
+                                class="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm md:text-base text-gray-700">
+                        <p><strong>Raça:</strong> ${horse.breed}</p>
+                        <p><strong>Idade:</strong> ${horse.age} anos</p>
+                        <p><strong>Sexo:</strong> ${horse.gender}</p>
+                        <p><strong>Pelagem:</strong> ${horse.color}</p>
+                        <p><strong>Registro:</strong> ${horse.registration}</p>
+                        <p class="text-emerald-700 font-semibold mt-3">
+                            💰 Total Gastos: R$ ${getTotalExpenses(horse).toFixed(2)}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
 
-function openHorse(i){
-  state.selected = i;
-  render();
-}
+            return `
+                <div class="max-w-7xl mx-auto p-4 md:p-6">
+                    <div class="bg-white rounded-2xl shadow-xl p-4 md:p-8">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h1 class="text-3xl md:text-4xl font-bold text-emerald-800 mb-2 flex items-center gap-3">
+                                    🐴 Controle de Haras
+                                </h1>
+                                <p class="text-gray-600">Gestão completa dos seus cavalos</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                ${state.saving ? 
+                                    '<div class="flex items-center gap-2 text-green-600 font-medium"><span class="text-2xl animate-pulse-slow">💾</span><span class="hidden md:inline">Salvando...</span></div>' :
+                                    '<div class="flex items-center gap-2 text-gray-500 text-sm"><span class="text-xl">💾</span><span class="hidden md:inline">Salvo ✓</span></div>'
+                                }
+                            </div>
+                        </div>
 
-function renderDetail(){
-  const h = data[state.selected];
+                        <div class="flex gap-2 mb-6 flex-wrap">
+                            <button onclick="state.showForm = !state.showForm; render();" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition flex items-center gap-2">
+                                ➕ Adicionar Cavalo
+                            </button>
+                            <button onclick="state.showBackupMenu = !state.showBackupMenu; render();" 
+                                class="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition flex items-center gap-2">
+                                🔒 Backup
+                            </button>
+                        </div>
 
-  app.innerHTML = `
-  <div class="max-w-4xl mx-auto p-4 bg-white shadow rounded">
-    <button onclick="back()" class="mb-4 bg-gray-500 text-white px-3 py-1 rounded">Voltar</button>
+                        ${state.showBackupMenu ? `
+                            <div class="bg-purple-50 p-4 md:p-6 rounded-xl mb-6 border-2 border-purple-200 fade-in">
+                                <h3 class="text-xl font-bold text-purple-800 mb-4 flex items-center gap-2">
+                                    🔒 Gerenciar Backup
+                                </h3>
+                                <p class="text-gray-700 mb-4 text-sm">
+                                    <strong>⚠️ IMPORTANTE:</strong> Seus dados ficam salvos apenas neste navegador. 
+                                    Faça backup regularmente para não perder suas informações!
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <button onclick="exportData()" 
+                                        class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center justify-center gap-2">
+                                        📥 Exportar Dados
+                                        <span class="text-xs block opacity-75">Salvar backup</span>
+                                    </button>
+                                    <button onclick="importData()" 
+                                        class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                                        📤 Importar Dados
+                                        <span class="text-xs block opacity-75">Restaurar backup</span>
+                                    </button>
+                                </div>
+                                <button onclick="state.showBackupMenu = false; render();" 
+                                    class="w-full mt-3 px-4 py-2 bg-gray-400 text-white rounded-lg font-medium hover:bg-gray-500 transition">
+                                    Fechar
+                                </button>
+                                <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                    <p class="text-sm text-blue-800">
+                                        💡 <strong>Dica:</strong> Salve o arquivo de backup no Google Drive, WhatsApp ou email para ter uma cópia segura!
+                                    </p>
+                                </div>
+                            </div>
+                        ` : ''}
 
-    <input type="file" accept="image/*" onchange="setPhoto(event)" class="mb-4"/>
-    <img src="${h.photo || ''}" class="w-full h-60 object-cover rounded mb-4"/>
+                        ${state.showForm ? `
+                            <div class="bg-blue-50 p-4 md:p-6 rounded-xl mb-6 border-2 border-blue-200 fade-in">
+                                <h3 class="text-xl font-bold text-blue-800 mb-4">Novo Cavalo</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input type="text" placeholder="Nome *" id="horseName" value="${formData.name}"
+                                        class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <input type="text" placeholder="Raça *" id="horseBreed" value="${formData.breed}"
+                                        class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <input type="number" placeholder="Idade" id="horseAge" value="${formData.age}"
+                                        class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <select id="horseGender" class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        <option ${formData.gender === 'Macho' ? 'selected' : ''}>Macho</option>
+                                        <option ${formData.gender === 'Fêmea' ? 'selected' : ''}>Fêmea</option>
+                                    </select>
+                                    <input type="text" placeholder="Pelagem" id="horseColor" value="${formData.color}"
+                                        class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <input type="text" placeholder="Registro" id="horseRegistration" value="${formData.registration}"
+                                        class="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <textarea placeholder="Observações" id="horseNotes" rows="3"
+                                    class="w-full mt-4 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">${formData.notes}</textarea>
+                                <div class="flex gap-3 mt-4">
+                                    <button onclick="
+                                        formData.name = document.getElementById('horseName').value;
+                                        formData.breed = document.getElementById('horseBreed').value;
+                                        formData.age = document.getElementById('horseAge').value;
+                                        formData.gender = document.getElementById('horseGender').value;
+                                        formData.color = document.getElementById('horseColor').value;
+                                        formData.registration = document.getElementById('horseRegistration').value;
+                                        formData.notes = document.getElementById('horseNotes').value;
+                                        addHorse();
+                                    " class="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition">
+                                        Salvar
+                                    </button>
+                                    <button onclick="state.showForm = false; render();" 
+                                        class="px-6 py-2 bg-gray-400 text-white rounded-lg font-medium hover:bg-gray-500 transition">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        ` : ''}
 
-    <h2 class="text-2xl font-bold mb-4">${h.name}</h2>
+                        ${state.horses.length === 0 ? `
+                            <div class="text-center py-12 fade-in">
+                                <div class="text-6xl mb-4">🐴</div>
+                                <p class="text-xl text-gray-600 mb-4">Nenhum cavalo cadastrado ainda</p>
+                                <button onclick="state.showForm = true; render();"
+                                    class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">
+                                    Cadastrar Primeiro Cavalo
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                                ${horsesHTML}
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        }
 
-    ${section("Treinos", h.trainings)}
-    ${section("Lesões", h.injuries)}
-    ${section("Ferragem", h.farrier)}
+        function renderHorseDetail() {
+            const horse = state.selectedHorse;
+            
+            return `
+                <div class="max-w-7xl mx-auto p-4 md:p-6">
+                    <div class="bg-white rounded-2xl shadow-xl p-4 md:p-8">
+                        <div class="flex justify-between items-center bg-emerald-600 text-white p-4 md:p-6 rounded-xl mb-6 fade-in">
+                            <div>
+                                <h2 class="text-2xl md:text-3xl font-bold">${horse.name}</h2>
+                                <p class="text-emerald-100">${horse.breed} • ${horse.age} anos</p>
+                            </div>
+                            <button onclick="state.selectedHorse = null; render();"
+                                class="px-4 py-2 bg-white text-emerald-600 rounded-lg font-medium hover:bg-emerald-50 transition">
+                                ← Voltar
+                            </button>
+                        </div>
 
-    <button onclick="addItem('trainings')" class="bg-green-500 text-white px-3 py-1 mt-2 rounded">+ Treino</button>
-    <button onclick="addItem('injuries')" class="bg-red-500 text-white px-3 py-1 mt-2 rounded">+ Lesão</button>
-    <button onclick="addItem('farrier')" class="bg-yellow-500 text-white px-3 py-1 mt-2 rounded">+ Ferragem</button>
-  </div>`;
-}
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                            ${renderVaccines(horse)}
+                            ${renderMedications(horse)}
+                            ${renderExpenses(horse)}
+                            ${renderNotes(horse)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-function section(name, arr){
-  const html = arr.map(e=>`<div class="border p-2 mb-1 text-sm">${e}</div>`).join("");
-  return `<h3 class="font-bold mt-4">${name}</h3>${html}`;
-}
+        function renderVaccines(horse) {
+            const vaccinesHTML = horse.vaccines.map((v, i) => `
+                <div class="bg-white p-3 rounded-lg relative group fade-in">
+                    <button onclick="deleteItem('vaccines', ${horse.id}, ${i})"
+                        class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition text-xs">
+                        🗑️
+                    </button>
+                    <p class="font-semibold text-purple-800">${v.vaccine}</p>
+                    <p class="text-sm text-gray-600">Aplicada: ${v.date}</p>
+                    ${v.nextDate ? `<p class="text-sm text-gray-600">Próxima: ${v.nextDate}</p>` : ''}
+                </div>
+            `).join('');
 
-function addItem(type){
-  const txt = prompt("Descreva:");
-  if(!txt) return;
-  data[state.selected][type].push(txt);
-  save();
-  render();
-}
+            return `
+                <div class="bg-purple-50 p-4 md:p-6 rounded-xl border-2 border-purple-200 fade-in">
+                    <h3 class="text-lg md:text-xl font-bold text-purple-800 mb-4 flex items-center gap-2">
+                        📅 Vacinas
+                    </h3>
+                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${vaccinesHTML}</div>
+                    <div class="space-y-2">
+                        <input type="date" id="vaccineDate" value="${newVaccine.date}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <input type="text" placeholder="Nome da vacina" id="vaccineName" value="${newVaccine.vaccine}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <input type="date" id="vaccineNext" value="${newVaccine.nextDate}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <button onclick="
+                            newVaccine.date = document.getElementById('vaccineDate').value;
+                            newVaccine.vaccine = document.getElementById('vaccineName').value;
+                            newVaccine.nextDate = document.getElementById('vaccineNext').value;
+                            addVaccine();
+                        " class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
+                            Adicionar Vacina
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
-function setPhoto(e){
-  const file = e.target.files[0];
-  const reader = new FileReader();
-  reader.onload = () => {
-    data[state.selected].photo = reader.result;
-    save();
-    render();
-  };
-  reader.readAsDataURL(file);
-}
+        function renderMedications(horse) {
+            const medsHTML = horse.medications.map((m, i) => `
+                <div class="bg-white p-3 rounded-lg relative group fade-in">
+                    <button onclick="deleteItem('medications', ${horse.id}, ${i})"
+                        class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition text-xs">
+                        🗑️
+                    </button>
+                    <p class="font-semibold text-pink-800">${m.medication}</p>
+                    <p class="text-sm text-gray-600">Data: ${m.date}</p>
+                    <p class="text-sm text-gray-600">Dosagem: ${m.dosage}</p>
+                    <p class="text-sm text-gray-600">Veterinário: ${m.vet}</p>
+                </div>
+            `).join('');
 
-function back(){
-  state.selected = null;
-  render();
-}
+            return `
+                <div class="bg-pink-50 p-4 md:p-6 rounded-xl border-2 border-pink-200 fade-in">
+                    <h3 class="text-lg md:text-xl font-bold text-pink-800 mb-4 flex items-center gap-2">
+                        💊 Medicações
+                    </h3>
+                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${medsHTML}</div>
+                    <div class="space-y-2">
+                        <input type="date" id="medDate" value="${newMedication.date}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <input type="text" placeholder="Medicação" id="medName" value="${newMedication.medication}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <input type="text" placeholder="Dosagem" id="medDosage" value="${newMedication.dosage}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <input type="text" placeholder="Veterinário" id="medVet" value="${newMedication.vet}"
+                            class="w-full p-2 border rounded-lg text-sm">
+                        <button onclick="
+                            newMedication.date = document.getElementById('medDate').value;
+                            newMedication.medication = document.getElementById('medName').value;
+                            newMedication.dosage = document.getElementById('medDosage').value;
+                            newMedication.vet = document.getElementById('medVet').value;
+                            addMedication();
+                        " class="w-full px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition text-sm">
+                            Adicionar Medicação
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
 
-render();
-</script>
+        function renderExpenses(horse) {
+            const expensesHTML = horse.expenses.map((e, i) => `
+                <div class="bg-white p-3 rounded-lg flex justify-between items-center relative group fade-in">
+                    <div class="flex-1 pr-2">
+                        <p class="font-semibold text-amber-800">${e.description}</p>
+                        <p class="text-sm text-gray-600">Data: ${e.date} • ${e.category}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <p class="text-lg font-bold text-amber-700">R$ ${e.amount.toFixed(2)}</p>
+                        <button onclick="deleteItem('expenses', ${horse.id}, ${i})"
+                            class="p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition text-xs">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="bg-amber-50 p-4 md:p-6 rounded-xl border-2 border-amber-200 lg:col-span-2 fade-in">
+                    <h3 class="text-lg md:text-xl font-bold text-amber-800 mb-4 flex items-center gap-2">
+                        💰 Gastos
+                    </h3>
+                    <div class="mb-4">
+                        <p class="text-xl md:text-2xl font-bold text-amber-800">
+                            Total: R$ ${getTotalExpenses(horse).toFixed(2)}
+                        </p>
+                    </div>
+                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${expensesHTML}</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input type="date" id="expDate" value="${newExpense.date}"
+                            class="p-2 border rounded-lg text-sm">
+                        <input type="text" placeholder="Descrição" id="expDesc" value="${newExpense.description}"
+                            class="p-2 border rounded-lg text-sm">
+                        <input type="number" step="0.01" placeholder="Valor (R$)" id="expAmount" value="${newExpense.amount}"
+                            class="p-2 border rounded-lg text-sm">
+                        <select id="expCategory" class="p-2 border rounded-lg text-sm">
+                            <option ${newExpense.category === 'Alimentação' ? 'selected' : ''}>Alimentação</option>
+                            <option ${newExpense.category === 'Veterinário' ? 'selected' : ''}>Veterinário</option>
+                            <option ${newExpense.category === 'Manutenção' ? 'selected' : ''}>Manutenção</option>
+                            <option ${newExpense.category === 'Medicamentos' ? 'selected' : ''}>Medicamentos</option>
+                            <option ${newExpense.category === 'Outros' ? 'selected' : ''}>Outros</option>
+                        </select>
+                    </div>
+                    <button onclick="
+                        newExpense.date = document.getElementById('expDate').value;
+                        newExpense.description = document.getElementById('expDesc').value;
+                        newExpense.amount = document.getElementById('expAmount').value;
+                        newExpense.category = document.getElementById('expCategory').value;
+                        addExpense();
+                    " class="w-full mt-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition text-sm">
+                        Adicionar Gasto
+                    </button>
+                </div>
+            `;
+        }
+
+        function renderNotes(horse) {
+            return `
+                <div class="bg-blue-50 p-4 md:p-6 rounded-xl border-2 border-blue-200 lg:col-span-2 fade-in">
+                    <h3 class="text-lg md:text-xl font-bold text-blue-800 mb-4 flex items-center gap-2">
+                        📝 Observações
+                    </h3>
+                    <p class="text-gray-700 whitespace-pre-wrap text-sm md:text-base">
+                        ${horse.notes || 'Nenhuma observação registrada.'}
+                    </p>
+                </div>
+            `;
+        }
+
+        // Inicializar aplicação
+        loadData();
+        render();
+
+        // Registrar Service Worker para funcionar offline
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('data:text/javascript;base64,').catch(() => {
+                    console.log('Service Worker não disponível');
+                });
+            });
+        }
+    </script>
 </body>
 </html>
