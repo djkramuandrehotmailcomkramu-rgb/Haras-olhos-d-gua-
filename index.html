@@ -1,4 +1,4 @@
-                     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -51,7 +51,12 @@
             selectedHorse: null,
             showForm: false,
             loading: true,
-            saving: false
+            saving: false,
+            activeView: 'horses', // 'horses' ou 'expenses'
+            expenseFilter: {
+                horseId: 'all',
+                month: new Date().toISOString().slice(0, 7)
+            }
         };
 
         let formData = {
@@ -201,6 +206,63 @@
                 alert('✅ Cavalo adicionado com sucesso!');
             } catch (error) {
                 alert('❌ Erro ao adicionar cavalo: ' + error.message);
+            }
+
+            state.saving = false;
+            render();
+        };
+
+        // Editar cavalo
+        window.editHorse = function(horse) {
+            formData = {
+                id: horse.id,
+                name: horse.name,
+                breed: horse.breed,
+                age: horse.age,
+                gender: horse.gender,
+                color: horse.color,
+                registration: horse.registration,
+                photo: horse.photo,
+                notes: horse.notes
+            };
+            state.showForm = true;
+            state.selectedHorse = null;
+            render();
+        };
+
+        // Atualizar cavalo
+        window.updateHorse = async function() {
+            if (!formData.name || !formData.breed) {
+                alert('⚠️ Preencha ao menos o Nome e a Raça!');
+                return;
+            }
+
+            state.saving = true;
+            render();
+
+            try {
+                const { error } = await supabase
+                    .from('horses')
+                    .update({
+                        name: formData.name,
+                        breed: formData.breed,
+                        age: parseInt(formData.age) || 0,
+                        gender: formData.gender,
+                        color: formData.color,
+                        registration: formData.registration,
+                        photo: formData.photo,
+                        notes: formData.notes
+                    })
+                    .eq('id', formData.id);
+
+                if (error) throw error;
+
+                formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' };
+                state.showForm = false;
+                await loadHorses();
+                alert('✅ Cavalo atualizado com sucesso!');
+            } catch (error) {
+                alert('❌ Erro ao atualizar: ' + error.message);
             }
 
             state.saving = false;
@@ -399,14 +461,42 @@
         window.handleImageUpload = function(event) {
             const file = event.target.files[0];
             if (file) {
-                if (file.size > 2000000) {
-                    alert('⚠️ Imagem muito grande! Máximo 2MB.');
+                if (file.size > 5000000) {
+                    alert('⚠️ Imagem muito grande! Máximo 5MB.');
                     return;
                 }
+                
+                // Comprimir imagem se for maior que 1MB
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    formData.photo = e.target.result;
-                    render();
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // Redimensionar se for muito grande
+                        const maxSize = 1200;
+                        if (width > maxSize || height > maxSize) {
+                            if (width > height) {
+                                height = (height / width) * maxSize;
+                                width = maxSize;
+                            } else {
+                                width = (width / height) * maxSize;
+                                height = maxSize;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Comprimir para JPEG com qualidade 0.8
+                        formData.photo = canvas.toDataURL('image/jpeg', 0.8);
+                        render();
+                    };
+                    img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             }
@@ -462,6 +552,8 @@
 
             if (state.selectedHorse) {
                 app.innerHTML = renderHorseDetail();
+            } else if (state.activeView === 'expenses') {
+                app.innerHTML = renderExpensesView();
             } else {
                 app.innerHTML = renderHorseList();
             }
@@ -525,7 +617,8 @@
                             <p class="text-emerald-600 font-semibold">${horse.breed}</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="selectHorse(${horse.id})" class="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700">✏️</button>
+                            <button onclick="editHorse(${JSON.stringify(horse).replace(/"/g, '&quot;')})" class="p-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700">📝</button>
+                            <button onclick="selectHorse(${horse.id})" class="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700">👁️</button>
                             <button onclick="deleteHorse(${horse.id})" class="p-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700">🗑️</button>
                         </div>
                     </div>
@@ -562,50 +655,71 @@
                             </button>
                         </div>
 
-                        <button onclick="toggleForm()" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold shadow-lg">
-                            ➕ Novo Cavalo
-                        </button>
+                        <div class="flex gap-3 flex-wrap">
+                            <button onclick="setActiveView('horses')" 
+                                class="px-6 py-3 ${state.activeView === 'horses' ? 'bg-emerald-600' : 'bg-gray-400'} text-white rounded-xl font-semibold shadow-lg">
+                                🐴 Cavalos
+                            </button>
+                            <button onclick="setActiveView('expenses')" 
+                                class="px-6 py-3 ${state.activeView === 'expenses' ? 'bg-emerald-600' : 'bg-gray-400'} text-white rounded-xl font-semibold shadow-lg">
+                                💰 Gastos
+                            </button>
+                            ${state.activeView === 'horses' ? `
+                                <button onclick="toggleForm()" class="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-lg">
+                                    ➕ Novo Cavalo
+                                </button>
+                            ` : ''}
+                        </div>
 
                         ${state.showForm ? `
                             <div class="bg-blue-50 p-6 rounded-2xl mt-6 border-2 border-blue-200 fade-in">
-                                <h3 class="text-2xl font-bold text-blue-900 mb-6">✨ Novo Cavalo</h3>
+                                <h3 class="text-2xl font-bold text-blue-900 mb-6">✨ ${formData.id ? 'Editar' : 'Novo'} Cavalo</h3>
                                 
                                 ${formData.photo ? `
                                     <div class="mb-4 text-center">
                                         <img src="${formData.photo}" class="image-preview mx-auto shadow-lg">
-                                        <button onclick="removePhoto()" class="mt-2 text-sm text-red-600">🗑️ Remover foto</button>
+                                        <div class="flex gap-2 justify-center mt-2">
+                                            <label class="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                                                📷 Trocar Foto
+                                                <input type="file" accept="image/*" onchange="handleImageUpload(event)" class="hidden">
+                                            </label>
+                                            <button onclick="removePhoto()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                                                🗑️ Remover
+                                            </button>
+                                        </div>
                                     </div>
                                 ` : `
                                     <div class="mb-6">
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">📷 Foto</label>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">📷 Foto do Cavalo</label>
                                         <input type="file" accept="image/*" onchange="handleImageUpload(event)"
-                                            class="w-full p-3 border-2 border-dashed border-blue-300 rounded-xl bg-white">
+                                            class="w-full p-3 border-2 border-dashed border-blue-300 rounded-xl bg-white hover:border-blue-500 cursor-pointer">
+                                        <p class="text-xs text-gray-500 mt-1">Máximo 5MB - A imagem será otimizada automaticamente</p>
                                     </div>
                                 `}
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <input type="text" placeholder="Nome *" oninput="updateFormData('name', this.value)" 
+                                    <input type="text" placeholder="Nome *" value="${formData.name}" oninput="updateFormData('name', this.value)" 
                                         class="p-3 border-2 rounded-xl">
-                                    <input type="text" placeholder="Raça *" oninput="updateFormData('breed', this.value)" 
+                                    <input type="text" placeholder="Raça *" value="${formData.breed}" oninput="updateFormData('breed', this.value)" 
                                         class="p-3 border-2 rounded-xl">
-                                    <input type="number" placeholder="Idade" oninput="updateFormData('age', this.value)" 
+                                    <input type="number" placeholder="Idade" value="${formData.age}" oninput="updateFormData('age', this.value)" 
                                         class="p-3 border-2 rounded-xl">
                                     <select onchange="updateFormData('gender', this.value)" class="p-3 border-2 rounded-xl">
-                                        <option>Macho</option>
-                                        <option>Fêmea</option>
+                                        <option ${formData.gender === 'Macho' ? 'selected' : ''}>Macho</option>
+                                        <option ${formData.gender === 'Fêmea' ? 'selected' : ''}>Fêmea</option>
                                     </select>
-                                    <input type="text" placeholder="Pelagem" oninput="updateFormData('color', this.value)" 
+                                    <input type="text" placeholder="Pelagem" value="${formData.color}" oninput="updateFormData('color', this.value)" 
                                         class="p-3 border-2 rounded-xl">
-                                    <input type="text" placeholder="Registro" oninput="updateFormData('registration', this.value)" 
+                                    <input type="text" placeholder="Registro" value="${formData.registration}" oninput="updateFormData('registration', this.value)" 
                                         class="p-3 border-2 rounded-xl">
                                 </div>
                                 <textarea placeholder="Observações" rows="3" oninput="updateFormData('notes', this.value)"
-                                    class="w-full p-3 border-2 rounded-xl"></textarea>
+                                    class="w-full p-3 border-2 rounded-xl">${formData.notes}</textarea>
                                 <div class="flex gap-3 mt-6">
-                                    <button onclick="addHorse()" class="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold">
+                                    <button onclick="${formData.id ? 'updateHorse()' : 'addHorse()'}" class="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700">
                                         ${state.saving ? '⏳ Salvando...' : '✓ Salvar'}
                                     </button>
-                                    <button onclick="toggleForm()" class="px-6 py-3 bg-gray-400 text-white rounded-xl">✕</button>
+                                    <button onclick="formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' }; toggleForm()" class="px-6 py-3 bg-gray-400 text-white rounded-xl hover:bg-gray-500">✕</button>
                                 </div>
                             </div>
                         ` : ''}
