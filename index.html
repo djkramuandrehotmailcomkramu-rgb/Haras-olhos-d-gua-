@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Sistema Profissional de Controle de Haras - Versão Cloud">
+    <meta name="description" content="Sistema Profissional de Controle de Haras">
     <meta name="theme-color" content="#059669">
     <title>JCA Haras Control PRO 🐴</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23059669' width='100' height='100' rx='20'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white' font-weight='bold' font-family='Arial'>JCA</text></svg>">
@@ -35,13 +34,32 @@
             object-fit: cover;
             border-radius: 12px;
         }
+        .notification-badge {
+            position: relative;
+            display: inline-block;
+        }
+        .notification-badge::after {
+            content: attr(data-count);
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 min-h-screen">
     <div id="app"></div>
 
     <script>
-        // Configuração do Supabase
         const SUPABASE_URL = 'https://wfnpmdwlpccrppkbvdta.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndmbnBtZHdscGNjcnBwa2J2ZHRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyNzc0MjMsImV4cCI6MjA4MDg1MzQyM30.232e1z9ssCk64xyOmU80cwFqF2bny9h_8cYoqA4fwY8';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -49,15 +67,13 @@
         let state = {
             user: null,
             horses: [],
+            generalExpenses: [],
             selectedHorse: null,
             showForm: false,
             loading: true,
             saving: false,
-            activeView: 'horses', // 'horses' ou 'expenses'
-            expenseFilter: {
-                horseId: 'all',
-                month: new Date().toISOString().slice(0, 7)
-            }
+            currentView: 'horses',
+            notifications: []
         };
 
         let formData = {
@@ -65,18 +81,78 @@
             color: '', registration: '', photo: '', notes: ''
         };
 
-        // Verificar sessão ao carregar
         async function init() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 state.user = session.user;
                 await loadHorses();
+                await loadGeneralExpenses();
+                checkNotifications();
             }
             state.loading = false;
             render();
         }
 
-        // Login
+        function checkNotifications() {
+            state.notifications = [];
+            const today = new Date();
+            const in30Days = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+            state.horses.forEach(horse => {
+                // Verificar vacinas
+                horse.vaccines?.forEach(v => {
+                    if (v.next_date) {
+                        const nextDate = new Date(v.next_date);
+                        if (nextDate <= in30Days && nextDate >= today) {
+                            state.notifications.push({
+                                type: 'vaccine',
+                                horse: horse.name,
+                                message: `Vacina ${v.vaccine} vence em ${Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24))} dias`
+                            });
+                        }
+                    }
+                });
+
+                // Verificar vermífugo
+                horse.dewormings?.forEach(d => {
+                    if (d.next_date) {
+                        const nextDate = new Date(d.next_date);
+                        if (nextDate <= in30Days && nextDate >= today) {
+                            state.notifications.push({
+                                type: 'deworming',
+                                horse: horse.name,
+                                message: `Vermífugo vence em ${Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24))} dias`
+                            });
+                        }
+                    }
+                });
+
+                // Verificar ferrageamento
+                horse.shoeing?.forEach(s => {
+                    if (s.next_date) {
+                        const nextDate = new Date(s.next_date);
+                        if (nextDate <= in30Days && nextDate >= today) {
+                            state.notifications.push({
+                                type: 'shoeing',
+                                horse: horse.name,
+                                message: `Ferrageamento vence em ${Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24))} dias`
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
+        window.showNotifications = function() {
+            if (state.notifications.length === 0) {
+                alert('✅ Nenhuma notificação pendente!');
+                return;
+            }
+
+            const messages = state.notifications.map(n => `${n.horse}: ${n.message}`).join('\n');
+            alert('🔔 NOTIFICAÇÕES:\n\n' + messages);
+        };
+
         window.handleLogin = async function() {
             const email = document.getElementById('loginEmail').value;
             const password = document.getElementById('loginPassword').value;
@@ -87,22 +163,18 @@
             }
 
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                });
-
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-
                 state.user = data.user;
                 await loadHorses();
+                await loadGeneralExpenses();
+                checkNotifications();
                 render();
             } catch (error) {
                 alert('❌ Erro no login: ' + error.message);
             }
         };
 
-        // Registro
         window.handleSignup = async function() {
             const email = document.getElementById('signupEmail').value;
             const password = document.getElementById('signupPassword').value;
@@ -112,72 +184,114 @@
                 alert('⚠️ Preencha todos os campos!');
                 return;
             }
-
             if (password !== confirmPassword) {
                 alert('⚠️ As senhas não coincidem!');
                 return;
             }
-
             if (password.length < 6) {
                 alert('⚠️ A senha deve ter pelo menos 6 caracteres!');
                 return;
             }
 
             try {
-                const { data, error } = await supabase.auth.signUp({
-                    email: email,
-                    password: password
-                });
-
+                const { error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
-
-                alert('✅ Conta criada com sucesso! Faça login para continuar.');
+                alert('✅ Conta criada! Faça login para continuar.');
                 document.getElementById('signupEmail').value = '';
                 document.getElementById('signupPassword').value = '';
                 document.getElementById('signupConfirm').value = '';
             } catch (error) {
-                alert('❌ Erro ao criar conta: ' + error.message);
+                alert('❌ Erro: ' + error.message);
             }
         };
 
-        // Logout
         window.handleLogout = async function() {
             if (confirm('Deseja sair?')) {
                 await supabase.auth.signOut();
                 state.user = null;
                 state.horses = [];
+                state.generalExpenses = [];
                 state.selectedHorse = null;
+                state.notifications = [];
                 render();
             }
         };
 
-        // Carregar cavalos
         async function loadHorses() {
             try {
                 const { data, error } = await supabase
                     .from('horses')
-                    .select(`
-                        *,
-                        vaccines(*),
-                        medications(*),
-                        expenses(*),
-                        shoeing(*),
-                        dewormings(*)
-                    `)
+                    .select('*, vaccines(*), medications(*), dewormings(*), shoeing(*), injuries(*)')
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
                 state.horses = data || [];
             } catch (error) {
-                console.error('Erro ao carregar cavalos:', error);
-                alert('Erro ao carregar dados');
+                console.error('Erro:', error);
             }
         }
 
-        // Adicionar cavalo
+        async function loadGeneralExpenses() {
+            try {
+                const { data, error } = await supabase
+                    .from('general_expenses')
+                    .select('*')
+                    .order('date', { ascending: false });
+
+                if (error) throw error;
+                state.generalExpenses = data || [];
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+
+        window.changeView = function(view) {
+            state.currentView = view;
+            state.selectedHorse = null;
+            state.showForm = false;
+            render();
+        };
+
+        window.handleImageUpload = function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 5000000) {
+                    alert('⚠️ Imagem muito grande! Máximo 5MB.');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const maxSize = 1200;
+                        if (width > maxSize || height > maxSize) {
+                            if (width > height) {
+                                height = (height / width) * maxSize;
+                                width = maxSize;
+                            } else {
+                                width = (width / height) * maxSize;
+                                height = maxSize;
+                            }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        formData.photo = canvas.toDataURL('image/jpeg', 0.8);
+                        render();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
         window.addHorse = async function() {
             if (!formData.name || !formData.breed) {
-                alert('⚠️ Preencha ao menos o Nome e a Raça!');
+                alert('⚠️ Preencha Nome e Raça!');
                 return;
             }
 
@@ -185,36 +299,32 @@
             render();
 
             try {
-                const { data, error } = await supabase
-                    .from('horses')
-                    .insert([{
-                        name: formData.name,
-                        breed: formData.breed,
-                        age: parseInt(formData.age) || 0,
-                        gender: formData.gender,
-                        color: formData.color,
-                        registration: formData.registration,
-                        photo: formData.photo,
-                        notes: formData.notes,
-                        user_id: state.user.id
-                    }])
-                    .select();
+                const { error } = await supabase.from('horses').insert([{
+                    name: formData.name,
+                    breed: formData.breed,
+                    age: parseInt(formData.age) || 0,
+                    gender: formData.gender,
+                    color: formData.color,
+                    registration: formData.registration,
+                    photo: formData.photo,
+                    notes: formData.notes,
+                    user_id: state.user.id
+                }]);
 
                 if (error) throw error;
 
                 formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' };
                 state.showForm = false;
                 await loadHorses();
-                alert('✅ Cavalo adicionado com sucesso!');
+                alert('✅ Cavalo adicionado!');
             } catch (error) {
-                alert('❌ Erro ao adicionar cavalo: ' + error.message);
+                alert('❌ Erro: ' + error.message);
             }
 
             state.saving = false;
             render();
         };
 
-        // Editar cavalo
         window.editHorse = function(horse) {
             formData = {
                 id: horse.id,
@@ -232,10 +342,9 @@
             render();
         };
 
-        // Atualizar cavalo
         window.updateHorse = async function() {
             if (!formData.name || !formData.breed) {
-                alert('⚠️ Preencha ao menos o Nome e a Raça!');
+                alert('⚠️ Preencha Nome e Raça!');
                 return;
             }
 
@@ -243,264 +352,43 @@
             render();
 
             try {
-                const { error } = await supabase
-                    .from('horses')
-                    .update({
-                        name: formData.name,
-                        breed: formData.breed,
-                        age: parseInt(formData.age) || 0,
-                        gender: formData.gender,
-                        color: formData.color,
-                        registration: formData.registration,
-                        photo: formData.photo,
-                        notes: formData.notes
-                    })
-                    .eq('id', formData.id);
+                const { error } = await supabase.from('horses').update({
+                    name: formData.name,
+                    breed: formData.breed,
+                    age: parseInt(formData.age) || 0,
+                    gender: formData.gender,
+                    color: formData.color,
+                    registration: formData.registration,
+                    photo: formData.photo,
+                    notes: formData.notes
+                }).eq('id', formData.id);
 
                 if (error) throw error;
 
                 formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' };
                 state.showForm = false;
                 await loadHorses();
-                alert('✅ Cavalo atualizado com sucesso!');
+                alert('✅ Atualizado!');
             } catch (error) {
-                alert('❌ Erro ao atualizar: ' + error.message);
+                alert('❌ Erro: ' + error.message);
             }
 
             state.saving = false;
             render();
         };
 
-        // Deletar cavalo
         window.deleteHorse = async function(id) {
-            if (!confirm('Tem certeza que deseja excluir este cavalo?')) return;
+            if (!confirm('Excluir cavalo?')) return;
 
             try {
-                const { error } = await supabase
-                    .from('horses')
-                    .delete()
-                    .eq('id', id);
-
+                const { error } = await supabase.from('horses').delete().eq('id', id);
                 if (error) throw error;
-
                 await loadHorses();
                 if (state.selectedHorse?.id === id) state.selectedHorse = null;
-                alert('✅ Cavalo excluído!');
-                render();
-            } catch (error) {
-                alert('❌ Erro ao excluir: ' + error.message);
-            }
-        };
-
-        // Adicionar vacina
-        window.addVaccine = async function() {
-            const date = document.getElementById('vaccineDate').value;
-            const vaccine = document.getElementById('vaccineName').value;
-            const nextDate = document.getElementById('vaccineNext').value;
-
-            if (!date || !vaccine) {
-                alert('⚠️ Preencha ao menos a data e o nome da vacina!');
-                return;
-            }
-
-            try {
-                const { error } = await supabase
-                    .from('vaccines')
-                    .insert([{
-                        horse_id: state.selectedHorse.id,
-                        date: date,
-                        vaccine: vaccine,
-                        next_date: nextDate || null
-                    }]);
-
-                if (error) throw error;
-
-                document.getElementById('vaccineDate').value = '';
-                document.getElementById('vaccineName').value = '';
-                document.getElementById('vaccineNext').value = '';
-                
-                await loadHorses();
-                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                alert('✅ Excluído!');
                 render();
             } catch (error) {
                 alert('❌ Erro: ' + error.message);
-            }
-        };
-
-        // Adicionar medicação
-        window.addMedication = async function() {
-            const date = document.getElementById('medDate').value;
-            const medication = document.getElementById('medName').value;
-            const dosage = document.getElementById('medDosage').value;
-            const vet = document.getElementById('medVet').value;
-
-            if (!date || !medication) {
-                alert('⚠️ Preencha ao menos a data e a medicação!');
-                return;
-            }
-
-            try {
-                const { error } = await supabase
-                    .from('medications')
-                    .insert([{
-                        horse_id: state.selectedHorse.id,
-                        date: date,
-                        medication: medication,
-                        dosage: dosage,
-                        vet: vet
-                    }]);
-
-                if (error) throw error;
-
-                document.getElementById('medDate').value = '';
-                document.getElementById('medName').value = '';
-                document.getElementById('medDosage').value = '';
-                document.getElementById('medVet').value = '';
-                
-                await loadHorses();
-                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                render();
-            } catch (error) {
-                alert('❌ Erro: ' + error.message);
-            }
-        };
-
-        // Adicionar gasto
-        window.addExpense = async function() {
-            const date = document.getElementById('expDate').value;
-            const description = document.getElementById('expDesc').value;
-            const amount = document.getElementById('expAmount').value;
-            const category = document.getElementById('expCategory').value;
-
-            if (!date || !description || !amount) {
-                alert('⚠️ Preencha todos os campos!');
-                return;
-            }
-
-            try {
-                const { error } = await supabase
-                    .from('expenses')
-                    .insert([{
-                        horse_id: state.selectedHorse.id,
-                        date: date,
-                        description: description,
-                        amount: parseFloat(amount),
-                        category: category
-                    }]);
-
-                if (error) throw error;
-
-                document.getElementById('expDate').value = '';
-                document.getElementById('expDesc').value = '';
-                document.getElementById('expAmount').value = '';
-                
-                await loadHorses();
-                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                render();
-            } catch (error) {
-                alert('❌ Erro: ' + error.message);
-            }
-        };
-
-        // Adicionar ferrageamento
-        window.addShoeing = async function() {
-            const date = document.getElementById('shoeDate').value;
-            const nextDate = document.getElementById('shoeNext').value;
-            const farrier = document.getElementById('shoeFarrier').value;
-            const notes = document.getElementById('shoeNotes').value;
-
-            if (!date) {
-                alert('⚠️ Preencha a data!');
-                return;
-            }
-
-            try {
-                const { error } = await supabase
-                    .from('shoeing')
-                    .insert([{
-                        horse_id: state.selectedHorse.id,
-                        date: date,
-                        next_date: nextDate || null,
-                        farrier: farrier,
-                        notes: notes
-                    }]);
-
-                if (error) throw error;
-
-                document.getElementById('shoeDate').value = '';
-                document.getElementById('shoeNext').value = '';
-                document.getElementById('shoeFarrier').value = '';
-                document.getElementById('shoeNotes').value = '';
-                
-                await loadHorses();
-                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                render();
-            } catch (error) {
-                alert('❌ Erro: ' + error.message);
-            }
-        };
-
-        // Deletar item
-        window.deleteItem = async function(table, id) {
-            if (!confirm('Deseja excluir?')) return;
-
-            try {
-                const { error } = await supabase
-                    .from(table)
-                    .delete()
-                    .eq('id', id);
-
-                if (error) throw error;
-
-                await loadHorses();
-                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
-                render();
-            } catch (error) {
-                alert('❌ Erro: ' + error.message);
-            }
-        };
-
-        window.handleImageUpload = function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                if (file.size > 5000000) {
-                    alert('⚠️ Imagem muito grande! Máximo 5MB.');
-                    return;
-                }
-                
-                // Comprimir imagem se for maior que 1MB
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        
-                        // Redimensionar se for muito grande
-                        const maxSize = 1200;
-                        if (width > maxSize || height > maxSize) {
-                            if (width > height) {
-                                height = (height / width) * maxSize;
-                                width = maxSize;
-                            } else {
-                                width = (width / height) * maxSize;
-                                height = maxSize;
-                            }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // Comprimir para JPEG com qualidade 0.8
-                        formData.photo = canvas.toDataURL('image/jpeg', 0.8);
-                        render();
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
             }
         };
 
@@ -516,6 +404,9 @@
 
         window.toggleForm = function() {
             state.showForm = !state.showForm;
+            if (!state.showForm) {
+                formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' };
+            }
             render();
         };
 
@@ -528,9 +419,211 @@
             formData[field] = value;
         };
 
-        function getTotalExpenses(horse) {
-            return horse.expenses?.reduce((sum, exp) => sum + parseFloat(exp.amount), 0) || 0;
-        }
+        window.addVaccine = async function() {
+            const date = document.getElementById('vaccineDate').value;
+            const vaccine = document.getElementById('vaccineName').value;
+            const nextDate = document.getElementById('vaccineNext').value;
+
+            if (!date || !vaccine) {
+                alert('⚠️ Preencha data e vacina!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('vaccines').insert([{
+                    horse_id: state.selectedHorse.id,
+                    date, vaccine, next_date: nextDate || null
+                }]);
+
+                if (error) throw error;
+                document.getElementById('vaccineDate').value = '';
+                document.getElementById('vaccineName').value = '';
+                document.getElementById('vaccineNext').value = '';
+                await loadHorses();
+                checkNotifications();
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.addMedication = async function() {
+            const date = document.getElementById('medDate').value;
+            const medication = document.getElementById('medName').value;
+            const category = document.getElementById('medCategory').value;
+            const veterinarian = document.getElementById('medVet').value;
+            const notes = document.getElementById('medNotes').value;
+
+            if (!date || !medication) {
+                alert('⚠️ Preencha data e medicação!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('medications').insert([{
+                    horse_id: state.selectedHorse.id,
+                    date, medication, dosage: category, vet: veterinarian, notes
+                }]);
+
+                if (error) throw error;
+                document.getElementById('medDate').value = '';
+                document.getElementById('medName').value = '';
+                document.getElementById('medVet').value = '';
+                document.getElementById('medNotes').value = '';
+                await loadHorses();
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.addDeworming = async function() {
+            const date = document.getElementById('dewormDate').value;
+            const product = document.getElementById('dewormProduct').value;
+            const nextDate = document.getElementById('dewormNext').value;
+
+            if (!date || !product) {
+                alert('⚠️ Preencha data e produto!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('dewormings').insert([{
+                    horse_id: state.selectedHorse.id,
+                    date, product, next_date: nextDate || null
+                }]);
+
+                if (error) throw error;
+                document.getElementById('dewormDate').value = '';
+                document.getElementById('dewormProduct').value = '';
+                document.getElementById('dewormNext').value = '';
+                await loadHorses();
+                checkNotifications();
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.addInjury = async function() {
+            const date = document.getElementById('injuryDate').value;
+            const injuryType = document.getElementById('injuryType').value;
+            const treatment = document.getElementById('injuryTreatment').value;
+            const veterinarian = document.getElementById('injuryVet').value;
+            const recoveryDate = document.getElementById('injuryRecovery').value;
+            const status = document.getElementById('injuryStatus').value;
+
+            if (!date || !injuryType) {
+                alert('⚠️ Preencha data e tipo de lesão!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('injuries').insert([{
+                    horse_id: state.selectedHorse.id,
+                    date, injury_type: injuryType, treatment, 
+                    veterinarian, recovery_date: recoveryDate || null, status
+                }]);
+
+                if (error) throw error;
+                document.getElementById('injuryDate').value = '';
+                document.getElementById('injuryType').value = '';
+                document.getElementById('injuryTreatment').value = '';
+                document.getElementById('injuryVet').value = '';
+                document.getElementById('injuryRecovery').value = '';
+                await loadHorses();
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                alert('✅ Lesão registrada!');
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.addShoeing = async function() {
+            const date = document.getElementById('shoeDate').value;
+            const nextDate = document.getElementById('shoeNext').value;
+            const farrier = document.getElementById('shoeFarrier').value;
+            const notes = document.getElementById('shoeNotes').value;
+
+            if (!date) {
+                alert('⚠️ Preencha a data!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('shoeing').insert([{
+                    horse_id: state.selectedHorse.id,
+                    date, next_date: nextDate || null, farrier, notes
+                }]);
+
+                if (error) throw error;
+                document.getElementById('shoeDate').value = '';
+                document.getElementById('shoeNext').value = '';
+                document.getElementById('shoeFarrier').value = '';
+                document.getElementById('shoeNotes').value = '';
+                await loadHorses();
+                checkNotifications();
+                state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.addGeneralExpense = async function() {
+            const date = document.getElementById('genExpDate').value;
+            const category = document.getElementById('genExpCategory').value;
+            const description = document.getElementById('genExpDesc').value;
+            const amount = document.getElementById('genExpAmount').value;
+            const notes = document.getElementById('genExpNotes').value;
+
+            if (!date || !description || !amount) {
+                alert('⚠️ Preencha todos os campos obrigatórios!');
+                return;
+            }
+
+            try {
+                const { error } = await supabase.from('general_expenses').insert([{
+                    date, category, description, amount: parseFloat(amount), notes
+                }]);
+
+                if (error) throw error;
+                document.getElementById('genExpDate').value = '';
+                document.getElementById('genExpDesc').value = '';
+                document.getElementById('genExpAmount').value = '';
+                document.getElementById('genExpNotes').value = '';
+                await loadGeneralExpenses();
+                alert('✅ Gasto adicionado!');
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
+
+        window.deleteItem = async function(table, id) {
+            if (!confirm('Deseja excluir?')) return;
+
+            try {
+                const { error } = await supabase.from(table).delete().eq('id', id);
+                if (error) throw error;
+                
+                if (table === 'general_expenses') {
+                    await loadGeneralExpenses();
+                } else {
+                    await loadHorses();
+                    state.selectedHorse = state.horses.find(h => h.id === state.selectedHorse.id);
+                }
+                
+                checkNotifications();
+                render();
+            } catch (error) {
+                alert('❌ Erro: ' + error.message);
+            }
+        };
 
         function render() {
             const app = document.getElementById('app');
@@ -554,7 +647,7 @@
 
             if (state.selectedHorse) {
                 app.innerHTML = renderHorseDetail();
-            } else if (state.activeView === 'expenses') {
+            } else if (state.currentView === 'expenses') {
                 app.innerHTML = renderExpensesView();
             } else {
                 app.innerHTML = renderHorseList();
@@ -575,11 +668,11 @@
                             <div>
                                 <h2 class="text-xl font-bold text-gray-800 mb-4">Login</h2>
                                 <input type="email" id="loginEmail" placeholder="Email" 
-                                    class="w-full p-3 border-2 rounded-xl mb-3 focus:ring-2 focus:ring-emerald-500">
+                                    class="w-full p-3 border-2 rounded-xl mb-3">
                                 <input type="password" id="loginPassword" placeholder="Senha" 
-                                    class="w-full p-3 border-2 rounded-xl mb-3 focus:ring-2 focus:ring-emerald-500">
+                                    class="w-full p-3 border-2 rounded-xl mb-3">
                                 <button onclick="handleLogin()" 
-                                    class="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition">
+                                    class="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700">
                                     Entrar
                                 </button>
                             </div>
@@ -587,22 +680,16 @@
                             <div class="border-t pt-6">
                                 <h2 class="text-xl font-bold text-gray-800 mb-4">Criar Conta</h2>
                                 <input type="email" id="signupEmail" placeholder="Email" 
-                                    class="w-full p-3 border-2 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500">
-                                <input type="password" id="signupPassword" placeholder="Senha (mínimo 6 caracteres)" 
-                                    class="w-full p-3 border-2 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500">
+                                    class="w-full p-3 border-2 rounded-xl mb-3">
+                                <input type="password" id="signupPassword" placeholder="Senha (mín. 6 caracteres)" 
+                                    class="w-full p-3 border-2 rounded-xl mb-3">
                                 <input type="password" id="signupConfirm" placeholder="Confirmar senha" 
-                                    class="w-full p-3 border-2 rounded-xl mb-3 focus:ring-2 focus:ring-blue-500">
+                                    class="w-full p-3 border-2 rounded-xl mb-3">
                                 <button onclick="handleSignup()" 
-                                    class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition">
+                                    class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
                                     Criar Conta
                                 </button>
                             </div>
-                        </div>
-
-                        <div class="mt-6 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                            <p class="text-sm text-emerald-800">
-                                <strong>✨ Novidade:</strong> Agora com dados sincronizados na nuvem! Todos da equipe veem as mesmas informações em tempo real.
-                            </p>
                         </div>
                     </div>
                 </div>
@@ -619,303 +706,4 @@
                             <p class="text-emerald-600 font-semibold">${horse.breed}</p>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="editHorse(${JSON.stringify(horse).replace(/"/g, '&quot;')})" class="p-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700">📝</button>
-                            <button onclick="selectHorse(${horse.id})" class="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700">👁️</button>
-                            <button onclick="deleteHorse(${horse.id})" class="p-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3 text-sm mb-4">
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <p class="text-xs text-gray-500">Idade</p>
-                            <p class="font-semibold">${horse.age} anos</p>
-                        </div>
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <p class="text-xs text-gray-500">Sexo</p>
-                            <p class="font-semibold">${horse.gender}</p>
-                        </div>
-                    </div>
-                    <div class="bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                        <p class="text-emerald-800 font-bold text-lg">💰 R$ ${getTotalExpenses(horse).toFixed(2)}</p>
-                        <p class="text-xs text-emerald-600">Total em gastos</p>
-                    </div>
-                </div>
-            `).join('');
-
-            return `
-                <div class="max-w-7xl mx-auto p-4 md:p-6">
-                    <div class="bg-white rounded-3xl shadow-2xl p-6 md:p-8 mb-6">
-                        <div class="flex justify-between items-center mb-6">
-                            <div class="flex items-center gap-4">
-                                <div class="logo-jca text-white text-2xl">JCA</div>
-                                <div>
-                                    <h1 class="text-3xl font-black text-gray-800">Haras Control PRO</h1>
-                                    <p class="text-gray-500 text-sm">☁️ {state.user.email}</p>
-                                </div>
-                            </div>
-                            <button onclick="handleLogout()" class="px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600">
-                                Sair
-                            </button>
-                        </div>
-
-                        <div class="flex gap-3 flex-wrap">
-                            <button onclick="setActiveView('horses')" 
-                                class="px-6 py-3 ${state.activeView === 'horses' ? 'bg-emerald-600' : 'bg-gray-400'} text-white rounded-xl font-semibold shadow-lg">
-                                🐴 Cavalos
-                            </button>
-                            <button onclick="setActiveView('expenses')" 
-                                class="px-6 py-3 ${state.activeView === 'expenses' ? 'bg-emerald-600' : 'bg-gray-400'} text-white rounded-xl font-semibold shadow-lg">
-                                💰 Gastos
-                            </button>
-                            ${state.activeView === 'horses' ? `
-                                <button onclick="toggleForm()" class="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-lg">
-                                    ➕ Novo Cavalo
-                                </button>
-                            ` : ''}
-                        </div>
-
-                        ${state.showForm ? `
-                            <div class="bg-blue-50 p-6 rounded-2xl mt-6 border-2 border-blue-200 fade-in">
-                                <h3 class="text-2xl font-bold text-blue-900 mb-6">✨ ${formData.id ? 'Editar' : 'Novo'} Cavalo</h3>
-                                
-                                ${formData.photo ? `
-                                    <div class="mb-4 text-center">
-                                        <img src="${formData.photo}" class="image-preview mx-auto shadow-lg">
-                                        <div class="flex gap-2 justify-center mt-2">
-                                            <label class="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                                                📷 Trocar Foto
-                                                <input type="file" accept="image/*" onchange="handleImageUpload(event)" class="hidden">
-                                            </label>
-                                            <button onclick="removePhoto()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
-                                                🗑️ Remover
-                                            </button>
-                                        </div>
-                                    </div>
-                                ` : `
-                                    <div class="mb-6">
-                                        <label class="block text-sm font-semibold text-gray-700 mb-2">📷 Foto do Cavalo</label>
-                                        <input type="file" accept="image/*" onchange="handleImageUpload(event)"
-                                            class="w-full p-3 border-2 border-dashed border-blue-300 rounded-xl bg-white hover:border-blue-500 cursor-pointer">
-                                        <p class="text-xs text-gray-500 mt-1">Máximo 5MB - A imagem será otimizada automaticamente</p>
-                                    </div>
-                                `}
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    <input type="text" placeholder="Nome *" value="${formData.name}" oninput="updateFormData('name', this.value)" 
-                                        class="p-3 border-2 rounded-xl">
-                                    <input type="text" placeholder="Raça *" value="${formData.breed}" oninput="updateFormData('breed', this.value)" 
-                                        class="p-3 border-2 rounded-xl">
-                                    <input type="number" placeholder="Idade" value="${formData.age}" oninput="updateFormData('age', this.value)" 
-                                        class="p-3 border-2 rounded-xl">
-                                    <select onchange="updateFormData('gender', this.value)" class="p-3 border-2 rounded-xl">
-                                        <option ${formData.gender === 'Macho' ? 'selected' : ''}>Macho</option>
-                                        <option ${formData.gender === 'Fêmea' ? 'selected' : ''}>Fêmea</option>
-                                    </select>
-                                    <input type="text" placeholder="Pelagem" value="${formData.color}" oninput="updateFormData('color', this.value)" 
-                                        class="p-3 border-2 rounded-xl">
-                                    <input type="text" placeholder="Registro" value="${formData.registration}" oninput="updateFormData('registration', this.value)" 
-                                        class="p-3 border-2 rounded-xl">
-                                </div>
-                                <textarea placeholder="Observações" rows="3" oninput="updateFormData('notes', this.value)"
-                                    class="w-full p-3 border-2 rounded-xl">${formData.notes}</textarea>
-                                <div class="flex gap-3 mt-6">
-                                    <button onclick="${formData.id ? 'updateHorse()' : 'addHorse()'}" class="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700">
-                                        ${state.saving ? '⏳ Salvando...' : '✓ Salvar'}
-                                    </button>
-                                    <button onclick="formData = { name: '', breed: '', age: '', gender: 'Macho', color: '', registration: '', photo: '', notes: '' }; toggleForm()" class="px-6 py-3 bg-gray-400 text-white rounded-xl hover:bg-gray-500">✕</button>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    ${state.horses.length === 0 ? `
-                        <div class="bg-white rounded-3xl shadow-2xl p-12 text-center">
-                            <div class="text-8xl mb-6">🐴</div>
-                            <h2 class="text-3xl font-bold text-gray-800 mb-4">Nenhum cavalo cadastrado</h2>
-                            <button onclick="toggleForm()" class="px-8 py-4 bg-blue-600 text-white rounded-xl font-semibold">
-                                ➕ Adicionar Primeiro Cavalo
-                            </button>
-                        </div>
-                    ` : `
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            ${horsesHTML}
-                        </div>
-                    `}
-                </div>
-            `;
-        }
-
-        function renderHorseDetail() {
-            const horse = state.selectedHorse;
-            
-            return `
-                <div class="max-w-7xl mx-auto p-4">
-                    <div class="bg-white rounded-3xl shadow-2xl p-6">
-                        <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-6 rounded-2xl mb-6">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <h2 class="text-4xl font-black mb-2">${horse.name}</h2>
-                                    <p class="text-emerald-100">${horse.breed} • ${horse.age} anos</p>
-                                </div>
-                                ${horse.photo ? `<img src="${horse.photo}" class="w-32 h-32 object-cover rounded-xl border-4 border-white">` : ''}
-                            </div>
-                            <button onclick="backToList()" class="mt-4 px-6 py-2 bg-white text-emerald-600 rounded-xl font-semibold">
-                                ← Voltar
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            ${renderVaccines(horse)}
-                            ${renderMedications(horse)}
-                            ${renderShoeing(horse)}
-                            ${renderExpenses(horse)}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderVaccines(horse) {
-            const vaccinesHTML = horse.vaccines?.map(v => `
-                <div class="bg-white p-4 rounded-xl border border-purple-200 relative group hover:shadow-md transition">
-                    <button onclick="deleteItem('vaccines', ${v.id})" 
-                        class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition">
-                        🗑️
-                    </button>
-                    <p class="font-bold text-purple-900">${v.vaccine}</p>
-                    <p class="text-sm text-gray-600">📅 ${v.date}</p>
-                    ${v.next_date ? `<p class="text-sm text-purple-600 font-semibold">🔔 Próxima: ${v.next_date}</p>` : ''}
-                </div>
-            `).join('') || '<p class="text-gray-500 text-center py-4">Nenhuma vacina</p>';
-
-            return `
-                <div class="bg-purple-50 p-6 rounded-2xl border-2 border-purple-200">
-                    <h3 class="text-xl font-bold text-purple-900 mb-4">💉 Vacinas</h3>
-                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${vaccinesHTML}</div>
-                    <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="vaccineDate" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Nome da vacina" id="vaccineName" class="w-full p-3 border-2 rounded-lg">
-                        <input type="date" id="vaccineNext" class="w-full p-3 border-2 rounded-lg">
-                        <button onclick="addVaccine()" class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
-                            ➕ Adicionar Vacina
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderMedications(horse) {
-            const medsHTML = horse.medications?.map(m => `
-                <div class="bg-white p-4 rounded-xl border border-pink-200 relative group hover:shadow-md transition">
-                    <button onclick="deleteItem('medications', ${m.id})" 
-                        class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition">
-                        🗑️
-                    </button>
-                    <p class="font-bold text-pink-900">${m.medication}</p>
-                    <p class="text-sm text-gray-600">📅 ${m.date}</p>
-                    <p class="text-sm text-gray-600">💊 ${m.dosage}</p>
-                    <p class="text-sm text-gray-600">👨‍⚕️ ${m.vet}</p>
-                </div>
-            `).join('') || '<p class="text-gray-500 text-center py-4">Nenhuma medicação</p>';
-
-            return `
-                <div class="bg-pink-50 p-6 rounded-2xl border-2 border-pink-200">
-                    <h3 class="text-xl font-bold text-pink-900 mb-4">💊 Medicações</h3>
-                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${medsHTML}</div>
-                    <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="medDate" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Medicação" id="medName" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Dosagem" id="medDosage" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Veterinário" id="medVet" class="w-full p-3 border-2 rounded-lg">
-                        <button onclick="addMedication()" class="w-full px-4 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 font-semibold">
-                            ➕ Adicionar Medicação
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderShoeing(horse) {
-            const shoeingHTML = horse.shoeing?.map(s => `
-                <div class="bg-white p-4 rounded-xl border border-orange-200 relative group hover:shadow-md transition">
-                    <button onclick="deleteItem('shoeing', ${s.id})" 
-                        class="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition">
-                        🗑️
-                    </button>
-                    <p class="font-bold text-orange-900">🔨 Ferrageamento</p>
-                    <p class="text-sm text-gray-600">📅 ${s.date}</p>
-                    ${s.next_date ? `<p class="text-sm text-orange-600 font-semibold">🔔 Próximo: ${s.next_date}</p>` : ''}
-                    ${s.farrier ? `<p class="text-sm text-gray-600">👷 ${s.farrier}</p>` : ''}
-                    ${s.notes ? `<p class="text-sm text-gray-600 italic">${s.notes}</p>` : ''}
-                </div>
-            `).join('') || '<p class="text-gray-500 text-center py-4">Nenhum ferrageamento</p>';
-
-            return `
-                <div class="bg-orange-50 p-6 rounded-2xl border-2 border-orange-200">
-                    <h3 class="text-xl font-bold text-orange-900 mb-4">🔨 Ferrageamento</h3>
-                    <div class="space-y-3 mb-4 max-h-60 overflow-y-auto">${shoeingHTML}</div>
-                    <div class="space-y-3 bg-white p-4 rounded-xl">
-                        <input type="date" id="shoeDate" class="w-full p-3 border-2 rounded-lg">
-                        <input type="date" id="shoeNext" placeholder="Próxima ferragem" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Ferrador" id="shoeFarrier" class="w-full p-3 border-2 rounded-lg">
-                        <input type="text" placeholder="Observações" id="shoeNotes" class="w-full p-3 border-2 rounded-lg">
-                        <button onclick="addShoeing()" class="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold">
-                            ➕ Adicionar Ferrageamento
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderExpenses(horse) {
-            const expensesHTML = horse.expenses?.map(e => `
-                <div class="bg-white p-4 rounded-xl border border-amber-200 flex justify-between items-center relative group hover:shadow-md transition">
-                    <div class="flex-1">
-                        <p class="font-bold text-amber-900">${e.description}</p>
-                        <p class="text-sm text-gray-600">📅 ${e.date}</p>
-                        <span class="inline-block mt-1 px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full">${e.category}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <p class="text-xl font-bold text-amber-700">R$ ${parseFloat(e.amount).toFixed(2)}</p>
-                        <button onclick="deleteItem('expenses', ${e.id})" 
-                            class="p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition">
-                            🗑️
-                        </button>
-                    </div>
-                </div>
-            `).join('') || '<p class="text-gray-500 text-center py-4">Nenhum gasto</p>';
-
-            return `
-                <div class="bg-amber-50 p-6 rounded-2xl border-2 border-amber-200 lg:col-span-2">
-                    <h3 class="text-xl font-bold text-amber-900 mb-4">💰 Controle Financeiro</h3>
-                    <div class="mb-6 bg-white p-4 rounded-xl border-2 border-amber-300">
-                        <p class="text-3xl font-black text-amber-800">R$ ${getTotalExpenses(horse).toFixed(2)}</p>
-                        <p class="text-sm text-amber-600">Total investido</p>
-                    </div>
-                    <div class="space-y-3 mb-4 max-h-80 overflow-y-auto">${expensesHTML}</div>
-                    <div class="bg-white p-4 rounded-xl">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                            <input type="date" id="expDate" class="p-3 border-2 rounded-lg">
-                            <input type="text" placeholder="Descrição" id="expDesc" class="p-3 border-2 rounded-lg">
-                            <input type="number" step="0.01" placeholder="Valor (R$)" id="expAmount" class="p-3 border-2 rounded-lg">
-                            <select id="expCategory" class="p-3 border-2 rounded-lg">
-                                <option>Alimentação</option>
-                                <option>Veterinário</option>
-                                <option>Manutenção</option>
-                                <option>Medicamentos</option>
-                                <option>Ferrageamento</option>
-                                <option>Outros</option>
-                            </select>
-                        </div>
-                        <button onclick="addExpense()" class="w-full px-4 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-semibold">
-                            ➕ Adicionar Gasto
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Inicializar
-        init();
-    </script>
-</body>
-</html>
+                            <button onclick='editHorse(${JSON.stringify(horse).replace(/'/g, "&#39;")})' class="p-2.5 bg-amber-600 text-white
