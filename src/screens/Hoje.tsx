@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
-import { aba, diaSel, erros, horaSel, limites, operacao } from '../state';
-import { Carregando, SeletorEscopo, useVisao } from './comum';
+import { aba, diaSel, horaSel, limites, operacao } from '../state';
+import { Carregando, LugarChip, SeletorEscopo, useVisao } from './comum';
 import { MODELOS, NOME_MODELO } from '../../shared/tipos';
 import { addDias, calcularPesos, fatorCorrecao, fmtHora, fmtJanela, fmtMm, horasOk, horaMaisProvavel, partesLocais, semaforos, somaMm } from '../../shared/calc';
 import type { Estado, Operacao, ValorHora } from '../../shared/calc';
@@ -92,7 +92,7 @@ export function Hoje() {
     const temps = horasD.map((h) => h.temp).filter((t): t is number => t != null);
     const ventos = horasD.map((h) => h.vento).filter((t): t is number => t != null);
     return { dia, ehHoje, hora, horasD, d, sem, faixa, nascer, por, hh, tMin: temps.length ? Math.min(...temps) : null, tMax: temps.length ? Math.max(...temps) : null, vMax: ventos.length ? Math.max(...ventos) : null, restante: somaMm(horasD.filter((h) => h.ts + 3600 > agoraTs)), fuso };
-  }, [x?.p.gerado_em, x?.tid, x?.ms, lim, erros.value, op, diaSel.value, horaSel.value]);
+  }, [x?.p.gerado_em, x?.tid, x?.ms, lim, x?.erros, op, diaSel.value, horaSel.value]);
 
   if (!x || !m) return <Carregando />;
   const { p, g, hoje, t, ms } = x;
@@ -101,9 +101,9 @@ export function Hoje() {
   const info = OPS.find((o) => o.id === op)!;
   const ok = horasOk(op, horasD, lim);
   const maxMm = Math.max(1, ...horasD.map((h) => h.mm ?? 0));
-  const fc = fatorCorrecao(erros.value);
+  const fc = fatorCorrecao(x.erros);
   const dh = Math.round((Date.parse(dia) - Date.parse(hoje)) / 86400000);
-  const pesos = calcularPesos(erros.value, dh);
+  const pesos = calcularPesos(x.erros, dh);
   const med = medidoDia(ms, dia, x.tid);
   const hp = horaMaisProvavel(horasD);
 
@@ -124,6 +124,7 @@ export function Hoje() {
 
   return (
     <>
+      <LugarChip />
       <div class={`banner b-${semOp.estado}`} role="status">
         <div class="bt">
           {TITULO[semOp.estado]} {info.verbo}
@@ -168,7 +169,7 @@ export function Hoje() {
         <Tile titulo="Chance" tom={tomProb} valor={n(d?.prob, '%')} sub={d?.p10mm != null ? `≥10 mm: ${d.p10mm}%` : d?.probFonte === 'modelos' ? 'média dos modelos' : ' '} />
         <Tile titulo="Nuvens" tom="neutro" valor={n(hh?.nuvem, '%')} sub={hh?.mm != null ? `chuva ${fmtMm(hh.mm)} mm/h` : ' '} />
         <Tile titulo="Umidade" tom={tomUr} valor={n(hh?.ur, '%')} sub={op === 'pulv' ? `mín. ${lim.pulv_ur_min}%` : op === 'colheita' ? `máx. ${lim.colheita_ur_max}%` : ' '} />
-        <Tile titulo="Medido" tom="neutro" valor={med != null ? `${fmtMm(med)} mm` : '—'} sub={med != null ? 'seu pluviômetro' : 'sem lançamento'} />
+        <Tile titulo="Medido" tom="neutro" valor={med != null ? `${fmtMm(med)} mm` : '—'} sub={x.lugar ? 'só na fazenda' : med != null ? 'seu pluviômetro' : 'sem lançamento'} />
         <Tile titulo={ehHoje ? 'Ainda previsto' : 'Total previsto'} tom="neutro" valor={`${fmtMm(ehHoje ? m.restante : d?.provavel)} mm`} sub={ehHoje ? 'até o fim do dia' : 'no dia'} />
         <Tile titulo="Hora chuva" tom="neutro" valor={hp != null ? fmtHora(hp) : '—'} sub="hora mais provável" />
       </div>
@@ -250,8 +251,8 @@ export function Hoje() {
         </table>
         <div class="aviso">
           Pesos {pesos.calibrado ? (pesos.fonte === 'pluviometro' ? `aprendidos com o seu pluviômetro (${pesos.nDias} dias)` : `aprendidos no histórico de ${pesos.nDias} dias contra satélite/reanálise (não é pluviômetro)`) : 'iguais (sem histórico suficiente)'} para {dh <= 0 ? 'hoje' : `${dh} dia(s) à frente`}.{' '}
-          {fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos cenários do ensemble (6 sistemas, até 212 membros, cada sistema com o mesmo peso) com ≥ 1 mm' : 'média dos modelos'}. Grade ECMWF {g.grade.lat.toFixed(2)},{g.grade.lon.toFixed(2)}
-          {t ? ` · ${t.nome}` : ` · grupo ${g.id}`}.
+          {x.lugar ? 'Sem correção de viés: só existe na fazenda (precisa do seu pluviômetro).' : fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos cenários do ensemble (6 sistemas, até 212 membros, cada sistema com o mesmo peso) com ≥ 1 mm' : 'média dos modelos'}. Grade ECMWF {g.grade.lat.toFixed(2)},{g.grade.lon.toFixed(2)}
+          {t ? ` · ${t.nome}` : x.lugar ? ` · ${x.lugar.nome}` : ` · grupo ${g.id}`}.
         </div>
         <div class="aviso">
           <IcAlerta size={14} /> Confirme sempre pela bula do produto e pelo receituário agronômico. <button class="lk" onClick={() => (aba.value = 'ajustes')}>Editar limites</button>

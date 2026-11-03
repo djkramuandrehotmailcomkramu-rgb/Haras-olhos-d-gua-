@@ -134,3 +134,21 @@ export const LIMITES_PADRAO: Limites = {
   alerta_mm24: 20,
   alerta_prob6: 80,
 };
+
+/** Local pesquisado (qualquer cidade/estado/coordenada), fora dos talhões do KML. */
+export interface Lugar {
+  nome: string;
+  detalhe?: string;
+  lat: number;
+  lon: number;
+  tipo?: string;
+}
+
+export interface PayloadLugar {
+  lugar: Lugar;
+  fuso: string;
+  gerado_em: string;
+  grupo: Grupo;
+  hind: ErroModelo[];
+  erros: string[];
+}

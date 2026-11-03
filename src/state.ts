@@ -1,6 +1,6 @@
 import { signal, computed } from '@preact/signals';
 import { LIMITES_PADRAO } from '../shared/tipos';
-import type { ErroModelo, Limites, Medida, PayloadPrevisao, Talhao } from '../shared/tipos';
+import type { ErroModelo, Limites, Lugar, Medida, PayloadLugar, PayloadPrevisao, Talhao } from '../shared/tipos';
 import { FAZENDA, getJson } from './net';
 
 import type { Operacao } from '../shared/calc';
@@ -54,4 +54,54 @@ export async function carregar(forcar = false) {
     ts: p?.ts ?? status.value.ts,
     offline: !!p?.offline,
   };
+}
+
+// ---- local pesquisado (cidade, estado ou coordenada fora do KML) ----
+export const lugar = signal<Lugar | null>(null);
+export const payloadLugar = signal<PayloadLugar | null>(null);
+export const statusLugar = signal<{ carregando: boolean; erro: string | null; offline: boolean; ts: number | null }>({ carregando: false, erro: null, offline: false, ts: null });
+export const buscaAberta = signal(false);
+
+const chaveLugar = (l: Lugar) => `${l.lat},${l.lon}`;
+
+export async function abrirLugar(l: Lugar | null, forcar = false) {
+  lugar.value = l;
+  if (!l) {
+    payloadLugar.value = null;
+    return;
+  }
+  aba.value = 'hoje';
+  diaSel.value = null;
+  horaSel.value = null;
+  buscaAberta.value = false;
+  salvarRecente(l);
+  if (payloadLugar.value && chaveLugar(payloadLugar.value.lugar) !== chaveLugar(l)) payloadLugar.value = null;
+  statusLugar.value = { ...statusLugar.value, carregando: true, erro: null };
+  try {
+    const q = `lat=${l.lat}&lon=${l.lon}&nome=${encodeURIComponent(l.nome)}&detalhe=${encodeURIComponent(l.detalhe || '')}&tipo=${encodeURIComponent(l.tipo || '')}`;
+    const r = await getJson<PayloadLugar>(`/api/ponto?${q}`, forcar);
+    if (lugar.value && chaveLugar(lugar.value) === chaveLugar(l)) {
+      payloadLugar.value = r.data;
+      statusLugar.value = { carregando: false, erro: r.data.erros.length ? r.data.erros.join(' | ') : null, offline: r.offline, ts: r.ts };
+    }
+  } catch (e) {
+    statusLugar.value = { carregando: false, erro: `Não consegui a previsão de ${l.nome}: ${(e as Error).message}`, offline: false, ts: null };
+  }
+}
+
+const RECENTES = 'chuvapro:recentes';
+export function lerRecentes(): Lugar[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENTES) || '[]');
+  } catch {
+    return [];
+  }
+}
+function salvarRecente(l: Lugar) {
+  try {
+    const lista = [l, ...lerRecentes().filter((x) => chaveLugar(x) !== chaveLugar(l))].slice(0, 6);
+    localStorage.setItem(RECENTES, JSON.stringify(lista));
+  } catch {
+    /* sem armazenamento: segue */
+  }
 }

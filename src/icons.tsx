@@ -28,3 +28,4 @@ export const IcPlay = (p: P) => <I {...p}><path d="M7 4v16l13-8z" /></I>;
 export const IcPausa = (p: P) => <I {...p}><path d="M7 4h3v16H7zM14 4h3v16h-3z" /></I>;
 export const IcRadar = (p: P) => <I {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><path d="M12 12 19 5" /></I>;
 export const IcSino = (p: P) => <I {...p}><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4" /></I>;
+export const IcBusca = (p: P) => <I {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></I>;

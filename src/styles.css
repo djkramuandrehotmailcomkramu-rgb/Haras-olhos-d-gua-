@@ -104,3 +104,8 @@ th{color:var(--tx2);font-weight:600;font-size:12px}
 .un{font-size:15px;font-weight:500;color:#ffffffd0}
 .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 nav.bar button{font-size:10px}
+
+.busca{position:fixed;inset:0;z-index:60;background:var(--bg);padding:12px 14px calc(16px + var(--sb));overflow:auto;max-width:720px;margin:0 auto}
+.busca-top{display:flex;gap:8px;margin-bottom:10px}.busca-top input{flex:1}
+.lugar-chip{display:flex;flex-direction:column;gap:2px;background:#10264a;border:1px solid #ffffff2a;border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.lugar-chip b{font-size:18px}

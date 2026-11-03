@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Carregando, SeletorEscopo, useVisao } from './comum';
+import { Carregando, LugarChip, SeletorEscopo, useVisao } from './comum';
 import { addDias, fmtDia, fmtHora, fmtMm } from '../../shared/calc';
 import { medidoPeriodo, previstoPeriodo } from '../derive';
 
@@ -26,9 +26,12 @@ export function Semana() {
 
   return (
     <>
-      <div class="card">
-        <SeletorEscopo />
-      </div>
+      <LugarChip />
+      {!x.lugar && (
+        <div class="card">
+          <SeletorEscopo />
+        </div>
+      )}
       <div class="card">
         <h2>Comparativo (medido × previsto)</h2>
         <div class="row sp">

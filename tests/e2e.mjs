@@ -31,6 +31,31 @@ ok(/bruto/i.test(await page.innerText('main')) && /calibrando|Correção|aprendi
 ok(/atualizado|offline/.test(await page.innerText('header')), 'selo "atualizado há X"');
 
 const aba = async (nome) => page.locator('nav.bar').getByRole('button', { name: nome }).click();
+// pesquisa de outro local: cidade e coordenadas
+await page.getByRole('button', { name: 'Pesquisar outro local' }).click();
+await page.fill('input[type=search]', 'Cuiabá');
+await page.waitForSelector('.busca .tal', { timeout: 15000 });
+ok(/Cuiab/.test(await page.innerText('.busca')), 'BUSCA: "Cuiabá" retorna resultados');
+await page.locator('.busca .tal').first().click();
+await page.waitForSelector('.lugar-chip', { timeout: 45000 });
+await page.waitForSelector('.banner', { timeout: 45000 });
+ok(/Cuiab/.test(await page.innerText('.lugar-chip')), 'BUSCA: mostra a previsão do local escolhido');
+ok((await page.locator('.tile').count()) === 12, 'BUSCA: 12 blocos de condições para o local');
+ok(/este local|Cuiab/.test(await page.innerText('main')) && /Pesos aprendidos|Pesos iguais|Pesos/.test(await page.innerText('main')), 'BUSCA: mostra pesos dos modelos do local');
+await aba('Previsão');
+await page.waitForSelector('.day');
+ok((await page.locator('.day').count()) >= 14, 'BUSCA: Previsão de 15 dias do local');
+await page.getByRole('button', { name: 'Voltar para a fazenda' }).first().click();
+await aba('Condições');
+await page.waitForSelector('.banner');
+ok((await page.locator('.lugar-chip').count()) === 0, 'BUSCA: voltar para a fazenda');
+await page.getByRole('button', { name: 'Pesquisar outro local' }).click();
+await page.fill('input[type=search]', '-15.60, -56.10');
+await page.waitForSelector('.busca .tal');
+await page.locator('.busca .tal').first().click();
+await page.waitForSelector('.lugar-chip', { timeout: 45000 });
+ok(/Coordenadas|-15/.test(await page.innerText('.lugar-chip')), 'BUSCA: coordenadas digitadas');
+await page.getByRole('button', { name: 'Voltar para a fazenda' }).first().click();
 await aba('Previsão');
 await page.waitForSelector('.day');
 ok((await page.locator('.day').count()) >= 14, `SEMANA: ${await page.locator('.day').count()} dias`);

@@ -68,3 +68,27 @@ describe.skipIf(!URL_)('contrato com dados reais', () => {
     }
   });
 });
+
+describe.skipIf(!URL_)('busca de local (API real)', () => {
+  it('geocodificação: "Cuiabá" retorna cidade em MT com coordenadas', async () => {
+    const r: any[] = await fetch(`${URL_}/api/buscar?q=${encodeURIComponent('Cuiabá')}`).then((x) => x.json());
+    expect(r.length).toBeGreaterThan(0);
+    const c = r.find((x) => /Cuiab/.test(x.nome) && /Mato Grosso/.test(x.detalhe));
+    expect(c).toBeTruthy();
+    expect(c.lat).toBeLessThan(-14);
+    expect(c.lon).toBeLessThan(-55);
+  });
+  it('previsão de ponto: fuso detectado, ensemble e histórico próprios do local', async () => {
+    const j: any = await fetch(`${URL_}/api/ponto?lat=-15.6&lon=-56.1&nome=Cuiab%C3%A1`).then((x) => x.json());
+    expect(j.erro).toBeUndefined();
+    expect(j.fuso).toBe('America/Cuiaba');
+    expect(j.grupo.ens).not.toBeNull();
+    expect(j.hind.length).toBeGreaterThanOrEqual(12);
+    expect(j.hind.every((e: any) => e.fonte === 'hindcast' && e.n_dias >= 20)).toBe(true);
+    for (const m of MODELOS) expect(j.grupo.forecast.daily[`precipitation_sum_${m}`]).toBeTruthy();
+  });
+  it('entradas inválidas são recusadas', async () => {
+    const r = await fetch(`${URL_}/api/ponto?lat=999&lon=0`);
+    expect(r.status).toBe(400);
+  });
+});
