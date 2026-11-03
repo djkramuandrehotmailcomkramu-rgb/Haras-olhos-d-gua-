@@ -3,6 +3,7 @@ import { LIMITES_PADRAO } from '../shared/tipos';
 import type { ErroModelo, Limites, Medida, PayloadPrevisao, Talhao } from '../shared/tipos';
 import { FAZENDA, getJson } from './net';
 
+import type { Operacao } from '../shared/calc';
 export type Aba = 'hoje' | 'semana' | 'talhoes' | 'mapa' | 'medida' | 'confiab' | 'ajustes';
 export const aba = signal<Aba>('hoje');
 export const payload = signal<PayloadPrevisao | null>(null);
@@ -22,7 +23,10 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => (online.value = true));
   window.addEventListener('offline', () => (online.value = false));
 }
-export const escopo = signal<string>('fazenda'); // 'fazenda' ou id do talhão
+export const escopo = signal<string>('fazenda');
+export const operacao = signal<Operacao>('pulv');
+export const diaSel = signal<string | null>(null);
+export const horaSel = signal<number | null>(null); // 'fazenda' ou id do talhão
 
 export const fuso = computed(() => payload.value?.fazenda.fuso || 'America/Sao_Paulo');
 

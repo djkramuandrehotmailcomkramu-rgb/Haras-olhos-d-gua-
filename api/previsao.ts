@@ -1,7 +1,7 @@
 import { agrupar } from '../shared/grupos';
 import type { Fazenda, Grupo, PayloadPrevisao, Talhao } from '../shared/tipos';
 import { db, erro, q1, Req, Res } from './_db';
-import { buscarForecast, buscarMeteo } from './_om';
+import { buscarEnsemble, buscarForecast, buscarMeteo } from './_om';
 
 // Previsão por GRUPO de talhões (~5 km), cacheada 30 min na CDN para todos os usuários.
 export default async function handler(req: Req, res: Res) {
@@ -20,10 +20,14 @@ export default async function handler(req: Req, res: Res) {
     await Promise.all(
       gps.map(async (g) => {
         try {
-          const [forecast, meteo] = await Promise.all([
+          const [forecast, meteo, ens] = await Promise.all([
             buscarForecast(g.lat, g.lon, faz.fuso),
             buscarMeteo(g.lat, g.lon, faz.fuso).catch((e) => {
               erros.push(`vento/temperatura/UR do grupo ${g.id}: ${e.message}`);
+              return null;
+            }),
+            buscarEnsemble(g.lat, g.lon, faz.fuso).catch((e) => {
+              erros.push(`ensemble do grupo ${g.id}: ${e.message}`);
               return null;
             }),
           ]);
@@ -35,6 +39,7 @@ export default async function handler(req: Req, res: Res) {
             grade: { lat: forecast.latitude, lon: forecast.longitude, elev: forecast.elevation },
             forecast,
             meteo,
+            ens,
           });
         } catch (e) {
           erros.push(`grupo ${g.id}: ${(e as Error).message}`);

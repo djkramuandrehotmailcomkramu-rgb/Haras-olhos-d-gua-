@@ -4,6 +4,7 @@ import { LIMITES_PADRAO, MODELOS } from '../shared/tipos';
 import type { ErroModelo, Fazenda } from '../shared/tipos';
 import { db, erro, Req, Res } from './_db';
 import { buscarForecast, buscarMeteo } from './_om';
+import { calcularHindcast } from './_hind';
 
 const HORIZONTES = [0, 1, 3, 7];
 
@@ -37,7 +38,7 @@ async function tarefaFazenda(f: Fazenda & { lat: number; lon: number }) {
   const prevs = await db<{ rodada: string; modelo: string; alvo: string; mm: number }[]>('previsoes', {
     query: `fazenda_id=eq.${f.id}&alvo=gte.${de}&alvo=lte.${hoje}&select=rodada,modelo,alvo,mm&limit=20000`,
   });
-  const erros: Omit<ErroModelo, 'atualizado_em'>[] = [];
+  const erros: Omit<ErroModelo, 'atualizado_em' | 'fonte'>[] = [];
   for (const janela of [30, 90]) {
     const corte = addDias(hoje, -janela);
     const grupos = new Map<string, ParPrevMedido[]>();
@@ -77,12 +78,24 @@ async function tarefaFazenda(f: Fazenda & { lat: number; lon: number }) {
   if (erros.length) await db('erro_modelo', { method: 'POST', upsert: 'fazenda_id,modelo,horizonte,janela', body: erros.map((e) => ({ ...e, atualizado_em: new Date().toISOString() })), retorno: false });
   out.erros_atualizados = erros.length;
 
+  // 2b) hindcast de 90 dias (peso inicial dos modelos, antes de haver pluviômetro)
+  try {
+    const h = await calcularHindcast(f.id, f.lat, f.lon, f.fuso);
+    if (h.linhas.length) await db('erro_hindcast', { method: 'POST', upsert: 'fazenda_id,modelo,horizonte,janela', body: h.linhas, retorno: false });
+    out.hindcast = { linhas: h.linhas.length, referencias: h.referencias };
+  } catch (e) {
+    out.hindcast_erro = (e as Error).message;
+  }
+
   // 3) alertas push (≥ X mm em 24 h ou ≥ Y% nas próximas 6 h)
   const [lim] = await db<any[]>('limites_operacao', { query: `fazenda_id=eq.${f.id}` });
   const cfg = { ...LIMITES_PADRAO, ...(lim?.cfg || {}) };
   const meteo = await buscarMeteo(f.lat, f.lon, f.fuso, 0, 3).catch(() => null);
   const fc2 = await buscarForecast(f.lat, f.lon, f.fuso, 0, 3);
-  const eRows = await db<ErroModelo[]>('erro_modelo', { query: `fazenda_id=eq.${f.id}` });
+  const eRows = [
+    ...(await db<ErroModelo[]>('erro_modelo', { query: `fazenda_id=eq.${f.id}` })).map((r) => ({ ...r, fonte: 'pluviometro' })),
+    ...(await db<ErroModelo[]>('erro_hindcast', { query: `fazenda_id=eq.${f.id}` })).map((r) => ({ ...r, fonte: 'hindcast' })),
+  ];
   const horas = horasPrevistas(fc2, meteo, f.fuso, eRows, hoje);
   const agora = Math.floor(Date.now() / 1000);
   const prox24 = horas.filter((h) => h.ts >= agora && h.ts < agora + 86400);

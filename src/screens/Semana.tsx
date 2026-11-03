@@ -66,7 +66,7 @@ export function Semana() {
                     <i style={`width:${Math.min(100, ((d.provavel ?? 0) / maxDia) * 100)}%`} />
                   </div>
                   <div class="muted" style="margin-top:4px">
-                    {d.prob != null ? `${Math.round(d.prob)}%` : '—'} · faixa {fmtMm(d.min)}–{fmtMm(d.max)} mm
+                    {d.prob != null ? `${Math.round(d.prob)}%` : '—'} · faixa {fmtMm(d.q10 ?? d.min)}–{fmtMm(d.q90 ?? d.max)} mm
                   </div>
                   <div class="muted">
                     {r.venMax != null ? `vento ${Math.round(r.venMax)} km/h` : 'vento —'} · {r.tMin != null ? `${Math.round(r.tMin)}–${Math.round(r.tMax!)} °C` : 'temp. —'}

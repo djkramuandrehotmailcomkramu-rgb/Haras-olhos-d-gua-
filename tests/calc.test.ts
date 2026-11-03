@@ -3,7 +3,7 @@ import { baldeHorizonte, calcularFator, calcularPesos, estatisticasErro, faixaMm
 import type { ValorHora } from '../shared/calc';
 import { ErroModelo, LIMITES_PADRAO } from '../shared/tipos';
 
-const erro = (modelo: string, mae: number, n: number, h = 1, janela = 90): ErroModelo => ({ fazenda_id: 'x', modelo, horizonte: h, janela, n_dias: n, mae, vies: 0, acerto: 0.8, atualizado_em: '' });
+const erro = (modelo: string, mae: number, n: number, h = 1, janela = 90, fonte = 'pluviometro'): ErroModelo => ({ fazenda_id: 'x', modelo, horizonte: h, janela, fonte, n_dias: n, mae, vies: 0, acerto: 0.8, atualizado_em: '' });
 
 describe('formatação pt-BR', () => {
   it('mm com 1 casa e vírgula', () => {
@@ -26,14 +26,37 @@ describe('pesos do ensemble', () => {
   it('sem dados suficientes: pesos iguais e NÃO calibrado', () => {
     const r = calcularPesos([erro('ecmwf_ifs025', 1, 5), erro('gfs_seamless', 3, 5)], 1);
     expect(r.calibrado).toBe(false);
+    expect(r.fonte).toBeNull();
     expect(new Set(Object.values(r.pesos)).size).toBe(1);
     expect(r.nDias).toBe(5);
   });
-  it('com ≥ 20 dias: modelo de menor erro pesa mais', () => {
-    const r = calcularPesos([erro('ecmwf_ifs025', 1, 25), erro('gfs_seamless', 4, 25), erro('best_match', 2, 25), erro('icon_seamless', 3, 25)], 1);
+  it('hindcast de 90 dias (valores reais, ERA5, D+1): GFS pesa mais que ECMWF e GEM', () => {
+    const h = (m: string, mae: number) => erro(m, mae, 91, 1, 90, 'hindcast');
+    const r = calcularPesos([h('gfs_seamless', 0.94), h('ecmwf_ifs025', 1.11), h('ukmo_seamless', 1.15), h('icon_seamless', 1.59), h('jma_seamless', 1.62), h('gem_global', 1.71)], 1);
     expect(r.calibrado).toBe(true);
-    expect(r.pesos.ecmwf_ifs025).toBeGreaterThan(r.pesos.best_match);
-    expect(r.pesos.best_match).toBeGreaterThan(r.pesos.gfs_seamless);
+    expect(r.fonte).toBe('hindcast');
+    expect(r.pesos.gfs_seamless).toBeGreaterThan(r.pesos.ecmwf_ifs025);
+    expect(r.pesos.ecmwf_ifs025).toBeGreaterThan(r.pesos.gem_global);
+  });
+  it('o ranking inverte com o horizonte: a D+3 o GFS (MAE 2,87) pesa menos que GEM (1,14)', () => {
+    const h = (m: string, mae: number) => erro(m, mae, 91, 3, 90, 'hindcast');
+    const r = calcularPesos([h('gem_global', 1.14), h('ukmo_seamless', 1.28), h('ecmwf_ifs025', 1.42), h('icon_seamless', 1.6), h('jma_seamless', 2.06), h('gfs_seamless', 2.87)], 3);
+    expect(r.pesos.gem_global).toBeGreaterThan(r.pesos.gfs_seamless * 2);
+  });
+  it('encolhimento: com poucos dias o peso fica perto do igual', () => {
+    const f = (n: number) => calcularPesos([erro('a', 0.5, n, 1, 90, 'hindcast'), erro('ecmwf_ifs025', 0.5, n, 1, 90, 'hindcast'), erro('gfs_seamless', 3, n, 1, 90, 'hindcast')], 1);
+    const poucos = f(30).pesos;
+    const muitos = f(90).pesos;
+    expect(poucos.gfs_seamless).toBeGreaterThan(muitos.gfs_seamless);
+    expect(poucos.gfs_seamless).toBeLessThan(1);
+  });
+  it('pluviômetro (≥ 20 dias) tem prioridade sobre o hindcast', () => {
+    const r = calcularPesos(
+      [erro('ecmwf_ifs025', 0.5, 25), erro('gfs_seamless', 4, 25), erro('ecmwf_ifs025', 4, 91, 1, 90, 'hindcast'), erro('gfs_seamless', 0.5, 91, 1, 90, 'hindcast')],
+      1,
+    );
+    expect(r.fonte).toBe('pluviometro');
+    expect(r.pesos.ecmwf_ifs025).toBeGreaterThan(r.pesos.gfs_seamless);
   });
   it('baldes de horizonte', () => {
     expect([0, 1, 2, 3, 4, 5, 10].map(baldeHorizonte)).toEqual([0, 1, 3, 3, 3, 7, 7]);
@@ -41,6 +64,9 @@ describe('pesos do ensemble', () => {
 });
 
 describe('correção de viés', () => {
+  it('hindcast NUNCA gera correção de viés (só pluviômetro)', () => {
+    expect(fatorCorrecao([{ ...erro('_fator', 0, 90, 0, 90, 'hindcast'), vies: 1.5 }]).ativo).toBe(false);
+  });
   it('inativa abaixo de 20 dias', () => {
     const r = fatorCorrecao([{ ...erro('_fator', 0, 10), vies: 1.4 }]);
     expect(r).toEqual({ fator: 1, nDias: 10, ativo: false });
@@ -62,7 +88,7 @@ describe('correção de viés', () => {
   });
 });
 
-const hora = (h: number, mm: number, extra: Partial<ValorHora> = {}): ValorHora => ({ ts: h, data: '2026-11-03', hora: h, mm, prob: 10, vento: 8, temp: 28, ur: 70, ...extra });
+const hora = (h: number, mm: number, extra: Partial<ValorHora> = {}): ValorHora => ({ ts: h, data: '2026-11-03', hora: h, mm, prob: 10, vento: 8, rajada: null, dir: null, temp: 28, ur: 70, nuvem: null, ...extra });
 const dia = (f: (h: number) => Partial<ValorHora> & { mm?: number }) => Array.from({ length: 24 }, (_, h) => hora(h, f(h).mm ?? 0, f(h)));
 
 describe('semáforos e janelas', () => {

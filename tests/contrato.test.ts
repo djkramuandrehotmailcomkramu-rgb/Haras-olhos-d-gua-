@@ -1,13 +1,16 @@
 // Contrato contra a API REAL (Open-Meteo via /api/previsao). Roda só com CONTRATO_URL definido:
 //   CONTRATO_URL=https://chuva-pro-fazenda-itaguaia.vercel.app npx vitest run tests/contrato.test.ts
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { diasPrevistos, horasPrevistas, hojeLocal, semaforos } from '../shared/calc';
 import { MODELOS } from '../shared/tipos';
 import type { PayloadPrevisao } from '../shared/tipos';
 
 const URL_ = process.env.CONTRATO_URL;
-describe.skipIf(!URL_)('contrato com dados reais', async () => {
-  const p: PayloadPrevisao = await fetch(`${URL_}/api/previsao?fazenda=lagoa-formosa&km=5`).then((r) => r.json());
+describe.skipIf(!URL_)('contrato com dados reais', () => {
+  let p: PayloadPrevisao;
+  beforeAll(async () => {
+    p = await fetch(`${URL_}/api/previsao?fazenda=lagoa-formosa&km=5`).then((r) => r.json());
+  });
   it('2+ grupos cobrindo os 18 talhões, sem erros de coleta', () => {
     expect(p.erros).toEqual([]);
     expect(p.grupos.length).toBeGreaterThanOrEqual(2);

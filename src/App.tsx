@@ -2,7 +2,8 @@ import { useEffect } from 'preact/hooks';
 import { aba, carregar, status, payload, online } from './state';
 import type { Aba } from './state';
 import { haMinutos } from './net';
-import { IcAtualizar, IcCalendario, IcEngrenagem, IcGota, IcGrade, IcGrafico, IcMapa, IcRegua, IcWifiOff } from './icons';
+import { IcAtualizar, IcCalendario, IcCompartilhar, IcEngrenagem, IcGota, IcGrade, IcGrafico, IcMapa, IcRegua, IcWifiOff } from './icons';
+import { compartilharWhats } from './resumo';
 import { Hoje } from './screens/Hoje';
 import { Semana } from './screens/Semana';
 import { Talhoes } from './screens/Talhoes';
@@ -12,11 +13,13 @@ import { Confiabilidade } from './screens/Confiabilidade';
 import { Ajustes } from './screens/Ajustes';
 
 const ABAS: { id: Aba; nome: string; Ic: (p: { size?: number }) => any }[] = [
-  { id: 'hoje', nome: 'Hoje', Ic: IcGota },
-  { id: 'semana', nome: 'Semana', Ic: IcCalendario },
+  { id: 'hoje', nome: 'Condições', Ic: IcGota },
+  { id: 'semana', nome: 'Previsão', Ic: IcCalendario },
   { id: 'talhoes', nome: 'Talhões', Ic: IcGrade },
   { id: 'mapa', nome: 'Mapa', Ic: IcMapa },
   { id: 'medida', nome: 'Medida', Ic: IcRegua },
+  { id: 'confiab', nome: 'Precisão', Ic: IcGrafico },
+  { id: 'ajustes', nome: 'Ajustes', Ic: IcEngrenagem },
 ];
 
 export function App() {
@@ -38,9 +41,11 @@ export function App() {
   return (
     <>
       <header class="top">
+        <img src="/icon-192.png" alt="" />
         <h1>
-          Lagoa Formosa
+          Chuva Pro
           <small>
+            Lagoa Formosa ·{' '}
             {s.carregando && !payload.value
               ? 'carregando…'
               : s.offline
@@ -58,11 +63,8 @@ export function App() {
         <button class="ib" aria-label="Atualizar agora" onClick={() => carregar(true)} disabled={s.carregando}>
           <IcAtualizar />
         </button>
-        <button class={`ib ${a === 'confiab' ? 'on' : ''}`} aria-label="Confiabilidade" onClick={() => (aba.value = 'confiab')}>
-          <IcGrafico />
-        </button>
-        <button class={`ib ${a === 'ajustes' ? 'on' : ''}`} aria-label="Ajustes" onClick={() => (aba.value = 'ajustes')}>
-          <IcEngrenagem />
+        <button class="ib" aria-label="Enviar resumo no WhatsApp" onClick={compartilharWhats}>
+          <IcCompartilhar />
         </button>
       </header>
       <main>

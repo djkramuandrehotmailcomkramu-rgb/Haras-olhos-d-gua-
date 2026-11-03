@@ -17,7 +17,7 @@ export function visaoGrupo(p: PayloadPrevisao, g: Grupo, erros: import('../share
   const hoje = hojeLocal(p.fazenda.fuso);
   const v = {
     grupo: g,
-    dias: diasPrevistos(g.forecast, p.fazenda.fuso, erros, hoje),
+    dias: diasPrevistos(g.forecast, p.fazenda.fuso, erros, hoje, g.ens),
     horas: horasPrevistas(g.forecast, g.meteo, p.fazenda.fuso, erros, hoje),
   };
   if (memo.size > 12) memo.clear();

@@ -1,11 +1,25 @@
-export type ModeloId = 'best_match' | 'ecmwf_ifs025' | 'gfs_seamless' | 'icon_seamless';
-export const MODELOS: ModeloId[] = ['best_match', 'ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'];
+export type ModeloId = 'ecmwf_ifs025' | 'gfs_seamless' | 'icon_seamless' | 'gem_global' | 'jma_seamless' | 'ukmo_seamless';
+// best_match fica de fora da média: é uma mistura que repete o ECMWF aqui (mesma probabilidade) e teve erro maior no histórico.
+export const MODELOS: ModeloId[] = ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless', 'gem_global', 'jma_seamless', 'ukmo_seamless'];
 export const NOME_MODELO: Record<ModeloId, string> = {
-  best_match: 'Open-Meteo (melhor)',
   ecmwf_ifs025: 'ECMWF',
   gfs_seamless: 'GFS',
   icon_seamless: 'ICON',
+  gem_global: 'GEM',
+  jma_seamless: 'JMA',
+  ukmo_seamless: 'UKMO',
 };
+
+/** Resumo diário do ensemble (ECMWF 51 + GEFS 30 membros). */
+export interface EnsDia {
+  data: string; // yyyy-mm-dd local
+  n: number; // membros usados
+  p1: number; // % de membros com ≥ 1 mm
+  p10mm: number; // % de membros com ≥ 10 mm
+  q10: number;
+  q50: number;
+  q90: number;
+}
 
 export interface Fazenda {
   id: string;
@@ -42,6 +56,7 @@ export interface ForecastRaw {
 /** Resposta crua para vento/temperatura/umidade (sem `models`, chaves sem sufixo). */
 export interface MeteoRaw {
   hourly: { time: number[] } & Record<string, Serie | number[]>;
+  daily?: { time: number[]; sunrise?: number[]; sunset?: number[] };
 }
 
 export interface Grupo {
@@ -52,6 +67,7 @@ export interface Grupo {
   grade: { lat: number; lon: number; elev: number };
   forecast: ForecastRaw;
   meteo: MeteoRaw | null;
+  ens: EnsDia[] | null;
 }
 
 export interface PayloadPrevisao {
@@ -66,6 +82,7 @@ export interface ErroModelo {
   modelo: string;
   horizonte: number;
   janela: number; // 30 ou 90 dias
+  fonte: 'pluviometro' | 'hindcast' | string;
   n_dias: number;
   mae: number | null;
   vies: number | null;

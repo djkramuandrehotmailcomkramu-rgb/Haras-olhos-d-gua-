@@ -1,4 +1,4 @@
-import { ErroModelo, ForecastRaw, Limites, LIMITES_PADRAO, MeteoRaw, MODELOS, ModeloId, Serie } from './tipos';
+import { EnsDia, ErroModelo, ForecastRaw, Limites, LIMITES_PADRAO, MeteoRaw, MODELOS, ModeloId, Serie } from './tipos';
 
 // ---------- tempo local ----------
 export function partesLocais(ts: number, fuso: string) {
@@ -39,10 +39,12 @@ const serie = (obj: Record<string, unknown>, chave: string): Serie | null => {
 export interface PesosModelo {
   pesos: Record<ModeloId, number>;
   calibrado: boolean;
+  fonte: 'pluviometro' | 'hindcast' | null;
   nDias: number;
 }
 
-const pesosIguais = (): Record<ModeloId, number> => ({ best_match: 1, ecmwf_ifs025: 1, gfs_seamless: 1, icon_seamless: 1 });
+const pesosIguais = (): Record<ModeloId, number> =>
+  Object.fromEntries(MODELOS.map((m) => [m, 1])) as Record<ModeloId, number>;
 
 /** Horizonte em dias → balde de erro usado (0, 1, 3 ou 7). */
 export function baldeHorizonte(dias: number): number {
@@ -52,25 +54,40 @@ export function baldeHorizonte(dias: number): number {
   return 7;
 }
 
+const mediana = (v: number[]) => {
+  const s = [...v].sort((a, b) => a - b);
+  return s.length ? s[Math.floor(s.length / 2)] : 0;
+};
+
 /**
- * Peso por modelo ∝ 1/(MAE+0,5), só com ≥ minDias de erro medido naquele horizonte.
- * Sem dados suficientes → pesos iguais e `calibrado=false` (nunca finge calibração).
+ * Peso por modelo e horizonte aprendido do erro (MAE): habilidade = 1/(MAE+0,3)², normalizada,
+ * e puxada para pesos iguais conforme poucos dias (encolhimento λ = min(1, dias/60)).
+ * Fonte preferida: o SEU pluviômetro (≥ minDias); senão o histórico de 90 dias contra
+ * satélite/reanálise ("hindcast", ≥ 30 dias). Sem nenhum dos dois → pesos iguais, `calibrado=false`.
  */
 export function calcularPesos(erros: ErroModelo[], horizonteDias: number, minDias = 20): PesosModelo {
   const h = baldeHorizonte(horizonteDias);
-  const doBalde = erros.filter((e) => e.janela === 90 && e.horizonte === h && e.mae != null && (MODELOS as string[]).includes(e.modelo));
-  const nDias = doBalde.reduce((m, e) => Math.max(m, e.n_dias), 0);
-  if (doBalde.length < 2 || doBalde.some((e) => e.n_dias < minDias)) {
-    return { pesos: pesosIguais(), calibrado: false, nDias };
+  const doBalde = (fonte: string, min: number) =>
+    erros.filter(
+      (e) => (e.fonte ?? 'pluviometro') === fonte && e.janela === 90 && e.horizonte === h && e.mae != null && e.n_dias >= min && (MODELOS as string[]).includes(e.modelo),
+    );
+  const nMax = erros.filter((e) => e.janela === 90 && e.horizonte === h && (MODELOS as string[]).includes(e.modelo)).reduce((m, e) => Math.max(m, e.n_dias), 0);
+  for (const [fonte, min] of [['pluviometro', minDias], ['hindcast', 30]] as const) {
+    const rows = doBalde(fonte, min);
+    if (rows.length < 2) continue;
+    const hab = rows.map((e) => 1 / ((e.mae as number) + 0.3) ** 2);
+    const media = hab.reduce((a, b) => a + b, 0) / hab.length;
+    const lambda = Math.min(1, mediana(rows.map((e) => e.n_dias)) / 60);
+    const pesos = pesosIguais();
+    rows.forEach((e, i) => (pesos[e.modelo as ModeloId] = (1 - lambda) + lambda * (hab[i] / media)));
+    return { pesos, calibrado: true, fonte, nDias: Math.max(...rows.map((e) => e.n_dias)) };
   }
-  const pesos = pesosIguais();
-  for (const e of doBalde) pesos[e.modelo as ModeloId] = 1 / ((e.mae as number) + 0.5);
-  return { pesos, calibrado: true, nDias };
+  return { pesos: pesosIguais(), calibrado: false, fonte: null, nDias: nMax };
 }
 
-/** Fator multiplicativo de correção de viés (linha `_fator`). Só vale com ≥ minDias. */
+/** Fator multiplicativo de correção de viés — SÓ com chuva medida no pluviômetro (≥ minDias). */
 export function fatorCorrecao(erros: ErroModelo[], minDias = 20): { fator: number; nDias: number; ativo: boolean } {
-  const r = erros.find((e) => e.modelo === '_fator' && e.janela === 90);
+  const r = erros.find((e) => e.modelo === '_fator' && e.janela === 90 && (e.fonte ?? 'pluviometro') === 'pluviometro');
   if (!r) return { fator: 1, nDias: 0, ativo: false };
   const ativo = r.n_dias >= minDias && r.vies != null && r.vies > 0;
   return { fator: ativo ? (r.vies as number) : 1, nDias: r.n_dias, ativo };
@@ -84,7 +101,11 @@ export interface ValorDia {
   provavel: number | null; // bruto × fator
   min: number | null;
   max: number | null;
-  prob: number | null;
+  prob: number | null; // % de chance de ≥ 1 mm (ensemble, quando disponível)
+  probFonte: 'ensemble' | 'modelos' | null;
+  q10: number | null; // faixa realista (ensemble) já corrigida
+  q90: number | null;
+  p10mm: number | null; // % de chance de ≥ 10 mm
   nModelos: number;
 }
 
@@ -98,6 +119,7 @@ export function diasPrevistos(
   fuso: string,
   erros: ErroModelo[] = [],
   hoje: string = hojeLocal(fuso),
+  ens: EnsDia[] | null = null,
 ): ValorDia[] {
   const t = f.daily.time as number[];
   const { fator } = fatorCorrecao(erros);
@@ -118,6 +140,8 @@ export function diasPrevistos(
     }
     const bruto = mediaPonderada(vals);
     const mms = vals.map((x) => x.v);
+    const e = ens?.find((x) => x.data === data) ?? null;
+    const pm = mediaPonderada(probs);
     return {
       data,
       ts,
@@ -126,7 +150,11 @@ export function diasPrevistos(
       provavel: bruto == null ? null : bruto * fator,
       min: mms.length ? Math.min(...mms) * fator : null,
       max: mms.length ? Math.max(...mms) * fator : null,
-      prob: mediaPonderada(probs),
+      prob: e ? e.p1 : pm,
+      probFonte: e ? 'ensemble' : pm != null ? 'modelos' : null,
+      q10: e ? e.q10 * fator : null,
+      q90: e ? e.q90 * fator : null,
+      p10mm: e ? e.p10mm : null,
       nModelos: vals.length,
     };
   });
@@ -139,8 +167,11 @@ export interface ValorHora {
   mm: number | null;
   prob: number | null;
   vento: number | null;
+  rajada: number | null;
+  dir: number | null;
   temp: number | null;
   ur: number | null;
+  nuvem: number | null;
 }
 
 export function horasPrevistas(
@@ -176,8 +207,11 @@ export function horasPrevistas(
       mm: mm == null ? null : mm * fator,
       prob: mediaPonderada(probs),
       vento: get('wind_speed_10m'),
+      rajada: get('wind_gusts_10m'),
+      dir: get('wind_direction_10m'),
       temp: get('temperature_2m'),
       ur: get('relative_humidity_2m'),
+      nuvem: get('cloud_cover'),
     };
   });
 }
@@ -212,7 +246,26 @@ function classificar(janela: { ini: number; fim: number } | null, minH: number, 
   return { estado: 'amarelo', janela, motivo: `Janela curta de ${dur} h; mínimo recomendado ${minH} h` };
 }
 
-/** horas = apenas as do dia local (6h–20h são consideradas operacionais). */
+export type Operacao = 'pulv' | 'plantio' | 'colheita';
+
+/** Hora a hora: true = condição adequada para a operação (mesma regra dos semáforos). */
+export function horasOk(op: Operacao, horas: ValorHora[], lim: Limites = LIMITES_PADRAO): boolean[] {
+  const sec = (i: number, n: number) => horas.slice(i, i + n).every((h) => (h.mm ?? 0) <= 0.2);
+  return horas.map((h, i) => {
+    if (op === 'pulv')
+      return (
+        (h.mm ?? 0) <= lim.pulv_chuva_max &&
+        sec(i, 3) &&
+        (h.vento == null || h.vento <= lim.pulv_vento_max) &&
+        (h.temp == null || h.temp <= lim.pulv_temp_max) &&
+        (h.ur == null || h.ur >= lim.pulv_ur_min)
+      );
+    if (op === 'plantio') return (h.mm ?? 0) <= 2;
+    return (h.mm ?? 0) <= lim.colheita_chuva_max && sec(i, 2) && (h.ur == null || h.ur <= lim.colheita_ur_max);
+  });
+}
+
+/** horas = horas do dia local; só 6h–20h são operacionais. */
 export function semaforos(
   horasDia: ValorHora[],
   chuvaDiaMm: number | null,
@@ -225,44 +278,28 @@ export function semaforos(
     return { pulverizacao: sd, plantio: sd, colheita: sd };
   }
   const horas = op.map((h) => h.hora);
-  const prox = (i: number, n: number) => op.slice(i, i + n).every((h) => (h.mm ?? 0) <= 0.2);
 
-  // Pulverização: sem chuva (hora e janela seguinte), vento, temperatura e UR dentro dos limites
   const faltaMeteo = op.every((h) => h.vento == null);
-  const okP = op.map(
-    (h, i) =>
-      (h.mm ?? 0) <= lim.pulv_chuva_max &&
-      prox(i, 3) &&
-      (h.vento == null || h.vento <= lim.pulv_vento_max) &&
-      (h.temp == null || h.temp <= lim.pulv_temp_max) &&
-      (h.ur == null || h.ur >= lim.pulv_ur_min),
-  );
   const motivoPFalha = faltaMeteo
     ? 'Chuva prevista nas horas de trabalho'
     : `Chuva, vento > ${lim.pulv_vento_max} km/h, temp. > ${lim.pulv_temp_max} °C ou UR < ${lim.pulv_ur_min}% em todas as horas`;
   const pulverizacao = classificar(
-    melhorJanela(okP, horas),
+    melhorJanela(horasOk('pulv', op, lim), horas),
     lim.janela_min_h,
     motivoPFalha,
     'Sem chuva e dentro dos limites de vento/temperatura/UR',
   );
 
-  // Plantio: depende do total do dia + solo já úmido (medido) + sem chuva forte em hora
   let plantio: Semaforo;
   if (chuvaDiaMm == null) plantio = { estado: 'sem-dados', janela: null, motivo: 'Sem previsão do dia' };
   else if (chuvaDiaMm > lim.plantio_dia_max)
     plantio = { estado: 'vermelho', janela: null, motivo: `${fmtMm(chuvaDiaMm)} mm previstos (limite ${lim.plantio_dia_max} mm)` };
   else if (medido3d != null && medido3d > lim.plantio_acum_max)
     plantio = { estado: 'vermelho', janela: null, motivo: `Solo encharcado: ${fmtMm(medido3d)} mm medidos em 3 dias` };
-  else {
-    const okL = op.map((h) => (h.mm ?? 0) <= 2);
-    plantio = classificar(melhorJanela(okL, horas), lim.janela_min_h, 'Chuva forte em todas as horas', 'Chuva dentro do limite');
-  }
+  else plantio = classificar(melhorJanela(horasOk('plantio', op, lim), horas), lim.janela_min_h, 'Chuva forte em todas as horas', 'Chuva dentro do limite');
 
-  // Colheita: sem chuva e UR baixa (grão seco)
-  const okC = op.map((h, i) => (h.mm ?? 0) <= lim.colheita_chuva_max && prox(i, 2) && (h.ur == null || h.ur <= lim.colheita_ur_max));
   const colheita = classificar(
-    melhorJanela(okC, horas),
+    melhorJanela(horasOk('colheita', op, lim), horas),
     lim.janela_min_h,
     `Chuva ou UR > ${lim.colheita_ur_max}% em todas as horas`,
     'Sem chuva e umidade do ar adequada',

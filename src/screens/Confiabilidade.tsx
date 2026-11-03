@@ -8,8 +8,10 @@ const HZ: [number, string][] = [[0, 'Hoje'], [1, '24 h'], [3, '3 dias'], [7, '7 
 
 export function Confiabilidade() {
   const [janela, setJanela] = useState(90);
-  const rows = erros.value.filter((e) => e.janela === janela);
+  const [fonte, setFonte] = useState<'pluviometro' | 'hindcast'>('hindcast');
+  const rows = erros.value.filter((e) => e.janela === (fonte === 'hindcast' ? 90 : janela) && (e.fonte ?? 'pluviometro') === fonte);
   const fator = fatorCorrecao(erros.value);
+  const nPluv = Math.max(0, ...erros.value.filter((e) => (e.fonte ?? 'pluviometro') === 'pluviometro' && e.modelo !== '_fator').map((e) => e.n_dias));
   const nMax = Math.max(0, ...rows.filter((e) => e.modelo !== '_fator').map((e) => e.n_dias));
   const pct = (v: number | null) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 
@@ -17,20 +19,35 @@ export function Confiabilidade() {
     <>
       <div class="card">
         <h2>Confiabilidade da previsão</h2>
-        <div class="chips" role="group" aria-label="Janela">
-          {[30, 90].map((j) => (
-            <button class="chip" aria-pressed={janela === j} onClick={() => setJanela(j)}>
-              Últimos {j} dias
-            </button>
-          ))}
+        <div class="chips" role="group" aria-label="Fonte da comparação">
+          <button class="chip" aria-pressed={fonte === 'hindcast'} onClick={() => setFonte('hindcast')}>
+            Satélite/reanálise (90 d)
+          </button>
+          <button class="chip" aria-pressed={fonte === 'pluviometro'} onClick={() => setFonte('pluviometro')}>
+            Seu pluviômetro
+          </button>
         </div>
-        <div class="muted">
-          Compara o que cada modelo previu com a chuva <b>medida no seu pluviômetro</b>. Chuva ≥ 1 mm conta como "choveu".
-        </div>
-        {nMax < 20 && (
-          <div class="aviso">
-            <b>Ainda calibrando ({nMax} de 20 dias com medida).</b> Lance a chuva diariamente em “Medida”. Até lá, os modelos têm peso igual e não há correção de viés — os números abaixo são parciais e não devem ser tratados como definitivos.
+        {fonte === 'pluviometro' && (
+          <div class="chips" role="group" aria-label="Janela">
+            {[30, 90].map((j) => (
+              <button class="chip" aria-pressed={janela === j} onClick={() => setJanela(j)}>
+                Últimos {j} dias
+              </button>
+            ))}
           </div>
+        )}
+        <div class="muted">
+          {fonte === 'hindcast'
+            ? 'Compara o que cada modelo previu (com 0, 1, 3 e 7 dias de antecedência) com a chuva estimada por reanálise ERA5 e NASA POWER nos últimos 90 dias. Já vale desde o primeiro dia, mas NÃO é chuva medida na fazenda.'
+            : 'Compara com a chuva medida no seu pluviômetro. Chuva ≥ 1 mm conta como "choveu".'}
+        </div>
+        {fonte === 'pluviometro' && nMax < 20 && (
+          <div class="aviso">
+            <b>Ainda calibrando ({nPluv} de 20 dias com medida).</b> Lance a chuva todo dia em “Medida”. Até lá, os pesos vêm do histórico por satélite/reanálise e não há correção de viés.
+          </div>
+        )}
+        {fonte === 'hindcast' && (
+          <div class="aviso">O período recente é de estiagem (poucos dias de chuva); o desempenho na época das águas pode mudar o ranking. O app recalcula todo dia.</div>
         )}
         {status.value.ts == null && <div class="aviso">Sem conexão com o servidor.</div>}
       </div>
