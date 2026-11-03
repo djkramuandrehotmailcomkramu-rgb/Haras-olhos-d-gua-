@@ -38,8 +38,10 @@ export function Mapa() {
     poligonos.current = L.layerGroup().addTo(m);
     map.current = m;
     return () => {
-      m.remove();
       map.current = null;
+      m.stop();
+      m.off();
+      m.remove();
     };
   }, []);
 
@@ -61,7 +63,7 @@ export function Mapa() {
       pts.forEach((p) => bounds.push(L.latLng(p)));
     }
     if (bounds.length && !(m as any)._ajustado) {
-      m.fitBounds(L.latLngBounds(bounds), { padding: [16, 16] });
+      m.fitBounds(L.latLngBounds(bounds), { padding: [16, 16], animate: false });
       (m as any)._ajustado = true;
     }
     const tmr = setTimeout(() => {
@@ -111,7 +113,7 @@ export function Mapa() {
         const t = talhoes.value.find((x) => dentro(lat, lon, x));
         setGps(t ? `Você está no talhão ${t.nome}.` : 'Você está fora dos talhões cadastrados.');
         if (map.current) {
-          map.current.setView([lat, lon], 15);
+          map.current.setView([lat, lon], 15, { animate: false });
           L.circleMarker([lat, lon], { radius: 8, color: '#7BE04A', fillColor: '#7BE04A', fillOpacity: 1 }).addTo(map.current);
         }
       },
