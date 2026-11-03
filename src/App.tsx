@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { aba, carregar, status, payload } from './state';
+import { aba, carregar, status, payload, online } from './state';
 import type { Aba } from './state';
 import { haMinutos } from './net';
 import { IcAtualizar, IcCalendario, IcEngrenagem, IcGota, IcGrade, IcGrafico, IcMapa, IcRegua, IcWifiOff } from './icons';
@@ -33,7 +33,7 @@ export function App() {
     };
   }, []);
 
-  const s = status.value;
+  const s = { ...status.value, offline: status.value.offline || !online.value };
   const a = aba.value;
   return (
     <>

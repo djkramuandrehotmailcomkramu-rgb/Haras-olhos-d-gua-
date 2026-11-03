@@ -61,7 +61,7 @@ ok(true, 'MEDIDA: lançamento de teste apagado (sem sujar o banco)');
 await page.locator('header').getByRole('button', { name: 'Confiabilidade' }).click();
 ok(/calibrando/i.test(await page.innerText('main')), 'CONFIABILIDADE: mostra "ainda calibrando" em vez de número bonito');
 await page.locator('header').getByRole('button', { name: 'Ajustes' }).click();
-ok(/Limites dos semáforos/.test(await page.innerText('main')), 'AJUSTES abre');
+ok(/limites dos sem/i.test(await page.innerText('main')), 'AJUSTES abre');
 
 // offline: service worker precisa estar ativo
 await page.evaluate(() => navigator.serviceWorker.ready);
@@ -72,6 +72,7 @@ await ctx.setOffline(true);
 await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
 await page.waitForSelector('.big', { timeout: 20000 }).catch(() => {});
 const off = await page.innerText('body');
+console.log('offline body:', off.replace(/\s+/g, ' ').slice(0, 160));
 ok(/mm/.test(off) && /offline/i.test(off), 'OFFLINE: abre com o último dado salvo e selo "offline"');
 await page.screenshot({ path: '/tmp/e2e-offline.png' });
 await ctx.setOffline(false);

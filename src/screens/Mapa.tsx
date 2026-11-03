@@ -64,7 +64,10 @@ export function Mapa() {
       m.fitBounds(L.latLngBounds(bounds), { padding: [16, 16] });
       (m as any)._ajustado = true;
     }
-    setTimeout(() => m.invalidateSize(), 50);
+    const tmr = setTimeout(() => {
+      if (map.current === m) m.invalidateSize();
+    }, 50);
+    return () => clearTimeout(tmr);
   }, [linhas, per]);
 
   // Radar RainViewer (quadros do passado). Só visual: não gera alerta.
@@ -107,8 +110,10 @@ export function Mapa() {
         const { latitude: lat, longitude: lon } = pos.coords;
         const t = talhoes.value.find((x) => dentro(lat, lon, x));
         setGps(t ? `Você está no talhão ${t.nome}.` : 'Você está fora dos talhões cadastrados.');
-        map.current?.setView([lat, lon], 15);
-        L.circleMarker([lat, lon], { radius: 8, color: '#7BE04A', fillColor: '#7BE04A', fillOpacity: 1 }).addTo(map.current!);
+        if (map.current) {
+          map.current.setView([lat, lon], 15);
+          L.circleMarker([lat, lon], { radius: 8, color: '#7BE04A', fillColor: '#7BE04A', fillOpacity: 1 }).addTo(map.current);
+        }
       },
       (e) => setGps(`Não consegui o GPS: ${e.message}`),
       { enableHighAccuracy: true, timeout: 15000 },
