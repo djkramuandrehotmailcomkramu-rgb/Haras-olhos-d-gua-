@@ -119,7 +119,7 @@ export function Hoje() {
         ? hh.ur >= lim.pulv_ur_min + 10 ? 'verde' : hh.ur >= lim.pulv_ur_min ? 'amarelo' : 'vermelho'
         : hh.ur <= lim.colheita_ur_max - 10 ? 'verde' : hh.ur <= lim.colheita_ur_max ? 'amarelo' : 'vermelho';
 
-  const faixaTxt = d?.q10 != null && d?.q90 != null ? `${fmtMm(d.q10)}–${fmtMm(d.q90)} mm (P10–P90, 81 cenários)` : `${fmtMm(d?.min)}–${fmtMm(d?.max)} mm (entre modelos)`;
+  const faixaTxt = d?.q10 != null && d?.q90 != null ? `${fmtMm(d.q10)}–${fmtMm(d.q90)} mm (P10–P90 do ensemble)` : `${fmtMm(d?.min)}–${fmtMm(d?.max)} mm (entre modelos)`;
   const n = (v: number | null | undefined, un = '') => (v == null ? '—' : `${Math.round(v)}${un}`);
 
   return (
@@ -250,7 +250,7 @@ export function Hoje() {
         </table>
         <div class="aviso">
           Pesos {pesos.calibrado ? (pesos.fonte === 'pluviometro' ? `aprendidos com o seu pluviômetro (${pesos.nDias} dias)` : `aprendidos no histórico de ${pesos.nDias} dias contra satélite/reanálise (não é pluviômetro)`) : 'iguais (sem histórico suficiente)'} para {dh <= 0 ? 'hoje' : `${dh} dia(s) à frente`}.{' '}
-          {fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos 81 cenários do ensemble com ≥ 1 mm' : 'média dos modelos'}. Grade ECMWF {g.grade.lat.toFixed(2)},{g.grade.lon.toFixed(2)}
+          {fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos cenários do ensemble (6 sistemas, até 212 membros, cada sistema com o mesmo peso) com ≥ 1 mm' : 'média dos modelos'}. Grade ECMWF {g.grade.lat.toFixed(2)},{g.grade.lon.toFixed(2)}
           {t ? ` · ${t.nome}` : ` · grupo ${g.id}`}.
         </div>
         <div class="aviso">

@@ -55,12 +55,13 @@ describe.skipIf(!URL_)('contrato com dados reais', () => {
     }
     expect(assinaturaPrevisao(a.forecast)).toBe(assinaturaPrevisao(a.forecast));
   });
-  it('ensemble: 82 membros (51 depois de ~10 dias) e probabilidades coerentes', () => {
+  it('ensemble multi-sistema: ≥ 2 sistemas por dia e probabilidades coerentes', () => {
     for (const g of p.grupos) {
       expect(g.ens).not.toBeNull();
       expect(g.ens!.length).toBeGreaterThanOrEqual(14);
       for (const e of g.ens!) {
-        expect(e.n).toBeGreaterThanOrEqual(50); // 82 membros até ~10 dias; depois só os 51 do ECMWF
+        expect(e.n).toBeGreaterThanOrEqual(60); // 212 membros no início; depois só os sistemas de 15 dias (IFS, AIFS, GEM)
+        expect(e.sistemas).toBeGreaterThanOrEqual(2);
         expect(e.p1 >= e.p10mm).toBe(true);
         expect(e.q10 <= e.q50 && e.q50 <= e.q90).toBe(true);
       }

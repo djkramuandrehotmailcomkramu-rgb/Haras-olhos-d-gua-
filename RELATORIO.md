@@ -19,6 +19,24 @@ Data: 03/11/2026. Escopo final: **somente Fazenda Lagoa Formosa** (Itaguaia foi 
 - **Ensemble:** 82 membros até ~10 dias; depois disso só os 51 do ECMWF.
 - **Cuidado:** o hindcast usa os últimos 90 dias (estiagem, poucos dias de chuva) e a referência é reanálise, não pluviômetro. O ranking pode mudar na época das águas.
 
+## Busca dos modelos gratuitos mais precisos (04/11)
+Testados com dado real no ponto da fazenda (90 dias de previsões antigas × média de ERA5 e NASA POWER; D+1 / D+3 / D+5 / D+7, erro médio em mm/dia):
+| Modelo | D+1 | D+3 | D+5 | D+7 |
+|---|---|---|---|---|
+| **ECMWF AIFS (IA)** | **0,76** | **1,04** | **1,07** | **1,06** |
+| GFS | 0,80 | — | 1,22 | 1,48 |
+| UKMO | 1,09 | 1,10 | 1,32 | — |
+| GEM | 1,42 | 1,06 | 1,38 | 1,29 |
+| ECMWF IFS 25 km | 1,07 | 1,28 | 2,14 | 1,86 |
+| ECMWF IFS 9 km | 1,23 | 1,56 | 2,06 | 1,87 |
+| ICON | 1,39 | 1,48 | 1,18 | sem dado |
+| JMA / Météo-France / CMA | 1,3–1,7 | pior ou pouca cobertura | | |
+- O **AIFS** (a chave certa é `ecmwf_aifs025_single`; antes testei a errada) foi o melhor em todos os horizontes e detectou 8 de 8 chuvas ≥ 5 mm a D+3. Entrou no topo; JMA/Météo-France/CMA saíram; o IFS (25 e 9 km) tem viés úmido de +1,2 a +1,6 mm/dia de D+5 a D+7 (os pesos já o reduzem).
+- **Ensembles gratuitos disponíveis:** IFS 51, **AIFS 51**, GEFS 31, ICON 40, GEM 21, UKMO 18 membros — 212 no total, em 0,6 s.
+- **Sem dado na região:** GraphCast, KMA, BOM.
+- **Fonte observada brasileira gratuita (não integrada):** MERGE do INPE/CPTEC (GPM-IMERG late ajustado por pluviômetros, 10 km, diário, até o dia anterior), em `ftp.cptec.inpe.br/modelos/tempo/MERGE/GPM/DAILY/`, sem cadastro; GRIB2 com empacotamento complexo (precisa de decodificador próprio). Seria a melhor referência para calibrar e para mostrar "choveu ontem" por talhão.
+- Limite: 8 eventos ≥ 5 mm no período — amostra pequena; o ranking de detecção de chuva forte é indicativo.
+
 ## NÃO validado / limitações
 1. **Precisão da previsão: desconhecida.** Ainda não há 1 dia de chuva medida. Pesos por modelo e correção de viés ficam **inativos até 20 dias** de pluviômetro (a tela mostra "calibrando"). Nada foi comparado com a realidade.
 2. **Os modelos discordam muito** (ex.: 09 e 10/11 → ECMWF 26 e 30 mm; best_match 10 e 9 mm). Sem calibração, a "provável" é média simples. O `best_match` repete as probabilidades do ECMWF na região (não são independentes).

@@ -32,7 +32,7 @@ describe('pesos do ensemble', () => {
   });
   it('hindcast de 90 dias (valores reais, ERA5, D+1): GFS pesa mais que ECMWF e GEM', () => {
     const h = (m: string, mae: number) => erro(m, mae, 91, 1, 90, 'hindcast');
-    const r = calcularPesos([h('gfs_seamless', 0.94), h('ecmwf_ifs025', 1.11), h('ukmo_seamless', 1.15), h('icon_seamless', 1.59), h('jma_seamless', 1.62), h('gem_global', 1.71)], 1);
+    const r = calcularPesos([h('gfs_seamless', 0.94), h('ecmwf_ifs025', 1.11), h('ukmo_seamless', 1.15), h('icon_seamless', 1.59), h('ecmwf_aifs025_single', 1.62), h('gem_global', 1.71)], 1);
     expect(r.calibrado).toBe(true);
     expect(r.fonte).toBe('hindcast');
     expect(r.pesos.gfs_seamless).toBeGreaterThan(r.pesos.ecmwf_ifs025);
@@ -40,7 +40,7 @@ describe('pesos do ensemble', () => {
   });
   it('o ranking inverte com o horizonte: a D+3 o GFS (MAE 2,87) pesa menos que GEM (1,14)', () => {
     const h = (m: string, mae: number) => erro(m, mae, 91, 3, 90, 'hindcast');
-    const r = calcularPesos([h('gem_global', 1.14), h('ukmo_seamless', 1.28), h('ecmwf_ifs025', 1.42), h('icon_seamless', 1.6), h('jma_seamless', 2.06), h('gfs_seamless', 2.87)], 3);
+    const r = calcularPesos([h('gem_global', 1.14), h('ukmo_seamless', 1.28), h('ecmwf_ifs025', 1.42), h('icon_seamless', 1.6), h('ecmwf_aifs025_single', 2.06), h('gfs_seamless', 2.87)], 3);
     expect(r.pesos.gem_global).toBeGreaterThan(r.pesos.gfs_seamless * 2);
   });
   it('encolhimento: com poucos dias o peso fica perto do igual', () => {

@@ -1,19 +1,21 @@
-export type ModeloId = 'ecmwf_ifs025' | 'gfs_seamless' | 'icon_seamless' | 'gem_global' | 'jma_seamless' | 'ukmo_seamless';
-// best_match fica de fora da média: é uma mistura que repete o ECMWF aqui (mesma probabilidade) e teve erro maior no histórico.
-export const MODELOS: ModeloId[] = ['ecmwf_ifs025', 'gfs_seamless', 'icon_seamless', 'gem_global', 'jma_seamless', 'ukmo_seamless'];
+export type ModeloId = 'ecmwf_aifs025_single' | 'ecmwf_ifs025' | 'gfs_seamless' | 'icon_seamless' | 'gem_global' | 'ukmo_seamless';
+// Escolhidos por teste real (90 dias, D+1 a D+7, vs ERA5+NASA POWER): o AIFS (IA do ECMWF) teve o menor erro em todos os horizontes.
+// Fora: best_match (repete o ECMWF), JMA/Météo-France/CMA (erro maior ou pouca cobertura), ECMWF IFS 9 km (mesmo viés úmido do 25 km).
+export const MODELOS: ModeloId[] = ['ecmwf_aifs025_single', 'ecmwf_ifs025', 'gfs_seamless', 'icon_seamless', 'gem_global', 'ukmo_seamless'];
 export const NOME_MODELO: Record<ModeloId, string> = {
-  ecmwf_ifs025: 'ECMWF',
+  ecmwf_aifs025_single: 'ECMWF AIFS (IA)',
+  ecmwf_ifs025: 'ECMWF IFS',
   gfs_seamless: 'GFS',
   icon_seamless: 'ICON',
   gem_global: 'GEM',
-  jma_seamless: 'JMA',
   ukmo_seamless: 'UKMO',
 };
 
-/** Resumo diário do ensemble (ECMWF 51 + GEFS 30 membros). */
+/** Resumo diário do ensemble multi-sistema (ECMWF IFS 51, AIFS 51, GEFS 31, ICON 40, GEM 21, UKMO 18 membros; cada sistema pesa igual). */
 export interface EnsDia {
   data: string; // yyyy-mm-dd local
   n: number; // membros usados
+  sistemas: number; // sistemas de ensemble com dados neste dia
   p1: number; // % de membros com ≥ 1 mm
   p10mm: number; // % de membros com ≥ 10 mm
   q10: number;
