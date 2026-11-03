@@ -2,7 +2,7 @@ import { useMemo, useState } from 'preact/hooks';
 import { aba, escopo, erros, medidas, limites, payload, talhoes } from '../state';
 import { Carregando } from './comum';
 import { LEGENDA_FAIXAS, addDias, faixaMm, fmtMm, hojeLocal } from '../../shared/calc';
-import { grupoDoTalhao, inicioSafra, medidoPeriodo, previstoPeriodo, talhoesNaCelula, visaoGrupo } from '../derive';
+import { chaveCelula, grupoDoTalhao, inicioSafra, medidoPeriodo, previstoPeriodo, talhoesNaCelula, visaoGrupo } from '../derive';
 
 type Per = 'hoje' | '3d' | '7d' | '15d' | 'safra';
 type Ord = 'chuva' | 'chance' | 'nome';
@@ -40,7 +40,7 @@ export function Talhoes() {
   const lista = linhas
     .filter((l) => l.t.nome.toLowerCase().includes(busca.toLowerCase()) && (grupo === 'todos' || l.g?.id === grupo))
     .sort((a, b) => (ord === 'nome' ? a.t.nome.localeCompare(b.t.nome) : ord === 'chance' ? (b.prob ?? -1) - (a.prob ?? -1) : (b.mm ?? -1) - (a.mm ?? -1)));
-  const celulasUnicas = new Set(p.grupos.map((g) => `${g.grade.lat.toFixed(3)},${g.grade.lon.toFixed(3)}`)).size;
+  const celulasUnicas = new Set(p.grupos.map(chaveCelula)).size;
 
   return (
     <>
@@ -76,7 +76,7 @@ export function Talhoes() {
           </div>
         </div>
         <div class="aviso">
-          {talhoes.value.length} talhões em {p.grupos.length} grupos de ~{limites.value.agrupamento_km} km, usando {celulasUnicas} célula(s) distinta(s) do modelo. Talhões na mesma célula mostram o mesmo número porque o modelo não enxerga diferença entre eles.
+          {talhoes.value.length} talhões em {p.grupos.length} grupos de ~{limites.value.agrupamento_km} km, com {celulasUnicas} previsão(ões) distinta(s). Talhões do mesmo grupo mostram o mesmo número porque os modelos (10–25 km) não enxergam diferença entre eles; "mesma célula" = todos os modelos idênticos.
           {per === 'safra' && ' Safra = chuva medida desde ' + inicioSafra(hojeLocal(p.fazenda.fuso), limites.value.safra_inicio).split('-').reverse().slice(0, 2).join('/') + '.'}
         </div>
       </div>

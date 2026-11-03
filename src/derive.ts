@@ -1,4 +1,4 @@
-import { addDias, diasPrevistos, hojeLocal, horasPrevistas, somaMm } from '../shared/calc';
+import { addDias, assinaturaPrevisao, diasPrevistos, hojeLocal, horasPrevistas, somaMm } from '../shared/calc';
 import type { ValorDia, ValorHora } from '../shared/calc';
 import type { Grupo, Medida, PayloadPrevisao, Talhao } from '../shared/tipos';
 
@@ -34,7 +34,8 @@ export function grupoReferencia(p: PayloadPrevisao): Grupo {
   return [...p.grupos].sort((a, b) => b.talhoes.length - a.talhoes.length)[0];
 }
 
-export const chaveCelula = (g: Grupo) => `${g.grade.lat.toFixed(3)},${g.grade.lon.toFixed(3)}`;
+/** Dois grupos são a "mesma célula" só se TODOS os modelos deram exatamente os mesmos números (as grades dos modelos diferem). */
+export const chaveCelula = (g: Grupo) => assinaturaPrevisao(g.forecast);
 
 /** Quantos talhões compartilham a mesma célula de grade do modelo (inclui o próprio). */
 export function talhoesNaCelula(p: PayloadPrevisao, talhaoId: string): number {

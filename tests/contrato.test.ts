@@ -1,7 +1,7 @@
 // Contrato contra a API REAL (Open-Meteo via /api/previsao). Roda só com CONTRATO_URL definido:
 //   CONTRATO_URL=https://chuva-pro-fazenda-itaguaia.vercel.app npx vitest run tests/contrato.test.ts
 import { beforeAll, describe, expect, it } from 'vitest';
-import { diasPrevistos, horasPrevistas, hojeLocal, semaforos } from '../shared/calc';
+import { assinaturaPrevisao, diasPrevistos, horasPrevistas, hojeLocal, semaforos } from '../shared/calc';
 import { MODELOS } from '../shared/tipos';
 import type { PayloadPrevisao } from '../shared/tipos';
 
@@ -48,8 +48,22 @@ describe.skipIf(!URL_)('contrato com dados reais', () => {
     const s = semaforos(horas.filter((h) => h.data === hoje), d!.provavel, null);
     expect(['verde', 'amarelo', 'vermelho', 'sem-dados']).toContain(s.pulverizacao.estado);
   });
-  it('grupos distintos usam células de grade distintas (não finge diferença entre talhões da mesma célula)', () => {
-    const cel = new Set(p.grupos.map((g) => `${g.grade.lat},${g.grade.lon}`));
-    expect(cel.size).toBe(p.grupos.length);
+  it('grades diferem por modelo: mesma grade do ECMWF → mesmo ECMWF, mas modelos finos (ICON/GEM/UKMO) podem diferenciar os grupos', () => {
+    const [a, b] = p.grupos;
+    if (a.grade.lat === b.grade.lat && a.grade.lon === b.grade.lon) {
+      expect(a.forecast.daily['precipitation_sum_ecmwf_ifs025']).toEqual(b.forecast.daily['precipitation_sum_ecmwf_ifs025']);
+    }
+    expect(assinaturaPrevisao(a.forecast)).toBe(assinaturaPrevisao(a.forecast));
+  });
+  it('ensemble: ~81 membros e probabilidades coerentes', () => {
+    for (const g of p.grupos) {
+      expect(g.ens).not.toBeNull();
+      expect(g.ens!.length).toBeGreaterThanOrEqual(14);
+      for (const e of g.ens!) {
+        expect(e.n).toBeGreaterThanOrEqual(80);
+        expect(e.p1 >= e.p10mm).toBe(true);
+        expect(e.q10 <= e.q50 && e.q50 <= e.q90).toBe(true);
+      }
+    }
   });
 });

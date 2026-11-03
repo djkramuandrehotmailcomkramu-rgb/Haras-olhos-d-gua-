@@ -352,3 +352,11 @@ export function calcularFator(pares: ParPrevMedido[]): number | null {
   if (sp < 1) return null;
   return Math.min(2, Math.max(0.5, sm / sp));
 }
+
+/** Assinatura curta da previsão diária de todos os modelos: grupos com a mesma assinatura têm exatamente os mesmos números. */
+export function assinaturaPrevisao(f: ForecastRaw): string {
+  const txt = MODELOS.map((m) => ((f.daily[`precipitation_sum_${m}`] as Serie | undefined) ?? []).slice(0, 16).map((v) => (v == null ? 'n' : v)).join(',')).join('|');
+  let h = 5381;
+  for (let i = 0; i < txt.length; i++) h = ((h << 5) + h + txt.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}

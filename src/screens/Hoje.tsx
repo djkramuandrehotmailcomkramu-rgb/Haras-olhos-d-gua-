@@ -4,7 +4,7 @@ import { Carregando, SeletorEscopo, useVisao } from './comum';
 import { MODELOS, NOME_MODELO } from '../../shared/tipos';
 import { addDias, calcularPesos, fatorCorrecao, fmtHora, fmtJanela, fmtMm, horasOk, horaMaisProvavel, partesLocais, semaforos, somaMm } from '../../shared/calc';
 import type { Estado, Operacao, ValorHora } from '../../shared/calc';
-import { chaveCelula, medidoDia, medidoPeriodo } from '../derive';
+import { medidoDia, medidoPeriodo } from '../derive';
 import { IcAlerta, IcColheita, IcSemente, IcSpray } from '../icons';
 
 const OPS: { id: Operacao; nome: string; Ic: (p: { size?: number }) => any; verbo: string }[] = [
@@ -250,7 +250,7 @@ export function Hoje() {
         </table>
         <div class="aviso">
           Pesos {pesos.calibrado ? (pesos.fonte === 'pluviometro' ? `aprendidos com o seu pluviômetro (${pesos.nDias} dias)` : `aprendidos no histórico de ${pesos.nDias} dias contra satélite/reanálise (não é pluviômetro)`) : 'iguais (sem histórico suficiente)'} para {dh <= 0 ? 'hoje' : `${dh} dia(s) à frente`}.{' '}
-          {fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos 81 cenários do ensemble com ≥ 1 mm' : 'média dos modelos'}. Célula do modelo {chaveCelula(g)}
+          {fc.ativo ? `Correção de viés ×${fc.fator.toFixed(2).replace('.', ',')} (${fc.nDias} dias de pluviômetro).` : `Sem correção de viés: calibrando (${fc.nDias} de 20 dias de pluviômetro).`} Chance = {d?.probFonte === 'ensemble' ? 'fração dos 81 cenários do ensemble com ≥ 1 mm' : 'média dos modelos'}. Grade ECMWF {g.grade.lat.toFixed(2)},{g.grade.lon.toFixed(2)}
           {t ? ` · ${t.nome}` : ` · grupo ${g.id}`}.
         </div>
         <div class="aviso">
