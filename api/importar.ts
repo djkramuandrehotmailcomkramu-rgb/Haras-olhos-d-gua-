@@ -13,13 +13,13 @@ const slug = (s: string) =>
 export default async function handler(req: Req, res: Res) {
   try {
     if (req.method !== 'POST') return erro(res, 'use POST', 405);
-    const { nome, fuso, kml, substituir } = req.body || {};
+    const { nome, fuso, kml, substituir, id: idEnviado } = req.body || {};
     if (!nome || !fuso || !kml) return erro(res, 'nome, fuso e kml são obrigatórios', 400);
     if (!['America/Sao_Paulo', 'America/Cuiaba'].includes(fuso) && !/^[A-Za-z_]+\/[A-Za-z_]+$/.test(fuso)) return erro(res, 'fuso inválido', 400);
     if (String(kml).length > 5_000_000) return erro(res, 'KML grande demais (máx. 5 MB)', 413);
     const r = lerKml(String(kml));
     if (!r.talhoes.length) return erro(res, r.avisos.join(' '), 422);
-    const id = slug(nome);
+    const id = idEnviado ? slug(String(idEnviado)) : slug(nome);
     const todos = r.talhoes.map((t) => ({ lat: t.lat, lon: t.lon }));
     const c = centroide([...todos.map((p) => [p.lon, p.lat] as [number, number]), [todos[0].lon, todos[0].lat]]);
     await db('fazendas', { method: 'POST', upsert: 'id', body: [{ id, nome, fuso, lat: c.lat, lon: c.lon }], retorno: false });

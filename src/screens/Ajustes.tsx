@@ -44,7 +44,7 @@ export function Ajustes() {
   const importarKml = async (file: File) => {
     if (!confirm(`Importar "${file.name}"? Talhões com o mesmo nome serão atualizados.`)) return;
     try {
-      const r = await enviar<any>('/api/importar', 'POST', { nome: 'Fazenda Lagoa Formosa', fuso: 'America/Sao_Paulo', kml: await file.text() });
+      const r = await enviar<any>('/api/importar', 'POST', { id: FAZENDA, nome: 'Fazenda Lagoa Formosa', fuso: 'America/Sao_Paulo', kml: await file.text() });
       setMsg(`${r.importados} talhões importados (${r.ha_total} ha). ${(r.avisos || []).join(' ')}`);
       carregar(true);
     } catch (e) {
