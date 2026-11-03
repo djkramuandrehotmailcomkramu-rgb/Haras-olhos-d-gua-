@@ -1,0 +1,7 @@
+{
+  "framework": "vite",
+  "crons": [{ "path": "/api/cron", "schedule": "0 9 * * *" }],
+  "headers": [
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}

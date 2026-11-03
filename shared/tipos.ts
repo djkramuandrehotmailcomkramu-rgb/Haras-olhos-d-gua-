@@ -1,0 +1,117 @@
+export type ModeloId = 'best_match' | 'ecmwf_ifs025' | 'gfs_seamless' | 'icon_seamless';
+export const MODELOS: ModeloId[] = ['best_match', 'ecmwf_ifs025', 'gfs_seamless', 'icon_seamless'];
+export const NOME_MODELO: Record<ModeloId, string> = {
+  best_match: 'Open-Meteo (melhor)',
+  ecmwf_ifs025: 'ECMWF',
+  gfs_seamless: 'GFS',
+  icon_seamless: 'ICON',
+};
+
+export interface Fazenda {
+  id: string;
+  nome: string;
+  fuso: string;
+  lat: number | null;
+  lon: number | null;
+}
+
+export type Anel = [number, number][]; // [lon, lat]
+
+export interface Talhao {
+  id: string;
+  fazenda_id: string;
+  nome: string;
+  ha: number | null;
+  geom: { type: 'Polygon'; coordinates: Anel[] };
+  lat: number;
+  lon: number;
+}
+
+export type Serie = (number | null)[];
+
+/** Resposta crua do Open-Meteo /v1/forecast com vários modelos e timeformat=unixtime. */
+export interface ForecastRaw {
+  latitude: number;
+  longitude: number;
+  elevation: number;
+  utc_offset_seconds: number;
+  hourly: { time: number[] } & Record<string, Serie | number[]>;
+  daily: { time: number[] } & Record<string, Serie | number[]>;
+}
+
+/** Resposta crua para vento/temperatura/umidade (sem `models`, chaves sem sufixo). */
+export interface MeteoRaw {
+  hourly: { time: number[] } & Record<string, Serie | number[]>;
+}
+
+export interface Grupo {
+  id: string;
+  lat: number;
+  lon: number;
+  talhoes: string[];
+  grade: { lat: number; lon: number; elev: number };
+  forecast: ForecastRaw;
+  meteo: MeteoRaw | null;
+}
+
+export interface PayloadPrevisao {
+  fazenda: Fazenda;
+  gerado_em: string;
+  grupos: Grupo[];
+  erros: string[];
+}
+
+export interface ErroModelo {
+  fazenda_id: string;
+  modelo: string;
+  horizonte: number;
+  janela: number; // 30 ou 90 dias
+  n_dias: number;
+  mae: number | null;
+  vies: number | null;
+  acerto: number | null;
+  atualizado_em: string;
+}
+
+export interface Medida {
+  id: string;
+  fazenda_id: string;
+  talhao_id: string | null;
+  data: string; // yyyy-mm-dd
+  mm: number;
+  origem: string;
+  obs: string | null;
+  foto?: string | null;
+}
+
+export interface Limites {
+  pulv_vento_max: number; // km/h
+  pulv_temp_max: number; // °C
+  pulv_ur_min: number; // %
+  pulv_chuva_max: number; // mm/h
+  plantio_dia_max: number; // mm no dia
+  plantio_acum_max: number; // mm medido nos 3 dias anteriores
+  colheita_chuva_max: number; // mm/h
+  colheita_ur_max: number; // %
+  janela_min_h: number; // horas contínuas para "verde"
+  agrupamento_km: number;
+  safra_inicio: string; // mm-dd
+  alerta_mm24: number;
+  alerta_prob6: number;
+}
+
+export const LIMITES_PADRAO: Limites = {
+  pulv_vento_max: 15,
+  pulv_temp_max: 32,
+  pulv_ur_min: 55,
+  pulv_chuva_max: 0.1,
+  plantio_dia_max: 10,
+  plantio_acum_max: 40,
+  colheita_chuva_max: 0.1,
+  colheita_ur_max: 80,
+  janela_min_h: 3,
+  agrupamento_km: 5,
+  safra_inicio: '10-01',
+  alerta_mm24: 20,
+  alerta_prob6: 80,
+};
