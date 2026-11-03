@@ -15,6 +15,8 @@ Data: 03/11/2026. Escopo final: **somente Fazenda Lagoa Formosa** (Itaguaia foi 
 - **Pesos por horizonte desde o dia 1**, aprendidos do hindcast de 90 dias. Resultado real (ERA5, D+1): GFS MAE 0,94 mm; ECMWF 1,11; UKMO 1,15; ICON 1,59; JMA 1,62; GEM 1,71. **A D+3 o ranking inverte** (GEM 1,14; UKMO 1,28; ECMWF 1,42; GFS 2,87).
 - **Chance de chuva e faixa P10–P90 reais** pelo ensemble de 81 membros, no lugar da probabilidade dos modelos (que repetia o ECMWF).
 - Testado e descartado: NASA POWER IMERG (veio vazio); modelos de IA (AIFS, GraphCast) sem dado na região.
+- **Grades diferem por modelo:** ECMWF, GFS e JMA dão números idênticos aos dois grupos de talhões; ICON, GEM e UKMO (mais finos) diferenciam. "Mesma célula" só aparece quando todos os modelos são idênticos.
+- **Ensemble:** 82 membros até ~10 dias; depois disso só os 51 do ECMWF.
 - **Cuidado:** o hindcast usa os últimos 90 dias (estiagem, poucos dias de chuva) e a referência é reanálise, não pluviômetro. O ranking pode mudar na época das águas.
 
 ## NÃO validado / limitações

@@ -55,12 +55,12 @@ describe.skipIf(!URL_)('contrato com dados reais', () => {
     }
     expect(assinaturaPrevisao(a.forecast)).toBe(assinaturaPrevisao(a.forecast));
   });
-  it('ensemble: ~81 membros e probabilidades coerentes', () => {
+  it('ensemble: 82 membros (51 depois de ~10 dias) e probabilidades coerentes', () => {
     for (const g of p.grupos) {
       expect(g.ens).not.toBeNull();
       expect(g.ens!.length).toBeGreaterThanOrEqual(14);
       for (const e of g.ens!) {
-        expect(e.n).toBeGreaterThanOrEqual(80);
+        expect(e.n).toBeGreaterThanOrEqual(50); // 82 membros até ~10 dias; depois só os 51 do ECMWF
         expect(e.p1 >= e.p10mm).toBe(true);
         expect(e.q10 <= e.q50 && e.q50 <= e.q90).toBe(true);
       }

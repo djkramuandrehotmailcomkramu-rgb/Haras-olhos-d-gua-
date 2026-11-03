@@ -25,7 +25,7 @@ ok((await page.locator('.hr').count()) === 24, 'CONDIÇÕES: linha do tempo de 2
 ok(/Chance/.test(txt) && /Vento/i.test(txt) && /Umidade/i.test(txt), 'CONDIÇÕES: chance, vento e umidade');
 for (const nome of ['Plantar', 'Colher', 'Pulverizar']) { await page.getByRole('button', { name: nome }).click(); ok(/(Bom para|Atenção para|Não é bom para|Sem dados para)/.test(await page.innerText('.banner')), `operação ${nome} troca a faixa`); }
 await page.locator('.fd').nth(3).click();
-ok(/Precisão desta previsão/.test(await page.innerText('main')), 'PRECISÃO: bloco com bruto, corrigido, modelos e pesos');
+ok(/Precisão desta previsão/i.test(await page.innerText('main')), 'PRECISÃO: bloco com bruto, corrigido, modelos e pesos');
 ok(/bula/.test(txt), 'aviso de bula/receituário presente');
 ok(/bruto/i.test(await page.innerText('main')) && /calibrando|Correção|aprendidos/.test(await page.innerText('main')), 'número bruto/corrigido e estado da calibração visíveis');
 ok(/atualizado|offline/.test(await page.innerText('header')), 'selo "atualizado há X"');
