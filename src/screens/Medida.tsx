@@ -97,6 +97,17 @@ export function Medida() {
 
   return (
     <>
+      <div class="card">
+        <h2>Quanto choveu? (toque no valor)</h2>
+        <div class="rapido">
+          {[0, 2, 5, 10, 15, 20, 30, 40].map((v) => (
+            <button type="button" class={`chip rap ${mm === String(v) ? 'on' : ''}`} aria-pressed={mm === String(v)} onClick={() => setMm(String(v))}>
+              {v === 0 ? 'Não choveu' : `${v} mm`}
+            </button>
+          ))}
+        </div>
+        <div class="muted">Depois toque em Salvar, logo abaixo. Para outro valor, digite no campo.</div>
+      </div>
       <form class="card" onSubmit={salvar}>
         <h2>Lançar chuva do pluviômetro</h2>
         <label for="lt">Onde</label>

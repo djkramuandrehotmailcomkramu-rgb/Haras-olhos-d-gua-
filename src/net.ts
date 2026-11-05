@@ -10,7 +10,7 @@ const chave = (p: string) => `chuvapro:v1:${p}`;
 
 export async function getJson<T>(path: string, forcarRede = false): Promise<Cached<T>> {
   try {
-    const r = await fetch(path, { cache: forcarRede ? 'reload' : 'default' });
+    const r = await fetch(path, { cache: forcarRede ? 'no-store' : 'no-cache' });
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error((j && j.erro) || `HTTP ${r.status}`);
     const c: Cached<T> = { data: j as T, ts: Date.now(), offline: false };

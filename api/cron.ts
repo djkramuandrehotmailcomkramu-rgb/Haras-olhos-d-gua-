@@ -103,8 +103,8 @@ async function tarefaFazenda(f: Fazenda & { lat: number; lon: number }) {
   const mm24 = somaMm(prox24);
   const probMax6 = Math.max(0, ...prox6.map((h) => h.prob ?? 0));
   const alertas: { tipo: string; titulo: string; corpo: string }[] = [];
-  if (mm24 >= cfg.alerta_mm24) alertas.push({ tipo: 'mm24', titulo: `Chuva forte prevista — ${f.nome}`, corpo: `${mm24.toFixed(1).replace('.', ',')} mm previstos nas próximas 24 h.` });
-  if (probMax6 >= cfg.alerta_prob6) alertas.push({ tipo: 'prob6', titulo: `Chuva iminente — ${f.nome}`, corpo: `${Math.round(probMax6)}% de chance nas próximas 6 h.` });
+  if (mm24 >= cfg.alerta_mm24) alertas.push({ tipo: 'mm24', titulo: `Chuva forte chegando — ${f.nome}`, corpo: `Cerca de ${mm24.toFixed(0)} mm nas próximas 24 horas. Evite pulverizar e deixe as máquinas fora de área baixa.` });
+  if (probMax6 >= cfg.alerta_prob6) alertas.push({ tipo: 'prob6', titulo: `Pode chover em breve — ${f.nome}`, corpo: `${Math.round(probMax6)}% de chance de chuva nas próximas 6 horas. Termine o serviço de pulverização.` });
   out.alertas = alertas.map((a) => a.tipo);
 
   const pub = process.env.VAPID_PUBLIC;

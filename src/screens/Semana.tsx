@@ -2,6 +2,8 @@ import { useState } from 'preact/hooks';
 import { Carregando, LugarChip, SeletorEscopo, useVisao } from './comum';
 import { addDias, fmtDia, fmtHora, fmtMm } from '../../shared/calc';
 import { medidoPeriodo, previstoPeriodo } from '../derive';
+import { IconeClima } from '../weather';
+import { classeChuva, confianca, iconeDia } from '../../shared/texto';
 
 const SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
@@ -27,29 +29,6 @@ export function Semana() {
   return (
     <>
       <LugarChip />
-      {!x.lugar && (
-        <div class="card">
-          <SeletorEscopo />
-        </div>
-      )}
-      <div class="card">
-        <h2>Comparativo (medido × previsto)</h2>
-        <div class="row sp">
-          <div class="kv">
-            <b>{fmtMm(prev7)} mm</b>
-            <span>previsto próximos 7 dias</span>
-          </div>
-          <div class="kv">
-            <b>{temMed ? `${fmtMm(med7)} mm` : '—'}</b>
-            <span>medido últimos 7 dias</span>
-          </div>
-          <div class="kv">
-            <b>{temMed ? `${fmtMm(med7ant)} mm` : '—'}</b>
-            <span>medido semana anterior</span>
-          </div>
-        </div>
-        {!temMed && <div class="aviso">Sem lançamentos de pluviômetro ainda: o comparativo usa só chuva medida, nunca estimada.</div>}
-      </div>
       <div class="card">
         <h2>Próximos {dias.length} dias</h2>
         {dias.map((d, i) => {
@@ -63,13 +42,19 @@ export function Semana() {
                   {i === 0 ? 'Hoje' : fmtDia(d.data)}
                   <small>{dow}</small>
                 </div>
-                <div class="m">{fmtMm(d.provavel)}</div>
+                <div class="semana-ic">
+                  <IconeClima tipo={iconeDia(d.provavel, (() => { const nv = r.hs.map((h) => h.nuvem).filter((n): n is number => n != null); return nv.length ? nv.reduce((a, b) => a + b, 0) / nv.length : null; })(), Math.max(0, ...r.hs.map((h) => h.rajada ?? 0)))} size={46} />
+                </div>
+                <div class="m" style="min-width:72px">
+                  {fmtMm(d.provavel)}
+                  <div style={`font-size:12px;font-weight:700;color:${classeChuva(d.provavel).cor}`}>{classeChuva(d.provavel).nome.split(' / ')[0]}</div>
+                </div>
                 <div style="flex:1">
                   <div class="f" aria-hidden="true">
                     <i style={`width:${Math.min(100, ((d.provavel ?? 0) / maxDia) * 100)}%`} />
                   </div>
                   <div class="muted" style="margin-top:4px">
-                    {d.prob != null ? `${Math.round(d.prob)}%` : '—'} · faixa {fmtMm(d.q10 ?? d.min)}–{fmtMm(d.q90 ?? d.max)} mm
+                    Chance {d.prob != null ? `${Math.round(d.prob)}%` : '—'} · confiança {confianca(d, i).nome.toLowerCase()}
                   </div>
                   <div class="muted">
                     {r.venMax != null ? `vento ${Math.round(r.venMax)} km/h` : 'vento —'} · {r.tMin != null ? `${Math.round(r.tMin)}–${Math.round(r.tMax!)} °C` : 'temp. —'}
@@ -93,6 +78,29 @@ export function Semana() {
             </div>
           );
         })}
+      </div>
+      {!x.lugar && (
+        <div class="card">
+          <SeletorEscopo />
+        </div>
+      )}
+      <div class="card">
+        <h2>Comparativo (medido × previsto)</h2>
+        <div class="row sp">
+          <div class="kv">
+            <b>{fmtMm(prev7)} mm</b>
+            <span>previsto próximos 7 dias</span>
+          </div>
+          <div class="kv">
+            <b>{temMed ? `${fmtMm(med7)} mm` : '—'}</b>
+            <span>medido últimos 7 dias</span>
+          </div>
+          <div class="kv">
+            <b>{temMed ? `${fmtMm(med7ant)} mm` : '—'}</b>
+            <span>medido semana anterior</span>
+          </div>
+        </div>
+        {!temMed && <div class="aviso">Sem lançamentos de pluviômetro ainda: o comparativo usa só chuva medida, nunca estimada.</div>}
       </div>
     </>
   );

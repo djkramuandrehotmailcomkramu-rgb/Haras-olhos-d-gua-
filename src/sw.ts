@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { cleanupOutdatedCaches, precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { NetworkFirst, StaleWhileRevalidate, CacheFirst } from 'workbox-strategies';
+import { NetworkFirst, CacheFirst } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -9,12 +9,11 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//] }));
 
-// API: mostra o último dado salvo na hora e atualiza em segundo plano (stale-while-revalidate)
+// API: tenta a rede primeiro (dado novo sempre que há sinal); sem sinal, usa o último dado salvo
 registerRoute(
-  ({ url, request }) => url.pathname.startsWith('/api/') && request.method === 'GET' && !url.pathname.startsWith('/api/medidas'),
-  new StaleWhileRevalidate({ cacheName: 'api-v1' }),
+  ({ url, request }) => url.pathname.startsWith('/api/') && request.method === 'GET',
+  new NetworkFirst({ cacheName: 'api-v2', networkTimeoutSeconds: 6 }),
 );
-registerRoute(({ url }) => url.pathname.startsWith('/api/medidas'), new NetworkFirst({ cacheName: 'api-medidas', networkTimeoutSeconds: 6 }));
 // Mapa base e radar: cache curto
 registerRoute(
   ({ url }) => /tile\.openstreetmap\.org|arcgisonline\.com/.test(url.hostname),

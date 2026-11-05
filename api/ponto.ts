@@ -21,7 +21,7 @@ export default async function handler(req: Req, res: Res) {
     ]);
     const grupo: Grupo = { id: 'ponto', lat, lon, talhoes: [], grade: { lat: forecast.latitude, lon: forecast.longitude, elev: forecast.elevation }, forecast, meteo, ens };
     const out: PayloadLugar = { lugar, fuso, gerado_em: new Date().toISOString(), grupo, hind, erros };
-    res.setHeader('Cache-Control', erros.length ? 'public, s-maxage=60' : 'public, s-maxage=1800, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', erros.length ? 'public, s-maxage=60' : 'public, s-maxage=600, stale-while-revalidate=1800');
     res.status(200).json(out);
   } catch (e) {
     erro(res, e);

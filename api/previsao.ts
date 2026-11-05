@@ -49,7 +49,7 @@ export default async function handler(req: Req, res: Res) {
     if (!grupos.length) return erro(res, `Open-Meteo indisponível: ${erros.join(' | ')}`, 502);
     grupos.sort((a, b) => a.id.localeCompare(b.id));
     const out: PayloadPrevisao = { fazenda: faz, gerado_em: new Date().toISOString(), grupos, erros };
-    res.setHeader('Cache-Control', erros.length ? 'public, s-maxage=60' : 'public, s-maxage=1800, stale-while-revalidate=3600');
+    res.setHeader('Cache-Control', erros.length ? 'public, s-maxage=60' : 'public, s-maxage=600, stale-while-revalidate=1800');
     res.status(200).json(out);
   } catch (e) {
     erro(res, e);

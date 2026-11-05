@@ -1,5 +1,5 @@
 import { useMemo } from 'preact/hooks';
-import { aba, diaSel, horaSel, limites, operacao } from '../state';
+import { aba, definirModo, diaSel, horaSel, limites, operacao } from '../state';
 import { Carregando, LugarChip, SeletorEscopo, useVisao } from './comum';
 import { MODELOS, NOME_MODELO } from '../../shared/tipos';
 import { addDias, calcularPesos, fatorCorrecao, fmtHora, fmtJanela, fmtMm, horasOk, horaMaisProvavel, partesLocais, semaforos, somaMm } from '../../shared/calc';
@@ -124,6 +124,12 @@ export function Hoje() {
 
   return (
     <>
+      <div class="seg" role="group" aria-label="Modo de exibição">
+        <button aria-pressed="false" onClick={() => definirModo('simples')}>
+          Simples
+        </button>
+        <button aria-pressed="true">Técnico</button>
+      </div>
       <LugarChip />
       <div class={`banner b-${semOp.estado}`} role="status">
         <div class="bt">

@@ -4,7 +4,7 @@ import type { ErroModelo, Limites, Lugar, Medida, PayloadLugar, PayloadPrevisao,
 import { FAZENDA, getJson } from './net';
 
 import type { Operacao } from '../shared/calc';
-export type Aba = 'hoje' | 'semana' | 'talhoes' | 'mapa' | 'medida' | 'confiab' | 'ajustes';
+export type Aba = 'hoje' | 'semana' | 'talhoes' | 'mapa' | 'medida' | 'confiab' | 'ajustes' | 'mais';
 export const aba = signal<Aba>('hoje');
 export const payload = signal<PayloadPrevisao | null>(null);
 export const talhoes = signal<Talhao[]>([]);
@@ -104,4 +104,72 @@ function salvarRecente(l: Lugar) {
   } catch {
     /* sem armazenamento: segue */
   }
+}
+
+// ---- preferências (modo, tema, tamanho do texto, guia) e relógio ao vivo ----
+export type Modo = 'simples' | 'tecnico';
+export type Tema = 'auto' | 'claro' | 'escuro';
+export type Fonte = 'normal' | 'grande' | 'extra';
+const ler = (k: string, pad: string) => {
+  try {
+    return localStorage.getItem('chuvapro:' + k) || pad;
+  } catch {
+    return pad;
+  }
+};
+const gravar = (k: string, v: string) => {
+  try {
+    localStorage.setItem('chuvapro:' + k, v);
+  } catch {
+    /* sem armazenamento */
+  }
+};
+export const modo = signal<Modo>(ler('modo', 'simples') as Modo);
+export const tema = signal<Tema>(ler('tema', 'auto') as Tema);
+export const fonte = signal<Fonte>(ler('fonte', 'grande') as Fonte);
+export const guiaVisto = signal<boolean>(ler('guia', '0') === '1');
+export const guiaAberto = signal<boolean>(false);
+/** relógio que "bate" a cada 30 s para o app mostrar "há X min" e a hora atual sem precisar recarregar */
+export const agora = signal<number>(Date.now());
+
+export function aplicarPreferencias() {
+  const r = document.documentElement;
+  r.dataset.tema = tema.value;
+  r.dataset.fonte = fonte.value;
+  const claro = tema.value === 'claro' || (tema.value === 'auto' && window.matchMedia?.('(prefers-color-scheme: light)').matches);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', claro ? '#1d5fc4' : '#0B1B33');
+}
+export function definirModo(m: Modo) {
+  modo.value = m;
+  gravar('modo', m);
+}
+export function definirTema(t: Tema) {
+  tema.value = t;
+  gravar('tema', t);
+  aplicarPreferencias();
+}
+export function definirFonte(f: Fonte) {
+  fonte.value = f;
+  gravar('fonte', f);
+  aplicarPreferencias();
+}
+export function concluirGuia() {
+  guiaVisto.value = true;
+  guiaAberto.value = false;
+  gravar('guia', '1');
+}
+
+export const instalarEvt = signal<any>(null);
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    instalarEvt.value = e;
+  });
+}
+
+/** Atualiza fazenda e (se houver) o local pesquisado. `forcar` ignora o cache do navegador. */
+export async function atualizarTudo(forcar = false) {
+  agora.value = Date.now();
+  await Promise.all([carregar(forcar), lugar.value ? abrirLugar(lugar.value, forcar) : Promise.resolve()]);
+  agora.value = Date.now();
 }

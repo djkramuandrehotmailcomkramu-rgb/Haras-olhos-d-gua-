@@ -4,6 +4,7 @@ import { chromium, devices } from 'playwright';
 const URL_ = process.env.URL || 'https://chuva-pro-fazenda-itaguaia.vercel.app';
 const falhas = [];
 const ok = (c, m) => { console.log(`${c ? 'OK  ' : 'FALHA'} ${m}`); if (!c) falhas.push(m); };
+const TEM_STATUS = /(Bom para|Atenção para|Não é bom para|Sem dados para|PODE|CUIDADO|NÃO)/;
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ ...devices['Pixel 5'], locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', geolocation: { latitude: -16.2727, longitude: -46.132 }, permissions: ['geolocation'] });
@@ -11,103 +12,141 @@ const page = await ctx.newPage();
 const erros = [];
 page.on('pageerror', (e) => erros.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && !/tile|ERR_|Failed to load resource/.test(m.text()) && erros.push(m.text()));
+let reqPrevisao = 0;
+page.on('request', (r) => r.url().includes('/api/previsao') && reqPrevisao++);
 
+await page.clock.install();
 const t0 = Date.now();
 await page.goto(URL_, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.banner', { timeout: 30000 });
-const tUtil = Date.now() - t0;
-ok(tUtil < 4000, `primeira tela útil em ${tUtil} ms (meta < 2000 em 4G; aqui é rede de datacenter)`);
-const txt = await page.innerText('main');
-ok(/(Bom para|Atenção para|Não é bom para|Sem dados para)/.test(txt), 'CONDIÇÕES: faixa de status por operação');
-ok((await page.locator('.tile').count()) === 12, `CONDIÇÕES: ${await page.locator('.tile').count()} blocos de condições (esperado 12)`);
-ok((await page.locator('.fd').count()) === 14, 'CONDIÇÕES: faixa de 14 dias');
-ok((await page.locator('.hr').count()) === 24, 'CONDIÇÕES: linha do tempo de 24 h');
-ok(/Chance/.test(txt) && /Vento/i.test(txt) && /Umidade/i.test(txt), 'CONDIÇÕES: chance, vento e umidade');
-for (const nome of ['Plantar', 'Colher', 'Pulverizar']) { await page.getByRole('button', { name: nome }).click(); ok(/(Bom para|Atenção para|Não é bom para|Sem dados para)/.test(await page.innerText('.banner')), `operação ${nome} troca a faixa`); }
-await page.locator('.fd').nth(3).click();
-ok(/Precisão desta previsão/i.test(await page.innerText('main')), 'PRECISÃO: bloco com bruto, corrigido, modelos e pesos');
-ok(/bula/.test(txt), 'aviso de bula/receituário presente');
-ok(/bruto/i.test(await page.innerText('main')) && /calibrando|Correção|aprendidos/.test(await page.innerText('main')), 'número bruto/corrigido e estado da calibração visíveis');
-ok(/atualizado|offline/.test(await page.innerText('header')), 'selo "atualizado há X"');
 
-const aba = async (nome) => page.locator('nav.bar').getByRole('button', { name: nome }).click();
-// pesquisa de outro local: cidade e coordenadas
+// ---- guia de primeiro uso
+await page.waitForSelector('.guia', { timeout: 20000 });
+ok(/Veja se vai chover/.test(await page.innerText('.guia')), 'GUIA: aparece no primeiro uso');
+await page.getByRole('button', { name: 'Próximo' }).click();
+await page.getByRole('button', { name: 'Próximo' }).click();
+ok(/Escolha o dia e ouça/.test(await page.innerText('.guia')), 'GUIA: 3 passos');
+await page.getByRole('button', { name: 'Começar' }).click();
+
+// ---- tela inicial (modo simples)
+await page.waitForSelector('.heroi', { timeout: 30000 });
+const tUtil = Date.now() - t0;
+ok(tUtil < 6000, `primeira tela útil em ${tUtil} ms (datacenter; meta < 2000 em 4G)`);
+const txt = await page.innerText('main');
+ok(/(Vai chover|Pode chover|Não deve chover|Chance baixa|já passou)/.test(txt), 'SIMPLES: frase grande diz se vai chover');
+ok((await page.locator('.trab').count()) === 3, 'SIMPLES: 3 cartões (Pulverização, Plantio, Colheita)');
+ok(/(PODE|CUIDADO|NÃO|SEM DADOS)/.test(await page.locator('.trab').first().innerText()), 'SIMPLES: cartão com PODE/CUIDADO/NÃO');
+ok((await page.locator('.dia-b').count()) === 7, 'SIMPLES: faixa de 7 dias com desenhos');
+ok((await page.locator('.w-ico').count()) >= 8, 'SIMPLES: ícones de clima desenhados');
+ok(/Confiança da previsão/i.test(txt) && /(Alta|Média|Baixa)/.test(txt), 'SIMPLES: confiança Alta/Média/Baixa');
+ok(/bula/.test(txt), 'SIMPLES: aviso de bula/receituário');
+ok(/Ao vivo|Atualizando|atualizado/.test(await page.innerText('.vivo')), 'AO VIVO: faixa com hora da atualização');
+await page.locator('.dia-b').nth(3).click();
+ok(!/^Hoje/.test((await page.innerText('.heroi-dia')).trim()), 'SIMPLES: escolher outro dia troca a tela');
+await page.locator('.dia-b').first().click();
+await page.locator('.trab').first().click();
+await page.waitForSelector('.folha');
+ok(/Para (pulverizar|plantar|colher)/.test(await page.innerText('.folha')), 'SIMPLES: "por quê?" explica a regra com limites');
+await page.getByRole('button', { name: 'Fechar' }).click();
+await page.getByRole('button', { name: 'Ver escala' }).click();
+ok(/litro de água/.test(await page.innerText('.folha')), 'SIMPLES: escala da chuva explicada (1 mm = 1 litro)');
+await page.getByRole('button', { name: 'Fechar' }).click();
+const ouvir = page.getByRole('button', { name: /Ouvir a previsão/ });
+if (await ouvir.count()) { await ouvir.click(); ok(true, 'SIMPLES: botão Ouvir funciona sem erro'); }
+
+// ---- atualização automática (relógio acelerado: 5 min)
+const antes = reqPrevisao;
+await page.clock.fastForward('05:05');
+await page.waitForTimeout(2500);
+ok(reqPrevisao > antes, `AO VIVO: atualizou sozinho após 5 min (${reqPrevisao - antes} nova(s) consulta(s))`);
+
+// ---- modo técnico
+await page.getByRole('button', { name: 'Técnico', exact: true }).click();
+await page.waitForSelector('.tile');
+ok((await page.locator('.tile').count()) === 12 && (await page.locator('.fd').count()) === 14 && (await page.locator('.hr').count()) === 24, 'TÉCNICO: 12 blocos, 14 dias e linha do tempo de 24 h');
+ok(/Precisão desta previsão/i.test(await page.innerText('main')), 'TÉCNICO: bloco com bruto, corrigido, modelos e pesos');
+await page.getByRole('button', { name: 'Simples', exact: true }).click();
+await page.waitForSelector('.heroi');
+
+// ---- pesquisa de outro local
 await page.getByRole('button', { name: 'Pesquisar outro local' }).click();
 await page.fill('input[type=search]', 'Cuiabá');
 await page.waitForSelector('.busca .tal', { timeout: 15000 });
-ok(/Cuiab/.test(await page.innerText('.busca')), 'BUSCA: "Cuiabá" retorna resultados');
 await page.locator('.busca .tal').first().click();
 await page.waitForSelector('.lugar-chip', { timeout: 45000 });
-await page.waitForSelector('.banner', { timeout: 45000 });
-ok(/Cuiab/.test(await page.innerText('.lugar-chip')), 'BUSCA: mostra a previsão do local escolhido');
-ok((await page.locator('.tile').count()) === 12, 'BUSCA: 12 blocos de condições para o local');
-ok(/este local|Cuiab/.test(await page.innerText('main')) && /Pesos aprendidos|Pesos iguais|Pesos/.test(await page.innerText('main')), 'BUSCA: mostra pesos dos modelos do local');
-await aba('Previsão');
-await page.waitForSelector('.day');
-ok((await page.locator('.day').count()) >= 14, 'BUSCA: Previsão de 15 dias do local');
+await page.waitForSelector('.heroi', { timeout: 45000 });
+ok(/Cuiab/.test(await page.innerText('.lugar-chip')), 'BUSCA: previsão simples do local escolhido');
 await page.getByRole('button', { name: 'Voltar para a fazenda' }).first().click();
-await aba('Condições');
-await page.waitForSelector('.banner');
+await page.waitForSelector('.heroi');
 ok((await page.locator('.lugar-chip').count()) === 0, 'BUSCA: voltar para a fazenda');
-await page.getByRole('button', { name: 'Pesquisar outro local' }).click();
-await page.fill('input[type=search]', '-15.60, -56.10');
-await page.waitForSelector('.busca .tal');
-await page.locator('.busca .tal').first().click();
-await page.waitForSelector('.lugar-chip', { timeout: 45000 });
-ok(/Coordenadas|-15/.test(await page.innerText('.lugar-chip')), 'BUSCA: coordenadas digitadas');
-await page.getByRole('button', { name: 'Voltar para a fazenda' }).first().click();
-await aba('Previsão');
+
+// ---- semana
+await page.locator('nav.bar').getByRole('button', { name: 'Semana' }).click();
 await page.waitForSelector('.day');
-ok((await page.locator('.day').count()) >= 14, `SEMANA: ${await page.locator('.day').count()} dias`);
+ok((await page.locator('.day').count()) >= 14, `SEMANA: ${await page.locator('.day').count()} dias com desenho e palavras`);
+ok(/(Sem chuva|Garoa|Chuva)/.test(await page.innerText('main')), 'SEMANA: chuva descrita em palavras');
 await page.locator('.day .h').nth(1).click();
 ok((await page.locator('.hrs div').count()) > 0, 'SEMANA: toque abre hora a hora');
 
-await aba('Talhões');
-await page.waitForSelector('.tal');
-ok((await page.locator('.tal').count()) === 18, `TALHÕES: ${await page.locator('.tal').count()} talhões (esperado 18)`);
-ok(/mesma célula|célula/.test(await page.innerText('main')), 'TALHÕES: indica células do modelo');
-await page.fill('#b', 'Palmeira');
-ok((await page.locator('.tal').count()) === 4, 'TALHÕES: busca "Palmeira" = 4');
-
-await aba('Mapa');
+// ---- mapa
+await page.locator('nav.bar').getByRole('button', { name: 'Mapa' }).click();
 await page.waitForSelector('#mapa path.leaflet-interactive', { timeout: 15000 });
-const polis = await page.locator('#mapa path.leaflet-interactive').count();
-ok(polis === 18, `MAPA: ${polis} polígonos`);
+ok((await page.locator('#mapa path.leaflet-interactive').count()) === 18, 'MAPA: 18 polígonos');
 await page.getByRole('button', { name: /Onde estou/ }).click();
 await page.waitForFunction(() => /Você está/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
 ok(/Você está/.test(await page.innerText('main')), 'MAPA: GPS identifica talhão/posição');
 
-await aba('Medida');
-await page.waitForSelector('#lm');
-await page.fill('#lm', '0,1');
+// ---- medida (botões rápidos)
+await page.locator('nav.bar').getByRole('button', { name: 'Medida' }).click();
+await page.waitForSelector('.rapido');
+await page.getByRole('button', { name: '2 mm', exact: true }).click();
 await page.fill('#lo', 'e2e-teste');
 await page.getByRole('button', { name: 'Salvar', exact: true }).click();
 await page.waitForFunction(() => /Salvo:/.test(document.body.innerText), null, { timeout: 15000 });
-ok(true, 'MEDIDA: lançamento salvo');
+ok(true, 'MEDIDA: lançamento pelos botões rápidos salvo');
 page.once('dialog', (d) => d.accept());
 await page.locator('.tal', { hasText: 'e2e-teste' }).first().getByRole('button', { name: 'Apagar lançamento' }).click();
 await page.waitForFunction(() => !/e2e-teste/.test(document.body.innerText), null, { timeout: 15000 });
 ok(true, 'MEDIDA: lançamento de teste apagado (sem sujar o banco)');
 
-await aba('Precisão');
-ok(/Satélite\/reanálise|reanálise/i.test(await page.innerText('main')) && /não é chuva medida|NÃO é chuva medida/i.test(await page.innerText('main')), 'PRECISÃO: deixa claro que o histórico NÃO é pluviômetro');
-await page.getByRole('button', { name: 'Seu pluviômetro' }).click();
-ok(/calibrando/i.test(await page.innerText('main')), 'PRECISÃO: pluviômetro mostra "ainda calibrando"');
-await aba('Ajustes');
-ok(/limites dos sem/i.test(await page.innerText('main')), 'AJUSTES abre');
+// ---- mais: talhões, precisão, ajustes, aparência
+const mais = () => page.locator('nav.bar').getByRole('button', { name: 'Mais' }).click();
+await mais();
+await page.getByRole('button', { name: /Talhões/ }).click();
+await page.waitForSelector('.tal');
+ok((await page.locator('.tal').count()) === 18, 'MAIS > TALHÕES: 18 talhões');
+await page.fill('#b', 'Palmeira');
+ok((await page.locator('.tal').count()) === 4, 'MAIS > TALHÕES: busca "Palmeira" = 4');
+await page.getByRole('button', { name: /Voltar/ }).click();
+await page.getByRole('button', { name: /Precisão da previsão/ }).click();
+ok(/reanálise/i.test(await page.innerText('main')) && /não é chuva medida/i.test(await page.innerText('main')), 'MAIS > PRECISÃO: deixa claro que o histórico NÃO é pluviômetro');
+await page.getByRole('button', { name: /Voltar/ }).click();
+await page.getByRole('button', { name: /Ajustes/ }).click();
+ok(/limites dos sem/i.test(await page.innerText('main')), 'MAIS > AJUSTES abre');
+await page.getByRole('button', { name: /Voltar/ }).click();
+await page.getByRole('button', { name: 'Escuro', exact: true }).click();
+ok((await page.evaluate(() => document.documentElement.dataset.tema)) === 'escuro', 'APARÊNCIA: tema escuro');
+await page.getByRole('button', { name: 'Claro', exact: true }).click();
+ok((await page.evaluate(() => document.documentElement.dataset.tema)) === 'claro', 'APARÊNCIA: tema claro');
+await page.getByRole('button', { name: 'Extra grande' }).click();
+ok((await page.evaluate(() => document.documentElement.dataset.fonte)) === 'extra', 'APARÊNCIA: letras extra grandes');
+await page.getByRole('button', { name: 'Automático' }).click();
+await page.getByRole('button', { name: 'Grande', exact: true }).click();
+await page.getByRole('button', { name: /Como usar/ }).click();
+ok(/Veja se vai chover/.test(await page.innerText('.guia')), 'MAIS > COMO USAR reabre o guia');
+await page.getByRole('button', { name: 'Pular' }).click();
 
-// offline: service worker precisa estar ativo
+// ---- offline (service worker ativo)
+await page.locator('nav.bar').getByRole('button', { name: 'Hoje' }).click();
 await page.evaluate(() => navigator.serviceWorker.ready);
 await page.waitForTimeout(1500);
 await page.reload({ waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.banner');
+await page.waitForSelector('.heroi');
 await ctx.setOffline(true);
 await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-await page.waitForSelector('.banner', { timeout: 20000 }).catch(() => {});
+await page.waitForSelector('.heroi', { timeout: 20000 }).catch(() => {});
 const off = await page.innerText('body');
-console.log('offline body:', off.replace(/\s+/g, ' ').slice(0, 160));
-ok(/mm/.test(off) && /offline/i.test(off), 'OFFLINE: abre com o último dado salvo e selo "offline"');
-await page.screenshot({ path: '/tmp/e2e-offline.png' });
+console.log('offline body:', off.replace(/\s+/g, ' ').slice(0, 140));
+ok(/Sem sinal/i.test(off) && TEM_STATUS.test(off), 'OFFLINE: abre com o último dado salvo e avisa "sem sinal"');
 await ctx.setOffline(false);
 
 ok(erros.length === 0, `sem erros de console/página${erros.length ? ': ' + erros.slice(0, 3).join(' | ') : ''}`);
