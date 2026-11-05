@@ -52,7 +52,11 @@ const PASSOS = [
 /** Guia de primeiro uso (3 telas). Pode ser reaberto em Mais > Como usar. */
 export function Guia() {
   const [i, setI] = useState(0);
-  if (!guiaAberto.value) return null;
+  const aberto = guiaAberto.value;
+  useEffect(() => {
+    if (aberto) setI(0); // reabrir sempre começa no passo 1
+  }, [aberto]);
+  if (!aberto) return null;
   const p = PASSOS[i];
   const ultimo = i === PASSOS.length - 1;
   return (

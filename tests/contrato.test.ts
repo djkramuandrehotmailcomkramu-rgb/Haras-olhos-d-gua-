@@ -86,7 +86,7 @@ describe.skipIf(!URL_)('busca de local (API real)', () => {
     expect(j.hind.length).toBeGreaterThanOrEqual(12);
     expect(j.hind.every((e: any) => e.fonte === 'hindcast' && e.n_dias >= 20)).toBe(true);
     for (const m of MODELOS) expect(j.grupo.forecast.daily[`precipitation_sum_${m}`]).toBeTruthy();
-  });
+  }, 60000); // local novo: calcula o histórico de 90 dias na hora
   it('entradas inválidas são recusadas', async () => {
     const r = await fetch(`${URL_}/api/ponto?lat=999&lon=0`);
     expect(r.status).toBe(400);
