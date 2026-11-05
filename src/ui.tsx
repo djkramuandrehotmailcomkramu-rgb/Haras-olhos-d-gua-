@@ -1,7 +1,7 @@
 import { useEffect } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { concluirGuia, guiaAberto } from './state';
+import { concluirGuia, guiaAberto, guiaPasso } from './state';
 import { IconeClima } from './weather';
 
 /** Folha que sobe de baixo com explicação; fecha tocando fora, no X ou com Esc. */
@@ -51,12 +51,9 @@ const PASSOS = [
 
 /** Guia de primeiro uso (3 telas). Pode ser reaberto em Mais > Como usar. */
 export function Guia() {
-  const [i, setI] = useState(0);
-  const aberto = guiaAberto.value;
-  useEffect(() => {
-    if (aberto) setI(0); // reabrir sempre começa no passo 1
-  }, [aberto]);
-  if (!aberto) return null;
+  if (!guiaAberto.value) return null;
+  const i = guiaPasso.value;
+  const setI = (n: number) => (guiaPasso.value = n);
   const p = PASSOS[i];
   const ultimo = i === PASSOS.length - 1;
   return (

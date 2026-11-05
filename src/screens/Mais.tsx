@@ -1,4 +1,4 @@
-import { aba, buscaAberta, definirFonte, definirModo, definirTema, fonte, guiaAberto, instalarEvt, modo, tema } from '../state';
+import { aba, abrirGuia, buscaAberta, definirFonte, definirModo, definirTema, fonte, instalarEvt, modo, tema } from '../state';
 import { IcAjuda, IcBusca, IcEngrenagem, IcGrade, IcGrafico } from '../icons';
 
 const Linha = ({ ic, titulo, sub, onClick }: { ic: any; titulo: string; sub: string; onClick: () => void }) => (
@@ -42,7 +42,7 @@ export function Mais() {
         <Linha ic={<IcGrade />} titulo="Talhões" sub="Chuva em cada talhão da fazenda" onClick={() => (aba.value = 'talhoes')} />
         <Linha ic={<IcGrafico />} titulo="Precisão da previsão" sub="Quanto cada modelo acerta" onClick={() => (aba.value = 'confiab')} />
         <Linha ic={<IcEngrenagem />} titulo="Ajustes" sub="Limites, notificações, KML e backup" onClick={() => (aba.value = 'ajustes')} />
-        <Linha ic={<IcAjuda />} titulo="Como usar" sub="Guia rápido de 3 passos" onClick={() => (guiaAberto.value = true)} />
+        <Linha ic={<IcAjuda />} titulo="Como usar" sub="Guia rápido de 3 passos" onClick={abrirGuia} />
       </div>
       {instalarEvt.value && (
         <div class="card">

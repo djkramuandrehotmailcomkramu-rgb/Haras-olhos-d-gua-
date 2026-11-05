@@ -129,6 +129,11 @@ export const tema = signal<Tema>(ler('tema', 'auto') as Tema);
 export const fonte = signal<Fonte>(ler('fonte', 'grande') as Fonte);
 export const guiaVisto = signal<boolean>(ler('guia', '0') === '1');
 export const guiaAberto = signal<boolean>(false);
+export const guiaPasso = signal<number>(0);
+export function abrirGuia() {
+  guiaPasso.value = 0;
+  guiaAberto.value = true;
+}
 /** relógio que "bate" a cada 30 s para o app mostrar "há X min" e a hora atual sem precisar recarregar */
 export const agora = signal<number>(Date.now());
 
@@ -156,6 +161,7 @@ export function definirFonte(f: Fonte) {
 export function concluirGuia() {
   guiaVisto.value = true;
   guiaAberto.value = false;
+  guiaPasso.value = 0;
   gravar('guia', '1');
 }
 

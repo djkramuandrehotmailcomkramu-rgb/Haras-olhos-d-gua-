@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { aba, agora, atualizarTudo, aplicarPreferencias, buscaAberta, guiaAberto, guiaVisto, lugar, modo, online, payload, payloadLugar, abrirLugar, status, statusLugar } from './state';
+import { aba, abrirGuia, agora, atualizarTudo, aplicarPreferencias, buscaAberta, guiaVisto, lugar, modo, online, payload, payloadLugar, abrirLugar, status, statusLugar } from './state';
 import type { Aba } from './state';
 import { haMinutos } from './net';
 import { IcAtualizar, IcBusca, IcCalendario, IcGota, IcMais, IcMapa, IcRegua, IcWifiOff } from './icons';
@@ -33,7 +33,7 @@ export function App() {
 
   useEffect(() => {
     aplicarPreferencias();
-    if (!guiaVisto.value) guiaAberto.value = true;
+    if (!guiaVisto.value) abrirGuia();
     atualizarTudo();
     const dado = setInterval(() => atualizarTudo(), 5 * 60 * 1000); // dado novo a cada 5 min com o app aberto
     const relogio = setInterval(() => (agora.value = Date.now()), 30 * 1000); // "há X min" e hora atual andam sozinhos

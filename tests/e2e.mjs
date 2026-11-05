@@ -4,7 +4,7 @@ import { chromium, devices } from 'playwright';
 const URL_ = process.env.URL || 'https://chuva-pro-fazenda-itaguaia.vercel.app';
 const falhas = [];
 const ok = (c, m) => { console.log(`${c ? 'OK  ' : 'FALHA'} ${m}`); if (!c) falhas.push(m); };
-const TEM_STATUS = /(Bom para|Atenção para|Não é bom para|Sem dados para|PODE|CUIDADO|NÃO)/;
+const TEM_STATUS = /(PODE|CUIDADO|NÃO|SEM DADOS)/;
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ ...devices['Pixel 5'], locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', geolocation: { latitude: -16.2727, longitude: -46.132 }, permissions: ['geolocation'] });
@@ -132,7 +132,8 @@ ok((await page.evaluate(() => document.documentElement.dataset.fonte)) === 'extr
 await page.getByRole('button', { name: 'Automático' }).click();
 await page.getByRole('button', { name: 'Grande', exact: true }).click();
 await page.getByRole('button', { name: /Como usar/ }).click();
-ok(/Veja se vai chover/.test(await page.innerText('.guia')), 'MAIS > COMO USAR reabre o guia');
+await page.waitForSelector('.guia');
+ok(/Passo 1 de 3/.test(await page.innerText('.guia')), 'MAIS > COMO USAR reabre o guia no passo 1');
 await page.getByRole('button', { name: 'Pular' }).click();
 
 // ---- offline (service worker ativo)

@@ -35,7 +35,9 @@ export function Simples() {
     const fuso = x.p.fazenda.fuso;
     const agoraTs = Date.now() / 1000;
     const horaAgora = partesLocais(agoraTs, fuso).hora;
-    const dia = diaSel.value && v.dias.some((d) => d.data === diaSel.value) ? (diaSel.value as string) : hoje;
+    // depois das 20h não sobra hora de trabalho hoje: a tela já abre no dia seguinte
+    const padrao = horaAgora >= 20 && v.dias.some((d) => d.data === addDias(hoje, 1)) ? addDias(hoje, 1) : hoje;
+    const dia = diaSel.value && v.dias.some((d) => d.data === diaSel.value) ? (diaSel.value as string) : padrao;
     const ehHoje = dia === hoje;
     const horasD = v.horas.filter((h) => h.data === dia);
     const d = v.dias.find((q) => q.data === dia);
@@ -59,7 +61,8 @@ export function Simples() {
 
   if (!x || !m) return <Carregando />;
   const { dia, ehHoje, horasD, considerar, d, sem, resumo, conf, hAgora, faixa } = m;
-  const rotulo = ehHoje ? 'Hoje' : `${DIAS[new Date(dia + 'T12:00:00Z').getUTCDay()]}, ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+  const amanha = dia === addDias(x.hoje, 1);
+  const rotulo = ehHoje ? 'Hoje' : amanha ? 'Amanhã' : `${DIAS[new Date(dia + 'T12:00:00Z').getUTCDay()]}, ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
   const semOp = (op: Operacao) => (op === 'pulv' ? sem.pulverizacao : op === 'plantio' ? sem.plantio : sem.colheita);
   const trabalho = OPS.map(({ id }) => ({ id, nome: NOME_OP[id], s: semOp(id), f: fraseTrabalho(id, semOp(id), considerar, lim) }));
   const per = periodos(horasD);
@@ -112,7 +115,7 @@ export function Simples() {
         </button>
       </div>
 
-      <h2 class="sec-t">Posso trabalhar {ehHoje ? 'hoje' : 'neste dia'}?</h2>
+      <h2 class="sec-t">Posso trabalhar {ehHoje ? 'hoje' : amanha ? 'amanhã' : 'neste dia'}?</h2>
       {trabalho.map(({ id, nome, s, f }) => {
         const Ic = OPS.find((o) => o.id === id)!.Ic;
         return (
