@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Estoque Agro</title>
+<meta name="description" content="Calculadora de estoque de insumos: dose × hectares para soja.">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Estoque Agro">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{
+  --bg:#000; --panel:#0d0d0f; --key:#1c1c1e; --key2:#2a2a2d; --line:rgba(255,255,255,.13);
+  --txt:#f5f5f7; --mut:#8e8e93; --dim:#58585d;
+  --acc:#ff9f0a; --ok:#32d74b; --bad:#ff453a;
+  --f:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:var(--f);font-weight:300;
+  -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+input,select{font:inherit;color:inherit}
+#app{max-width:440px;height:100dvh;margin:0 auto;display:flex;flex-direction:column;position:relative;
+  border-left:.5px solid var(--line);border-right:.5px solid var(--line)}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;display:none;overflow-y:auto;overflow-x:hidden;
+  padding:calc(env(safe-area-inset-top) + 14px) 16px 16px}
+.view.on{display:flex;flex-direction:column}
+.eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);font-weight:400}
+h1{font-size:34px;font-weight:200;letter-spacing:-.02em;margin:2px 0 14px}
+
+/* seletor de produto */
+.prod{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;
+  border:.5px solid var(--line);border-radius:16px;background:var(--panel)}
+.prod .n{font-size:18px;font-weight:300;line-height:1.2}
+.prod .m{font-size:12px;color:var(--mut);margin-top:2px;letter-spacing:.04em}
+.prod svg{margin-left:auto;flex:none}
+
+/* display estilo calculadora */
+.display{flex:1;min-height:128px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;
+  padding:8px 4px 10px;text-align:right}
+.display .lbl{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);font-weight:400}
+.big{font-size:76px;font-weight:200;letter-spacing:-.04em;line-height:1.05;white-space:nowrap;font-variant-numeric:tabular-nums}
+.big small{font-size:.3em;letter-spacing:0;color:var(--mut);margin-left:.25em;font-weight:300}
+.big.m{font-size:58px}.big.s{font-size:44px}
+.status{font-size:14px;margin-top:6px;font-weight:400;min-height:20px}
+.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}.status.idle{color:var(--mut);font-weight:300}
+
+/* campos */
+.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.field{border:.5px solid var(--line);border-radius:14px;padding:9px 10px 8px;text-align:left;background:var(--panel);min-width:0}
+.field .k{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);font-weight:400}
+.field .v{font-size:23px;font-weight:200;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.field .v i{font-style:normal;font-size:11px;color:var(--mut);margin-left:3px;font-weight:300}
+.field.on{border-color:var(--acc);box-shadow:0 0 0 .5px var(--acc) inset}
+.field.on .k{color:var(--acc)}
+.field .v.ph{color:var(--dim)}
+
+/* mini resultados */
+.mini{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0;border-top:.5px solid var(--line);border-bottom:.5px solid var(--line)}
+.mini div{padding:9px 6px;text-align:center;min-width:0}
+.mini div+div{border-left:.5px solid var(--line)}
+.mini .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:400}
+.mini .v{font-size:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+
+/* teclado */
+.keypad{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,54px);gap:8px}
+.key{border:.5px solid var(--line);border-radius:999px;background:var(--key);font-size:25px;font-weight:200;display:flex;align-items:center;justify-content:center;
+  transition:background .08s}
+.key:active{background:var(--key2)}
+.key.op{background:var(--acc);color:#000;border-color:transparent;font-size:15px;font-weight:400;letter-spacing:.04em;flex-direction:column;gap:2px}
+.key.op:active{background:#ffb84d}
+.key.fn{background:#3a3a3d;font-size:18px}
+.key.zero{grid-column:span 2;justify-content:flex-start;padding-left:24px}
+.key.next{grid-row:span 2}
+
+.actions{display:flex;gap:8px;margin-top:12px;padding-bottom:6px}
+.btn{height:46px;border-radius:14px;border:.5px solid var(--line);padding:0 16px;font-size:15px;font-weight:400;letter-spacing:.02em;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--panel)}
+.btn:active{background:var(--key)}
+.btn.pri{flex:1;background:var(--acc);color:#000;border-color:transparent}
+.btn.pri:active{background:#ffb84d}
+.btn.wa{color:var(--ok);border-color:rgba(50,215,75,.45)}
+.btn.dng{color:var(--bad);border-color:rgba(255,69,58,.4)}
+.btn.sq{width:46px;padding:0}
+.btn.full{width:100%}
+
+/* abas */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-top:.5px solid var(--line);background:rgba(0,0,0,.92);
+  padding-bottom:env(safe-area-inset-bottom)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 0 8px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);font-weight:400}
+.tab.on{color:var(--acc)}
+.tab b{position:absolute;margin:-3px 0 0 20px;background:var(--acc);color:#000;border-radius:9px;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;font-weight:600;letter-spacing:0}
+.tab span.i{position:relative;display:block}
+
+/* listas */
+.search{width:100%;height:42px;border-radius:12px;border:.5px solid var(--line);background:var(--panel);padding:0 14px;font-size:16px;outline:0;margin-bottom:6px}
+.search:focus,.inp:focus{border-color:var(--acc)}
+.group{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut);padding:16px 2px 6px;font-weight:400}
+.row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:13px 2px;border-bottom:.5px solid var(--line)}
+.row .n{font-size:17px;flex:1;min-width:0}
+.row .d{font-size:13px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
+.row.sel .n{color:var(--acc)}
+.empty{margin:auto;text-align:center;color:var(--mut);font-size:14px;padding:40px 20px;line-height:1.5}
+.empty svg{opacity:.5;margin-bottom:10px}
+.note{font-size:11.5px;color:var(--dim);line-height:1.5;margin:16px 2px 4px}
+
+/* relatório */
+.inp{width:100%;height:44px;border-radius:12px;border:.5px solid var(--line);background:var(--panel);padding:0 14px;font-size:16px;outline:0}
+.lab{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);margin:12px 2px 6px;font-weight:400}
+.card{border:.5px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:10px;background:var(--panel);position:relative}
+.card .t{font-size:17px;padding-right:28px}
+.card .f{font-size:13px;color:var(--mut);margin-top:3px;font-variant-numeric:tabular-nums}
+.card .r{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;font-size:13px;color:var(--mut)}
+.card .r b{font-size:22px;font-weight:200;color:var(--txt)}
+.card .x{position:absolute;top:8px;right:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--mut)}
+.pill{font-size:12px;font-weight:400}
+.pill.ok{color:var(--ok)}.pill.bad{color:var(--bad)}
+.tot{display:flex;justify-content:space-between;padding:12px 2px;border-bottom:.5px solid var(--line);font-size:15px}
+.tot b{font-weight:300;font-variant-numeric:tabular-nums}
+.rel-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+
+/* sheet */
+.back{position:absolute;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.back.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:88%;background:#111113;border-top:.5px solid var(--line);border-radius:22px 22px 0 0;
+  transform:translateY(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1);z-index:21;display:flex;flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom)}
+.sheet.on{transform:none}
+.sheet .hd{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 8px}
+.sheet .hd h2{margin:0;font-size:22px;font-weight:200}
+.sheet .bd{overflow-y:auto;padding:0 18px 18px}
+.link{color:var(--acc);font-size:16px;font-weight:400}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:.5px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{height:42px;font-size:15px;color:var(--mut)}
+.seg button+button{border-left:.5px solid var(--line)}
+.seg button.on{background:var(--acc);color:#000;font-weight:500}
+select.inp{appearance:none;-webkit-appearance:none}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.toast{position:absolute;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translate(-50%,-80px);background:#2c2c2e;border:.5px solid var(--line);
+  border-radius:999px;padding:9px 18px;font-size:14px;font-weight:400;z-index:40;transition:transform .25s;white-space:nowrap;max-width:92%}
+.toast.on{transform:translate(-50%,0)}
+
+#print{display:none}
+@media print{
+  html,body{background:#fff!important;height:auto}
+  #app{display:none!important}
+  #print{display:block!important;color:#000;font-family:Helvetica,Arial,sans-serif;padding:8mm}
+  #print h1{font-size:22px;font-weight:300;margin:0 0 2px;color:#000;letter-spacing:0}
+  #print .sub{font-size:12px;color:#444;margin-bottom:14px}
+  #print table{width:100%;border-collapse:collapse;font-size:12px}
+  #print th{text-align:left;font-weight:600;border-bottom:1px solid #000;padding:6px 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+  #print td{padding:7px 4px;border-bottom:.5px solid #999}
+  #print td.r,#print th.r{text-align:right}
+  #print .ok{color:#0a7a22}.bad{color:#b3001b}
+  #print .tt{margin-top:14px;font-size:12px}
+  #print .ft{margin-top:22px;font-size:10px;color:#777;border-top:.5px solid #999;padding-top:6px}
+  @page{margin:10mm}
+}
+@media (max-height:700px){
+  .keypad{grid-template-rows:repeat(4,46px)}.key{font-size:22px}.big{font-size:60px}.display{min-height:96px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <main>
+    <!-- CALCULAR -->
+    <section id="v-calc" class="view on">
+      <div class="eyebrow">Estoque · Insumos</div>
+      <button class="prod" id="prodBtn" aria-label="Selecionar produto">
+        <div><div class="n" id="pName">—</div><div class="m" id="pMeta"></div></div>
+        <svg width="10" height="16" viewBox="0 0 10 16" fill="none" stroke="#8e8e93" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l3-3 3 3M2 10l3 3 3-3"/></svg>
+      </button>
+
+      <div class="display">
+        <div class="lbl">Necessário</div>
+        <div class="big" id="big">0</div>
+        <div class="status idle" id="status"></div>
+      </div>
+
+      <div class="fields" id="fields">
+        <button class="field on" data-f="estoque"><div class="k">Estoque</div><div class="v" id="fe"></div></button>
+        <button class="field" data-f="dose"><div class="k">Dose / ha</div><div class="v" id="fd"></div></button>
+        <button class="field" data-f="ha"><div class="k">Hectares</div><div class="v" id="fh"></div></button>
+      </div>
+
+      <div class="mini">
+        <div><div class="k">Saldo</div><div class="v" id="mSaldo">—</div></div>
+        <div><div class="k">Cobre</div><div class="v" id="mCob">—</div></div>
+        <div><div class="k" id="mEmbK">Comprar</div><div class="v" id="mEmb">—</div></div>
+      </div>
+
+      <div class="keypad" id="keypad">
+        <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+        <button class="key fn" data-k="del" aria-label="Apagar"><svg width="26" height="20" viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"><path d="M8 2h14a2 2 0 012 2v12a2 2 0 01-2 2H8L2 10z"/><path d="M12 7l6 6M18 7l-6 6"/></svg></button>
+        <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+        <button class="key fn" data-k="clr">C</button>
+        <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+        <button class="key op next" data-k="next" aria-label="Próximo campo"><span id="nextLbl">Dose</span><svg width="20" height="12" viewBox="0 0 20 12" fill="none" stroke="#000" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6h17M13 1l5 5-5 5"/></svg></button>
+        <button class="key zero" data-k="0">0</button><button class="key" data-k=",">,</button>
+      </div>
+
+      <div class="actions">
+        <button class="btn pri" id="addBtn">Adicionar ao relatório</button>
+        <button class="btn wa sq" id="waOne" aria-label="Enviar no WhatsApp"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.6-4.7A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 8.5c0 3.5 3 6.5 6.5 6.5l1-1.5-2-1-1 .7c-1-.4-2-1.4-2.4-2.4l.7-1-1-2z"/></svg></button>
+        <button class="btn sq" id="prOne" aria-label="Imprimir"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg></button>
+      </div>
+    </section>
+
+    <!-- RELATÓRIO -->
+    <section id="v-rel" class="view">
+      <div class="eyebrow">Resultado</div>
+      <h1>Relatório</h1>
+      <div class="two">
+        <div><label class="lab" style="margin-top:0">Fazenda / Talhão</label><input class="inp" id="farm" placeholder="Ex.: Talhão 03" autocomplete="off"></div>
+        <div><label class="lab" style="margin-top:0">Data</label><input class="inp" id="dt" type="date"></div>
+      </div>
+      <div id="relList"></div>
+      <div id="relTot"></div>
+      <div class="rel-actions" id="relAct">
+        <button class="btn wa" id="waAll">WhatsApp</button>
+        <button class="btn" id="prAll">Imprimir</button>
+        <button class="btn dng full" id="clrAll" style="grid-column:span 2">Limpar relatório</button>
+      </div>
+    </section>
+
+    <!-- PRODUTOS -->
+    <section id="v-prod" class="view">
+      <div class="eyebrow">Cadastro</div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between"><h1 style="margin-bottom:10px">Produtos</h1><button class="link" id="newProd" style="margin-bottom:12px">+ Novo</button></div>
+      <input class="search" id="pq" placeholder="Buscar produto" autocomplete="off">
+      <div id="pList"></div>
+      <p class="note">Doses pré-cadastradas são apenas referências. Confira sempre a bula, o rótulo e o receituário agronômico, e ajuste a dose de cada produto aqui.</p>
+      <button class="btn full" id="resetProd" style="margin-top:8px;color:var(--mut)">Restaurar lista padrão</button>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button class="tab on" data-v="calc"><span class="i"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 7h8M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></svg></span>Calcular</button>
+    <button class="tab" data-v="rel"><span class="i"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg><b id="badge" hidden>0</b></span>Relatório</button>
+    <button class="tab" data-v="prod"><span class="i"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></span>Produtos</button>
+  </nav>
+
+  <div class="back" id="back"></div>
+  <div class="sheet" id="sheet"><div class="hd"><h2 id="shT"></h2><button class="link" id="shX">Fechar</button></div><div class="bd" id="shB"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+<div id="print"></div>
+
+<script>
+(()=>{
+'use strict';
+const KEY='estoqueAgro.v1';
+const CATS=['Herbicida','Fungicida','Inseticida','Adjuvante','Fertilizante / Corretivo','Semente / Tratamento','Outro'];
+// [nome, categoria, unidade, dose por ha (referência), tamanho da embalagem]
+const DEF=[
+['Glifosato 480 g/L','Herbicida','L',2,20],['2,4-D','Herbicida','L',1,20],['Cletodim','Herbicida','L',0.4,5],
+['Diquat','Herbicida','L',2,20],['Fomesafem','Herbicida','L',1,20],['Imazetapir','Herbicida','L',1,5],
+['Trifloxistrobina + Protioconazol','Fungicida','L',0.4,5],['Azoxistrobina + Ciproconazol','Fungicida','L',0.3,5],
+['Fluxapiroxade + Piraclostrobina','Fungicida','L',0.35,5],['Mancozebe','Fungicida','kg',2,20],['Clorotalonil','Fungicida','L',1.5,20],
+['Tiametoxam + Lambda-cialotrina','Inseticida','L',0.25,5],['Imidacloprido + Beta-ciflutrina','Inseticida','L',1,5],
+['Clorantraniliprole','Inseticida','L',0.05,1],['Metomil','Inseticida','L',1,20],
+['Óleo mineral','Adjuvante','L',0.5,20],['Óleo vegetal','Adjuvante','L',0.5,20],['Espalhante adesivo','Adjuvante','L',0.2,5],
+['MAP (11-52-00)','Fertilizante / Corretivo','kg',150,50],['Cloreto de potássio (KCl)','Fertilizante / Corretivo','kg',150,50],
+['Superfosfato simples','Fertilizante / Corretivo','kg',300,50],['Sulfato de amônio','Fertilizante / Corretivo','kg',100,50],
+['Calcário','Fertilizante / Corretivo','kg',2000,1000],['Gesso agrícola','Fertilizante / Corretivo','kg',1000,1000],
+['Semente de soja','Semente / Tratamento','kg',55,40],['Inoculante líquido','Semente / Tratamento','L',0.12,1],
+['Fungicida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5],['Inseticida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5]
+];
+const seed=()=>({products:DEF.map((d,i)=>({id:'p'+i,nome:d[0],cat:d[1],un:d[2],dose:d[3],emb:d[4]})),stock:{},ha:'',farm:'',date:'',report:[],sel:'p0'});
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
+if(!S||!Array.isArray(S.products)||!S.products.length)S=seed();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=s=>{const n=parseFloat(String(s==null?'':s).replace(',','.'));return isFinite(n)?n:0;};
+const nf=(n,m=2)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:m}).format(Math.round(n*1e6)/1e6);
+const inp=n=>String(n).replace('.',',');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const brDate=iso=>iso?iso.split('-').reverse().join('/'):'';
+const prodOf=id=>S.products.find(p=>p.id===id)||S.products[0];
+
+/* ---------- estado da calculadora ---------- */
+const C={f:'estoque',fresh:true,estoque:'',dose:'',ha:S.ha||''};
+const ORDER=['estoque','dose','ha'],NAMES={estoque:'Estoque',dose:'Dose',ha:'Hectares'};
+function pick(id){
+  S.sel=id;const p=prodOf(id);
+  C.dose=inp(p.dose);C.estoque=S.stock[id]!=null?S.stock[id]:'';C.ha=S.ha||'';
+  C.f='estoque';C.fresh=true;save();render();
+}
+function calc(){
+  const p=prodOf(S.sel),e=num(C.estoque),d=num(C.dose),h=num(C.ha),nec=d*h,saldo=e-nec;
+  const falta=Math.max(0,-saldo);
+  return{p,nome:p.nome,un:p.un,emb:p.emb||0,e,d,h,nec,saldo,falta,cob:d>0?e/d:null,
+    packs:falta>0&&p.emb>0?Math.ceil(falta/p.emb-1e-9):null};
+}
+function key(k){
+  let v=C[C.f]||'';
+  if(k==='next'){C.f=ORDER[(ORDER.indexOf(C.f)+1)%3];C.fresh=true;return render();}
+  if(k==='del'){v=v.slice(0,-1);C.fresh=false;}
+  else if(k==='clr'){v='';C.fresh=false;}
+  else if(k===','){if(C.fresh){v='0,';}else if(!v.includes(','))v=(v||'0')+',';C.fresh=false;}
+  else{if(C.fresh){v=k;C.fresh=false;}else if(v.length<10)v=v==='0'?k:v+k;}
+  C[C.f]=v;
+  if(C.f==='estoque')S.stock[S.sel]=v;
+  if(C.f==='ha')S.ha=v;
+  save();render();
+}
+
+/* ---------- renderização ---------- */
+function render(){
+  const r=calc(),p=r.p;
+  $('#pName').textContent=p.nome;$('#pMeta').textContent=p.cat+' · '+p.un;
+  const big=nf(r.nec,2);
+  const B=$('#big');B.innerHTML=esc(big)+'<small>'+p.un+'</small>';
+  B.className='big'+(big.length>11?' s':big.length>8?' m':'');
+  const st=$('#status');
+  if(!(r.d>0&&r.h>0)){st.className='status idle';st.textContent='Informe dose e hectares';}
+  else if(r.saldo>=0){st.className='status ok';st.textContent='Estoque suficiente · sobra '+nf(r.saldo)+' '+p.un;}
+  else{st.className='status bad';st.textContent='Faltam '+nf(r.falta)+' '+p.un;}
+  const set=(id,f,val,unit,ph)=>{const el=$(id);el.className='v'+(val===''?' ph':'');
+    el.innerHTML=(val===''?ph:esc(val))+'<i>'+unit+'</i>';};
+  set('#fe','estoque',C.estoque,p.un,'0');set('#fd','dose',C.dose,p.un+'/ha','0');set('#fh','ha',C.ha,'ha','0');
+  $$('.field').forEach(b=>b.classList.toggle('on',b.dataset.f===C.f));
+  $('#nextLbl').textContent=NAMES[ORDER[(ORDER.indexOf(C.f)+1)%3]];
+  const ok=r.d>0&&r.h>0;
+  $('#mSaldo').textContent=ok?(r.saldo<0?'−':'')+nf(Math.abs(r.saldo))+' '+p.un:'—';
+  $('#mSaldo').style.color=ok?(r.saldo<0?'var(--bad)':'var(--ok)'):'';
+  $('#mCob').textContent=r.cob!=null&&r.e>0?nf(r.cob,1)+' ha':'—';
+  if(r.falta>0&&r.packs){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=r.packs+' × '+nf(r.emb)+' '+p.un;}
+  else if(r.falta>0){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=nf(r.falta)+' '+p.un;}
+  else{$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=ok?'Nada':'—';}
+  const n=S.report.length;$('#badge').hidden=!n;$('#badge').textContent=n;
+}
+
+/* ---------- relatório ---------- */
+const sit=i=>i.saldo>=0?{c:'ok',t:'Suficiente · sobra '+nf(i.saldo)+' '+i.un}:{c:'bad',t:'Faltam '+nf(i.falta)+' '+i.un+(i.packs?' (≈ '+i.packs+' emb. de '+nf(i.emb)+' '+i.un+')':'')};
+function snap(r){return{nome:r.nome,un:r.un,emb:r.emb,e:r.e,d:r.d,h:r.h,nec:r.nec,saldo:r.saldo,falta:r.falta,packs:r.packs};}
+function totals(items){const t={};items.forEach(i=>{t[i.un]=(t[i.un]||0)+i.nec;});return t;}
+function renderRel(){
+  const L=S.report;$('#farm').value=S.farm||'';$('#dt').value=S.date||today();
+  $('#relAct').style.display=L.length?'grid':'none';
+  if(!L.length){
+    $('#relList').innerHTML='<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg><br>Nenhum cálculo adicionado.<br>Calcule um produto e toque em<br><b style="font-weight:400;color:var(--txt)">Adicionar ao relatório</b>.</div>';
+    $('#relTot').innerHTML='';return;
+  }
+  $('#relList').innerHTML=L.map((i,k)=>{const s=sit(i);return`<div class="card"><button class="x" data-del="${k}" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+  <div class="t">${esc(i.nome)}</div><div class="f">${nf(i.d,3)} ${i.un}/ha × ${nf(i.h)} ha · estoque ${nf(i.e)} ${i.un}</div>
+  <div class="r"><span class="pill ${s.c}">${esc(s.t)}</span><span>Necessário <b>${nf(i.nec)}</b> ${i.un}</span></div></div>`;}).join('');
+  const t=totals(L);
+  $('#relTot').innerHTML='<div class="group">Total necessário</div>'+Object.entries(t).map(([u,v])=>`<div class="tot"><span>Em ${u==='L'?'litros':'quilos'}</span><b>${nf(v)} ${u}</b></div>`).join('');
+}
+function reportText(items){
+  const L=['*RELATÓRIO DE INSUMOS*'];
+  if(S.farm)L.push('Local: '+S.farm);
+  L.push('Data: '+brDate(S.date||today()),'');
+  items.forEach((i,k)=>{const s=sit(i);
+    L.push((k+1)+') *'+i.nome+'*',
+      '   Dose: '+nf(i.d,3)+' '+i.un+'/ha × '+nf(i.h)+' ha',
+      '   Necessário: *'+nf(i.nec)+' '+i.un+'*',
+      '   Estoque: '+nf(i.e)+' '+i.un,
+      '   '+(i.saldo>=0?'✅ ':'⚠️ ')+s.t,'');});
+  const t=Object.entries(totals(items));
+  if(items.length>1)L.push('*Total necessário*',...t.map(([u,v])=>'• '+nf(v)+' '+u),'');
+  return L.join('\n').trim();
+}
+const sendWA=items=>window.open('https://wa.me/?text='+encodeURIComponent(reportText(items)),'_blank');
+function printItems(items){
+  const rows=items.map(i=>{const s=sit(i);return`<tr><td>${esc(i.nome)}</td><td class="r">${nf(i.e)} ${i.un}</td><td class="r">${nf(i.d,3)} ${i.un}/ha</td><td class="r">${nf(i.h)} ha</td><td class="r"><b>${nf(i.nec)} ${i.un}</b></td><td class="${s.c}">${esc(s.t)}</td></tr>`;}).join('');
+  const tt=Object.entries(totals(items)).map(([u,v])=>nf(v)+' '+u).join(' &nbsp;·&nbsp; ');
+  $('#print').innerHTML=`<h1>Relatório de Insumos</h1><div class="sub">${S.farm?esc(S.farm)+' · ':''}${brDate(S.date||today())}</div>
+  <table><thead><tr><th>Produto</th><th class="r">Estoque</th><th class="r">Dose</th><th class="r">Área</th><th class="r">Necessário</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="tt"><b>Total necessário:</b> ${tt}</div><div class="ft">Estoque Agro · doses conforme bula e receituário agronômico.</div>`;
+  setTimeout(()=>window.print(),60);
+}
+function oneItem(){const r=calc();if(!(r.d>0&&r.h>0)){toast('Informe dose e hectares');return null;}return[snap(r)];}
+
+/* ---------- produtos ---------- */
+function renderProd(){
+  const q=($('#pq').value||'').toLowerCase().trim();
+  const list=S.products.filter(p=>!q||(p.nome+' '+p.cat).toLowerCase().includes(q));
+  $('#pList').innerHTML=groupedHTML(list,'data-edit');
+}
+function groupedHTML(list,attr,selId){
+  if(!list.length)return'<div class="empty">Nenhum produto encontrado.</div>';
+  const cats=[...new Set([...CATS,...list.map(p=>p.cat)])];let h='';
+  cats.forEach(c=>{const g=list.filter(p=>p.cat===c);if(!g.length)return;
+    h+='<div class="group">'+esc(c)+'</div>'+g.map(p=>`<button class="row${p.id===selId?' sel':''}" ${attr}="${p.id}"><span class="n">${esc(p.nome)}</span><span class="d">${nf(p.dose,3)} ${p.un}/ha</span></button>`).join('');});
+  return h;
+}
+function openSheet(t,html){$('#shT').textContent=t;$('#shB').innerHTML=html;$('#sheet').classList.add('on');$('#back').classList.add('on');$('#shB').scrollTop=0;}
+function closeSheet(){$('#sheet').classList.remove('on');$('#back').classList.remove('on');}
+function openPicker(){
+  openSheet('Produto','<input class="search" id="sq" placeholder="Buscar produto" autocomplete="off"><button class="row" id="addNew"><span class="n" style="color:var(--acc)">+ Adicionar produto manualmente</span></button><div id="sl"></div>');
+  const draw=()=>{const q=$('#sq').value.toLowerCase().trim();$('#sl').innerHTML=groupedHTML(S.products.filter(p=>!q||(p.nome+' '+p.cat).toLowerCase().includes(q)),'data-pick',S.sel);};
+  draw();$('#sq').addEventListener('input',draw);
+  $('#addNew').onclick=()=>openForm(null,true);
+}
+function openForm(id,pickAfter){
+  const p=id?S.products.find(x=>x.id===id):{nome:'',cat:'Herbicida',un:'L',dose:'',emb:''};
+  openSheet(id?'Editar produto':'Novo produto',`
+   <label class="lab">Nome do produto</label><input class="inp" id="fN" value="${esc(p.nome)}" placeholder="Ex.: Glifosato" autocomplete="off">
+   <label class="lab">Categoria</label><select class="inp" id="fC">${CATS.map(c=>`<option${c===p.cat?' selected':''}>${esc(c)}</option>`).join('')}</select>
+   <label class="lab">Unidade</label><div class="seg" id="fU"><button data-u="L" class="${p.un==='L'?'on':''}">Litros (L)</button><button data-u="kg" class="${p.un==='kg'?'on':''}">Quilos (kg)</button></div>
+   <div class="two"><div><label class="lab">Dose padrão por ha</label><input class="inp" id="fD" inputmode="decimal" value="${p.dose===''?'':inp(p.dose)}" placeholder="0"></div>
+   <div><label class="lab">Embalagem (opcional)</label><input class="inp" id="fE" inputmode="decimal" value="${p.emb?inp(p.emb):''}" placeholder="Ex.: 20"></div></div>
+   <div style="display:flex;gap:8px;margin-top:20px"><button class="btn pri" id="fS">Salvar</button>${id?'<button class="btn dng" id="fX">Excluir</button>':''}</div>`);
+  let un=p.un;
+  $('#fU').onclick=e=>{const b=e.target.closest('button');if(!b)return;un=b.dataset.u;$$('#fU button').forEach(x=>x.classList.toggle('on',x===b));};
+  $('#fS').onclick=()=>{
+    const nome=$('#fN').value.trim();if(!nome)return toast('Informe o nome do produto');
+    const o={nome,cat:$('#fC').value,un,dose:num($('#fD').value),emb:num($('#fE').value)};
+    let nid=id;
+    if(id)Object.assign(S.products.find(x=>x.id===id),o);else{nid='u'+Date.now();S.products.push({id:nid,...o});}
+    save();closeSheet();renderProd();
+    if(pickAfter||nid===S.sel)pick(nid);else render();
+    toast('Produto salvo');
+  };
+  if(id)$('#fX').onclick=()=>{
+    if(S.products.length<2)return toast('Mantenha ao menos um produto');
+    if(!confirm('Excluir "'+p.nome+'"?'))return;
+    S.products=S.products.filter(x=>x.id!==id);delete S.stock[id];
+    if(S.sel===id)S.sel=S.products[0].id;
+    save();closeSheet();renderProd();pick(S.sel);
+  };
+}
+
+/* ---------- utilidades ---------- */
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1900);}
+function view(v){
+  $$('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
+  $$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+  if(v==='rel')renderRel();if(v==='prod')renderProd();
+}
+
+/* ---------- eventos ---------- */
+$('#keypad').addEventListener('click',e=>{const b=e.target.closest('.key');if(b)key(b.dataset.k);});
+$('#fields').addEventListener('click',e=>{const b=e.target.closest('.field');if(!b)return;C.f=b.dataset.f;C.fresh=true;render();});
+$('#prodBtn').onclick=openPicker;
+$('#back').onclick=closeSheet;$('#shX').onclick=closeSheet;
+$('#shB').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(b){closeSheet();pick(b.dataset.pick);}});
+$('#pList').addEventListener('click',e=>{const b=e.target.closest('[data-edit]');if(b)openForm(b.dataset.edit,false);});
+$('#newProd').onclick=()=>openForm(null,false);
+$('#pq').addEventListener('input',renderProd);
+$('#resetProd').onclick=()=>{if(!confirm('Restaurar a lista padrão? Produtos adicionados por você serão removidos.'))return;
+  const keep={ha:S.ha,farm:S.farm,date:S.date,report:S.report};S=Object.assign(seed(),keep);save();renderProd();pick('p0');toast('Lista restaurada');};
+$$('.tab').forEach(b=>b.onclick=()=>view(b.dataset.v));
+$('#addBtn').onclick=()=>{const i=oneItem();if(!i)return;S.report.push(i[0]);save();render();toast('Adicionado ao relatório');};
+$('#waOne').onclick=()=>{const i=oneItem();if(i)sendWA(i);};
+$('#prOne').onclick=()=>{const i=oneItem();if(i)printItems(i);};
+$('#waAll').onclick=()=>sendWA(S.report);
+$('#prAll').onclick=()=>printItems(S.report);
+$('#clrAll').onclick=()=>{if(confirm('Limpar todos os itens do relatório?')){S.report=[];save();renderRel();render();}};
+$('#relList').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;S.report.splice(+b.dataset.del,1);save();renderRel();render();});
+$('#farm').addEventListener('input',e=>{S.farm=e.target.value;save();});
+$('#dt').addEventListener('change',e=>{S.date=e.target.value;save();});
+document.addEventListener('keydown',e=>{
+  if(!$('#v-calc').classList.contains('on')||$('#sheet').classList.contains('on')||e.ctrlKey||e.metaKey)return;
+  const k=e.key;
+  if(/^\d$/.test(k))key(k);else if(k===','||k==='.')key(',');else if(k==='Backspace')key('del');
+  else if(k==='Escape'||k==='Delete')key('clr');else if(k==='Tab'||k==='Enter'){e.preventDefault();key('next');}
+});
+
+if(!S.products.some(p=>p.id===S.sel))S.sel=S.products[0].id;
+pick(S.sel);
+if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+})();
+</script>
+</body>
+</html>
