@@ -1,7 +1,7 @@
 {
   "name": "Estoque Agro — Calculadora de Insumos",
   "short_name": "Estoque Agro",
-  "description": "Calculadora de estoque, dose e hectares para soja: plantio, colheita e análise de insumos.",
+  "description": "Calculadora de estoque, dose e hectares para soja.",
   "lang": "pt-BR",
   "start_url": "./index.html",
   "scope": "./",
