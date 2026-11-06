@@ -62,7 +62,11 @@ h1{font-size:34px;font-weight:200;letter-spacing:-.02em;margin:2px 0 14px}
 .field .v.ph{color:var(--dim)}
 
 /* mini resultados */
-.mini{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0;border-top:.5px solid var(--line);border-bottom:.5px solid var(--line)}
+.units{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:400;min-height:28px}
+.units span{flex:1}
+.units button{height:26px;min-width:44px;padding:0 12px;border-radius:999px;border:.5px solid var(--line);font-size:12px;letter-spacing:.02em;text-transform:none;color:var(--txt)}
+.units button.on{background:var(--acc);color:#000;border-color:transparent;font-weight:500}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);margin:6px 0 12px;border-top:.5px solid var(--line);border-bottom:.5px solid var(--line)}
 .mini div{padding:9px 6px;text-align:center;min-width:0}
 .mini div+div{border-left:.5px solid var(--line)}
 .mini .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:400}
@@ -193,7 +197,8 @@ select.inp{appearance:none;-webkit-appearance:none}
         <button class="field" data-f="ha"><div class="k">Hectares</div><div class="v" id="fh"></div></button>
       </div>
 
-      <div class="mini">
+      <div class="units" id="units"></div>
+<div class="mini">
         <div><div class="k">Saldo</div><div class="v" id="mSaldo">—</div></div>
         <div><div class="k">Cobre</div><div class="v" id="mCob">—</div></div>
         <div><div class="k" id="mEmbK">Comprar</div><div class="v" id="mEmb">—</div></div>
@@ -274,12 +279,16 @@ const DEF=[
 ['Superfosfato simples','Fertilizante / Corretivo','kg',300,50],['Sulfato de amônio','Fertilizante / Corretivo','kg',100,50],
 ['Calcário','Fertilizante / Corretivo','kg',2000,1000],['Gesso agrícola','Fertilizante / Corretivo','kg',1000,1000],
 ['Semente de soja','Semente / Tratamento','kg',55,40],['Inoculante líquido','Semente / Tratamento','L',0.12,1],
-['Fungicida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5],['Inseticida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5]
+['Fungicida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5],['Inseticida p/ tratamento de sementes','Semente / Tratamento','L',0.1,5],
+['Demarcor','Semente / Tratamento','L',30,0,'mL'],['Standak','Semente / Tratamento','L',100,0,'mL'],['Seed Plus','Semente / Tratamento','L',200,0,'mL'],['Vetrato','Semente / Tratamento','L',25,0,'mL']
 ];
-const seed=()=>({products:DEF.map((d,i)=>({id:'p'+i,nome:d[0],cat:d[1],un:d[2],dose:d[3],emb:d[4]})),stock:{},ha:'',farm:'',date:'',report:[],sel:'p0'});
+const NEWV=2,NEW_FROM=28;
+const seed=()=>({products:DEF.map((d,i)=>({id:'p'+i,nome:d[0],cat:d[1],un:d[2],dose:d[3],emb:d[4],du:d[5]||d[2]})),stock:{},su:{},ha:'',farm:'',date:'',report:[],sel:'p0',v:NEWV});
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){}
 if(!S||!Array.isArray(S.products)||!S.products.length)S=seed();
+if((S.v||1)<NEWV){DEF.slice(NEW_FROM).forEach((d,i)=>{if(!S.products.some(p=>p.nome===d[0]))S.products.push({id:'n'+NEW_FROM+i,nome:d[0],cat:d[1],un:d[2],dose:d[3],emb:d[4],du:d[5]||d[2]});});S.v=NEWV;}
+S.su=S.su||{};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
 
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -287,22 +296,30 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const num=s=>{const n=parseFloat(String(s==null?'':s).replace(',','.'));return isFinite(n)?n:0;};
 const nf=(n,m=2)=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:m}).format(Math.round(n*1e6)/1e6);
 const inp=n=>String(n).replace('.',',');
+const UN={L:{f:1,b:'L'},mL:{f:.001,b:'L'},kg:{f:1,b:'kg'},g:{f:.001,b:'kg'}};
+const sub=u=>u==='L'?'mL':u==='kg'?'g':u;
+const duOf=p=>p.du&&UN[p.du]&&UN[p.du].b===p.un?p.du:p.un;
+const qty=(n,un)=>{n=Math.abs(n)<1e-9?0:n;return n>0&&n<1?{v:nf(n*1000,1),u:sub(un)}:{v:nf(n,2),u:un};};
+const q=(n,un)=>{const r=qty(n,un);return r.v+' '+r.u;};
+const trim=n=>String(Math.round(n*1e6)/1e6).replace('.',',');
+const dl=i=>nf(i.dd!=null?i.dd:i.d,3)+' '+(i.du||i.un)+'/ha';
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 const brDate=iso=>iso?iso.split('-').reverse().join('/'):'';
 const prodOf=id=>S.products.find(p=>p.id===id)||S.products[0];
 
 /* ---------- estado da calculadora ---------- */
-const C={f:'estoque',fresh:true,estoque:'',dose:'',ha:S.ha||''};
+const C={f:'estoque',fresh:true,estoque:'',dose:'',ha:S.ha||'',eu:'L',du:'L'};
 const ORDER=['estoque','dose','ha'],NAMES={estoque:'Estoque',dose:'Dose',ha:'Hectares'};
 function pick(id){
   S.sel=id;const p=prodOf(id);
-  C.dose=inp(p.dose);C.estoque=S.stock[id]!=null?S.stock[id]:'';C.ha=S.ha||'';
+  C.du=duOf(p);C.dose=inp(p.dose);C.estoque=S.stock[id]!=null?S.stock[id]:'';C.ha=S.ha||'';
+  C.eu=(S.su[id]&&UN[S.su[id]]&&UN[S.su[id]].b===p.un)?S.su[id]:p.un;
   C.f='estoque';C.fresh=true;save();render();
 }
 function calc(){
-  const p=prodOf(S.sel),e=num(C.estoque),d=num(C.dose),h=num(C.ha),nec=d*h,saldo=e-nec;
+  const p=prodOf(S.sel),e=num(C.estoque)*UN[C.eu].f,d=num(C.dose)*UN[C.du].f,h=num(C.ha),nec=d*h,saldo=e-nec;
   const falta=Math.max(0,-saldo);
-  return{p,nome:p.nome,un:p.un,emb:p.emb||0,e,d,h,nec,saldo,falta,cob:d>0?e/d:null,
+  return{p,nome:p.nome,un:p.un,emb:p.emb||0,dd:num(C.dose),du:C.du,e,d,h,nec,saldo,falta,cob:d>0?e/d:null,
     packs:falta>0&&p.emb>0?Math.ceil(falta/p.emb-1e-9):null};
 }
 function key(k){
@@ -313,40 +330,51 @@ function key(k){
   else if(k===','){if(C.fresh){v='0,';}else if(!v.includes(','))v=(v||'0')+',';C.fresh=false;}
   else{if(C.fresh){v=k;C.fresh=false;}else if(v.length<10)v=v==='0'?k:v+k;}
   C[C.f]=v;
-  if(C.f==='estoque')S.stock[S.sel]=v;
+  if(C.f==='estoque'){S.stock[S.sel]=v;S.su[S.sel]=C.eu;}
   if(C.f==='ha')S.ha=v;
   save();render();
 }
 
 /* ---------- renderização ---------- */
+function setUnit(u){
+  if(C.f==='ha')return;
+  const k=C.f==='estoque'?'eu':'du',old=C[k];if(old===u)return;
+  if(C[C.f]!=='')C[C.f]=trim(num(C[C.f])*UN[old].f/UN[u].f);
+  C[k]=u;
+  if(C.f==='estoque'){S.stock[S.sel]=C.estoque;S.su[S.sel]=u;}
+  C.fresh=true;save();render();
+}
 function render(){
   const r=calc(),p=r.p;
   $('#pName').textContent=p.nome;$('#pMeta').textContent=p.cat+' · '+p.un;
-  const big=nf(r.nec,2);
-  const B=$('#big');B.innerHTML=esc(big)+'<small>'+p.un+'</small>';
+  const Q=qty(r.nec,p.un),big=Q.v;
+  const B=$('#big');B.innerHTML=esc(big)+'<small>'+Q.u+'</small>';
   B.className='big'+(big.length>11?' s':big.length>8?' m':'');
   const st=$('#status');
   if(!(r.d>0&&r.h>0)){st.className='status idle';st.textContent='Informe dose e hectares';}
-  else if(r.saldo>=0){st.className='status ok';st.textContent='Estoque suficiente · sobra '+nf(r.saldo)+' '+p.un;}
-  else{st.className='status bad';st.textContent='Faltam '+nf(r.falta)+' '+p.un;}
+  else if(r.saldo>=0){st.className='status ok';st.textContent='Estoque suficiente · sobra '+q(r.saldo,p.un);}
+  else{st.className='status bad';st.textContent='Faltam '+q(r.falta,p.un);}
   const set=(id,f,val,unit,ph)=>{const el=$(id);el.className='v'+(val===''?' ph':'');
     el.innerHTML=(val===''?ph:esc(val))+'<i>'+unit+'</i>';};
-  set('#fe','estoque',C.estoque,p.un,'0');set('#fd','dose',C.dose,p.un+'/ha','0');set('#fh','ha',C.ha,'ha','0');
+  set('#fe','estoque',C.estoque,C.eu,'0');set('#fd','dose',C.dose,C.du+'/ha','0');set('#fh','ha',C.ha,'ha','0');
   $$('.field').forEach(b=>b.classList.toggle('on',b.dataset.f===C.f));
   $('#nextLbl').textContent=NAMES[ORDER[(ORDER.indexOf(C.f)+1)%3]];
   const ok=r.d>0&&r.h>0;
-  $('#mSaldo').textContent=ok?(r.saldo<0?'−':'')+nf(Math.abs(r.saldo))+' '+p.un:'—';
+  $('#mSaldo').textContent=ok?(r.saldo<0?'−':'')+q(r.saldo,p.un):'—';
   $('#mSaldo').style.color=ok?(r.saldo<0?'var(--bad)':'var(--ok)'):'';
   $('#mCob').textContent=r.cob!=null&&r.e>0?nf(r.cob,1)+' ha':'—';
-  if(r.falta>0&&r.packs){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=r.packs+' × '+nf(r.emb)+' '+p.un;}
-  else if(r.falta>0){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=nf(r.falta)+' '+p.un;}
+  if(r.falta>0&&r.packs){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=r.packs+' × '+q(r.emb,p.un);}
+  else if(r.falta>0){$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=q(r.falta,p.un);}
   else{$('#mEmbK').textContent='Comprar';$('#mEmb').textContent=ok?'Nada':'—';}
+  const U=$('#units'),cur=C.f==='estoque'?C.eu:C.du;
+  U.style.visibility=C.f==='ha'?'hidden':'visible';
+  U.innerHTML='<span>Unidade · '+NAMES[C.f]+'</span>'+[p.un,sub(p.un)].map(u=>`<button data-u="${u}" class="${u===cur?'on':''}">${u}</button>`).join('');
   const n=S.report.length;$('#badge').hidden=!n;$('#badge').textContent=n;
 }
 
 /* ---------- relatório ---------- */
-const sit=i=>i.saldo>=0?{c:'ok',t:'Suficiente · sobra '+nf(i.saldo)+' '+i.un}:{c:'bad',t:'Faltam '+nf(i.falta)+' '+i.un+(i.packs?' (≈ '+i.packs+' emb. de '+nf(i.emb)+' '+i.un+')':'')};
-function snap(r){return{nome:r.nome,un:r.un,emb:r.emb,e:r.e,d:r.d,h:r.h,nec:r.nec,saldo:r.saldo,falta:r.falta,packs:r.packs};}
+const sit=i=>i.saldo>=0?{c:'ok',t:'Suficiente · sobra '+q(i.saldo,i.un)}:{c:'bad',t:'Faltam '+q(i.falta,i.un)+(i.packs?' (≈ '+i.packs+' emb. de '+q(i.emb,i.un)+')':'')};
+function snap(r){return{nome:r.nome,un:r.un,emb:r.emb,dd:r.dd,du:r.du,e:r.e,d:r.d,h:r.h,nec:r.nec,saldo:r.saldo,falta:r.falta,packs:r.packs};}
 const GR=[['falta','Faltam'],['ok','Suficiente'],['sem','Sem estoque']];
 const grpOf=i=>i.e<=0?'sem':i.saldo<0?'falta':'ok';
 function groups(items){
@@ -363,10 +391,10 @@ function renderRel(){
     $('#relTot').innerHTML='';return;
   }
   $('#relList').innerHTML=groups(L).map(g=>`<div class="group g-${g.k}">${g.t} · ${g.L.length}</div>`+g.L.map(({i,k})=>{const s=sit(i);return`<div class="card"><button class="x" data-del="${k}" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
-  <div class="t">${esc(i.nome)}</div><div class="f">${nf(i.d,3)} ${i.un}/ha × ${nf(i.h)} ha · estoque ${nf(i.e)} ${i.un}</div>
-  <div class="r"><span class="pill ${s.c}">${esc(s.t)}</span><span>Necessário <b>${nf(i.nec)}</b> ${i.un}</span></div></div>`;}).join('')).join('');
+  <div class="t">${esc(i.nome)}</div><div class="f">${dl(i)} × ${nf(i.h)} ha · estoque ${q(i.e,i.un)}</div>
+  <div class="r"><span class="pill ${s.c}">${esc(s.t)}</span><span>Necessário <b>${qty(i.nec,i.un).v}</b> ${qty(i.nec,i.un).u}</span></div></div>`;}).join('')).join('');
   const t=totals(L);
-  $('#relTot').innerHTML='<div class="group">Total necessário</div>'+Object.entries(t).map(([u,v])=>`<div class="tot"><span>Em ${u==='L'?'litros':'quilos'}</span><b>${nf(v)} ${u}</b></div>`).join('');
+  $('#relTot').innerHTML='<div class="group">Total necessário</div>'+Object.entries(t).map(([u,v])=>`<div class="tot"><span>Em ${u==='L'?'litros':'quilos'}</span><b>${q(v,u)}</b></div>`).join('');
 }
 function reportText(items){
   const L=['*RELATÓRIO DE INSUMOS*'];
@@ -377,18 +405,18 @@ function reportText(items){
   const EM={falta:'🔴',ok:'✅',sem:'⚪'};
   G.forEach(g=>{L.push(EM[g.k]+' *'+g.t.toUpperCase()+'*','');
     g.L.forEach(({i},n)=>{L.push((n+1)+') *'+i.nome+'*',
-      '   Dose: '+nf(i.d,3)+' '+i.un+'/ha × '+nf(i.h)+' ha',
-      '   Necessário: *'+nf(i.nec)+' '+i.un+'*',
-      '   Estoque: '+nf(i.e)+' '+i.un,
+      '   Dose: '+dl(i)+' × '+nf(i.h)+' ha',
+      '   Necessário: *'+q(i.nec,i.un)+'*',
+      '   Estoque: '+q(i.e,i.un),
       '   '+sit(i).t,'');});});
   const t=Object.entries(totals(items));
-  if(items.length>1)L.push('*Total necessário*',...t.map(([u,v])=>'• '+nf(v)+' '+u),'');
+  if(items.length>1)L.push('*Total necessário*',...t.map(([u,v])=>'• '+q(v,u)),'');
   return L.join('\n').trim();
 }
 const sendWA=items=>window.open('https://wa.me/?text='+encodeURIComponent(reportText(items)),'_blank');
 function printItems(items){
-  const rows=groups(items).map(g=>`<tr class="gh"><td colspan="6">${g.t} · ${g.L.length}</td></tr>`+g.L.map(({i})=>{const s=sit(i);return`<tr><td>${esc(i.nome)}</td><td class="r">${nf(i.e)} ${i.un}</td><td class="r">${nf(i.d,3)} ${i.un}/ha</td><td class="r">${nf(i.h)} ha</td><td class="r"><b>${nf(i.nec)} ${i.un}</b></td><td class="${s.c}">${esc(s.t)}</td></tr>`;}).join('')).join('');
-  const tt=Object.entries(totals(items)).map(([u,v])=>nf(v)+' '+u).join(' &nbsp;·&nbsp; ');
+  const rows=groups(items).map(g=>`<tr class="gh"><td colspan="6">${g.t} · ${g.L.length}</td></tr>`+g.L.map(({i})=>{const s=sit(i);return`<tr><td>${esc(i.nome)}</td><td class="r">${q(i.e,i.un)}</td><td class="r">${dl(i)}</td><td class="r">${nf(i.h)} ha</td><td class="r"><b>${q(i.nec,i.un)}</b></td><td class="${s.c}">${esc(s.t)}</td></tr>`;}).join('')).join('');
+  const tt=Object.entries(totals(items)).map(([u,v])=>q(v,u)).join(' &nbsp;·&nbsp; ');
   $('#print').innerHTML=`<h1>Relatório de Insumos</h1><div class="sub">${S.farm?esc(S.farm)+' · ':''}${brDate(S.date||today())}</div>
   <table><thead><tr><th>Produto</th><th class="r">Estoque</th><th class="r">Dose</th><th class="r">Área</th><th class="r">Necessário</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>
   <div class="tt"><b>Total necessário:</b> ${tt}</div><div class="ft">Estoque Agro · doses conforme bula e receituário agronômico.</div>`;
@@ -406,7 +434,7 @@ function groupedHTML(list,attr,selId){
   if(!list.length)return'<div class="empty">Nenhum produto encontrado.</div>';
   const cats=[...new Set([...CATS,...list.map(p=>p.cat)])];let h='';
   cats.forEach(c=>{const g=list.filter(p=>p.cat===c);if(!g.length)return;
-    h+='<div class="group">'+esc(c)+'</div>'+g.map(p=>`<button class="row${p.id===selId?' sel':''}" ${attr}="${p.id}"><span class="n">${esc(p.nome)}</span><span class="d">${nf(p.dose,3)} ${p.un}/ha</span></button>`).join('');});
+    h+='<div class="group">'+esc(c)+'</div>'+g.map(p=>`<button class="row${p.id===selId?' sel':''}" ${attr}="${p.id}"><span class="n">${esc(p.nome)}</span><span class="d">${nf(p.dose,3)} ${duOf(p)}/ha</span></button>`).join('');});
   return h;
 }
 function openSheet(t,html){$('#shT').textContent=t;$('#shB').innerHTML=html;$('#sheet').classList.add('on');$('#back').classList.add('on');$('#shB').scrollTop=0;}
@@ -418,19 +446,24 @@ function openPicker(){
   $('#addNew').onclick=()=>openForm(null,true);
 }
 function openForm(id,pickAfter){
-  const p=id?S.products.find(x=>x.id===id):{nome:'',cat:'Herbicida',un:'L',dose:'',emb:''};
+  const p=id?S.products.find(x=>x.id===id):{nome:'',cat:'Herbicida',un:'L',du:'L',dose:'',emb:''};
   openSheet(id?'Editar produto':'Novo produto',`
    <label class="lab">Nome do produto</label><input class="inp" id="fN" value="${esc(p.nome)}" placeholder="Ex.: Glifosato" autocomplete="off">
    <label class="lab">Categoria</label><select class="inp" id="fC">${CATS.map(c=>`<option${c===p.cat?' selected':''}>${esc(c)}</option>`).join('')}</select>
-   <label class="lab">Unidade</label><div class="seg" id="fU"><button data-u="L" class="${p.un==='L'?'on':''}">Litros (L)</button><button data-u="kg" class="${p.un==='kg'?'on':''}">Quilos (kg)</button></div>
-   <div class="two"><div><label class="lab">Dose padrão por ha</label><input class="inp" id="fD" inputmode="decimal" value="${p.dose===''?'':inp(p.dose)}" placeholder="0"></div>
-   <div><label class="lab">Embalagem (opcional)</label><input class="inp" id="fE" inputmode="decimal" value="${p.emb?inp(p.emb):''}" placeholder="Ex.: 20"></div></div>
+   <label class="lab">Unidade do estoque</label><div class="seg" id="fU"><button data-u="L" class="${p.un==='L'?'on':''}">Litros (L)</button><button data-u="kg" class="${p.un==='kg'?'on':''}">Quilos (kg)</button></div>
+   <label class="lab">Unidade da dose (por ha)</label><div class="seg" id="fDU"></div>
+  <div class="two"><div><label class="lab">Dose padrão por ha</label><input class="inp" id="fD" inputmode="decimal" value="${p.dose===''?'':inp(p.dose)}" placeholder="0"></div>
+   <div><label class="lab">Embalagem em L ou kg (opcional)</label><input class="inp" id="fE" inputmode="decimal" value="${p.emb?inp(p.emb):''}" placeholder="Ex.: 20"></div></div>
    <div style="display:flex;gap:8px;margin-top:20px"><button class="btn pri" id="fS">Salvar</button>${id?'<button class="btn dng" id="fX">Excluir</button>':''}</div>`);
-  let un=p.un;
-  $('#fU').onclick=e=>{const b=e.target.closest('button');if(!b)return;un=b.dataset.u;$$('#fU button').forEach(x=>x.classList.toggle('on',x===b));};
+  let un=p.un,du=duOf(p);
+  const UL={L:'Litros (L)',kg:'Quilos (kg)',mL:'Mililitros (mL)',g:'Gramas (g)'};
+  const drawDU=()=>{if(UN[du].b!==un)du=un;$('#fDU').innerHTML=[un,sub(un)].map(u=>`<button data-u="${u}" class="${du===u?'on':''}">${UL[u]}</button>`).join('');};
+  drawDU();
+  $('#fDU').onclick=e=>{const b=e.target.closest('button');if(!b)return;du=b.dataset.u;drawDU();};
+  $('#fU').onclick=e=>{const b=e.target.closest('button');if(!b)return;un=b.dataset.u;du=un;drawDU();$$('#fU button').forEach(x=>x.classList.toggle('on',x===b));};
   $('#fS').onclick=()=>{
     const nome=$('#fN').value.trim();if(!nome)return toast('Informe o nome do produto');
-    const o={nome,cat:$('#fC').value,un,dose:num($('#fD').value),emb:num($('#fE').value)};
+    const o={nome,cat:$('#fC').value,un,du,dose:num($('#fD').value),emb:num($('#fE').value)};
     let nid=id;
     if(id)Object.assign(S.products.find(x=>x.id===id),o);else{nid='u'+Date.now();S.products.push({id:nid,...o});}
     save();closeSheet();renderProd();
@@ -458,6 +491,7 @@ function view(v){
 $('#keypad').addEventListener('click',e=>{const b=e.target.closest('.key');if(b)key(b.dataset.k);});
 $('#fields').addEventListener('click',e=>{const b=e.target.closest('.field');if(!b)return;C.f=b.dataset.f;C.fresh=true;render();});
 $('#prodBtn').onclick=openPicker;
+$('#units').addEventListener('click',e=>{const b=e.target.closest('[data-u]');if(b)setUnit(b.dataset.u);});
 $('#back').onclick=closeSheet;$('#shX').onclick=closeSheet;
 $('#shB').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(b){closeSheet();pick(b.dataset.pick);}});
 $('#pList').addEventListener('click',e=>{const b=e.target.closest('[data-edit]');if(b)openForm(b.dataset.edit,false);});
