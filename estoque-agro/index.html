@@ -123,6 +123,7 @@ h1{font-size:34px;font-weight:200;letter-spacing:-.02em;margin:2px 0 14px}
 .pill.ok{color:var(--ok)}.pill.bad{color:var(--bad)}
 .tot{display:flex;justify-content:space-between;padding:12px 2px;border-bottom:.5px solid var(--line);font-size:15px}
 .tot b{font-weight:300;font-variant-numeric:tabular-nums}
+.group.g-falta{color:var(--bad)}.group.g-ok{color:var(--ok)}
 .rel-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
 
 /* sheet */
@@ -159,6 +160,7 @@ select.inp{appearance:none;-webkit-appearance:none}
   #print td{padding:7px 4px;border-bottom:.5px solid #999}
   #print td.r,#print th.r{text-align:right}
   #print .ok{color:#0a7a22}.bad{color:#b3001b}
+  #print .gh td{font-weight:600;background:#eee;padding:6px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
   #print .tt{margin-top:14px;font-size:12px}
   #print .ft{margin-top:22px;font-size:10px;color:#777;border-top:.5px solid #999;padding-top:6px}
   @page{margin:10mm}
@@ -226,7 +228,7 @@ select.inp{appearance:none;-webkit-appearance:none}
       <div id="relTot"></div>
       <div class="rel-actions" id="relAct">
         <button class="btn wa" id="waAll">WhatsApp</button>
-        <button class="btn" id="prAll">Imprimir</button>
+        <button class="btn" id="prAll">PDF / Imprimir</button>
         <button class="btn dng full" id="clrAll" style="grid-column:span 2">Limpar relatório</button>
       </div>
     </section>
@@ -345,6 +347,13 @@ function render(){
 /* ---------- relatório ---------- */
 const sit=i=>i.saldo>=0?{c:'ok',t:'Suficiente · sobra '+nf(i.saldo)+' '+i.un}:{c:'bad',t:'Faltam '+nf(i.falta)+' '+i.un+(i.packs?' (≈ '+i.packs+' emb. de '+nf(i.emb)+' '+i.un+')':'')};
 function snap(r){return{nome:r.nome,un:r.un,emb:r.emb,e:r.e,d:r.d,h:r.h,nec:r.nec,saldo:r.saldo,falta:r.falta,packs:r.packs};}
+const GR=[['falta','Faltam'],['ok','Suficiente'],['sem','Sem estoque']];
+const grpOf=i=>i.e<=0?'sem':i.saldo<0?'falta':'ok';
+function groups(items){
+  const m=items.map((i,k)=>({i,k}));
+  const by={falta:(a,b)=>b.i.falta-a.i.falta,sem:(a,b)=>b.i.nec-a.i.nec,ok:(a,b)=>a.i.saldo-b.i.saldo};
+  return GR.map(([k,t])=>({k,t,L:m.filter(x=>grpOf(x.i)===k).sort(by[k])})).filter(g=>g.L.length);
+}
 function totals(items){const t={};items.forEach(i=>{t[i.un]=(t[i.un]||0)+i.nec;});return t;}
 function renderRel(){
   const L=S.report;$('#farm').value=S.farm||'';$('#dt').value=S.date||today();
@@ -353,9 +362,9 @@ function renderRel(){
     $('#relList').innerHTML='<div class="empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8e8e93" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg><br>Nenhum cálculo adicionado.<br>Calcule um produto e toque em<br><b style="font-weight:400;color:var(--txt)">Adicionar ao relatório</b>.</div>';
     $('#relTot').innerHTML='';return;
   }
-  $('#relList').innerHTML=L.map((i,k)=>{const s=sit(i);return`<div class="card"><button class="x" data-del="${k}" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
+  $('#relList').innerHTML=groups(L).map(g=>`<div class="group g-${g.k}">${g.t} · ${g.L.length}</div>`+g.L.map(({i,k})=>{const s=sit(i);return`<div class="card"><button class="x" data-del="${k}" aria-label="Remover"><svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg></button>
   <div class="t">${esc(i.nome)}</div><div class="f">${nf(i.d,3)} ${i.un}/ha × ${nf(i.h)} ha · estoque ${nf(i.e)} ${i.un}</div>
-  <div class="r"><span class="pill ${s.c}">${esc(s.t)}</span><span>Necessário <b>${nf(i.nec)}</b> ${i.un}</span></div></div>`;}).join('');
+  <div class="r"><span class="pill ${s.c}">${esc(s.t)}</span><span>Necessário <b>${nf(i.nec)}</b> ${i.un}</span></div></div>`;}).join('')).join('');
   const t=totals(L);
   $('#relTot').innerHTML='<div class="group">Total necessário</div>'+Object.entries(t).map(([u,v])=>`<div class="tot"><span>Em ${u==='L'?'litros':'quilos'}</span><b>${nf(v)} ${u}</b></div>`).join('');
 }
@@ -363,19 +372,22 @@ function reportText(items){
   const L=['*RELATÓRIO DE INSUMOS*'];
   if(S.farm)L.push('Local: '+S.farm);
   L.push('Data: '+brDate(S.date||today()),'');
-  items.forEach((i,k)=>{const s=sit(i);
-    L.push((k+1)+') *'+i.nome+'*',
+  const G=groups(items);
+  L.push(G.map(g=>g.t+': '+g.L.length).join(' · '),'');
+  const EM={falta:'🔴',ok:'✅',sem:'⚪'};
+  G.forEach(g=>{L.push(EM[g.k]+' *'+g.t.toUpperCase()+'*','');
+    g.L.forEach(({i},n)=>{L.push((n+1)+') *'+i.nome+'*',
       '   Dose: '+nf(i.d,3)+' '+i.un+'/ha × '+nf(i.h)+' ha',
       '   Necessário: *'+nf(i.nec)+' '+i.un+'*',
       '   Estoque: '+nf(i.e)+' '+i.un,
-      '   '+(i.saldo>=0?'✅ ':'⚠️ ')+s.t,'');});
+      '   '+sit(i).t,'');});});
   const t=Object.entries(totals(items));
   if(items.length>1)L.push('*Total necessário*',...t.map(([u,v])=>'• '+nf(v)+' '+u),'');
   return L.join('\n').trim();
 }
 const sendWA=items=>window.open('https://wa.me/?text='+encodeURIComponent(reportText(items)),'_blank');
 function printItems(items){
-  const rows=items.map(i=>{const s=sit(i);return`<tr><td>${esc(i.nome)}</td><td class="r">${nf(i.e)} ${i.un}</td><td class="r">${nf(i.d,3)} ${i.un}/ha</td><td class="r">${nf(i.h)} ha</td><td class="r"><b>${nf(i.nec)} ${i.un}</b></td><td class="${s.c}">${esc(s.t)}</td></tr>`;}).join('');
+  const rows=groups(items).map(g=>`<tr class="gh"><td colspan="6">${g.t} · ${g.L.length}</td></tr>`+g.L.map(({i})=>{const s=sit(i);return`<tr><td>${esc(i.nome)}</td><td class="r">${nf(i.e)} ${i.un}</td><td class="r">${nf(i.d,3)} ${i.un}/ha</td><td class="r">${nf(i.h)} ha</td><td class="r"><b>${nf(i.nec)} ${i.un}</b></td><td class="${s.c}">${esc(s.t)}</td></tr>`;}).join('')).join('');
   const tt=Object.entries(totals(items)).map(([u,v])=>nf(v)+' '+u).join(' &nbsp;·&nbsp; ');
   $('#print').innerHTML=`<h1>Relatório de Insumos</h1><div class="sub">${S.farm?esc(S.farm)+' · ':''}${brDate(S.date||today())}</div>
   <table><thead><tr><th>Produto</th><th class="r">Estoque</th><th class="r">Dose</th><th class="r">Área</th><th class="r">Necessário</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table>
