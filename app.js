@@ -3,9 +3,15 @@
 'use strict';
 
 const KEY = 'pluvio.v2';
-const FIELDS = window.TALHOES;
+// Pontos de coleta: os 20 talhões com contorno (KML) e os pontos da planilha que não têm contorno no mapa.
+const EXTRA = [['armazem', 'Armazém'], ['retiro01', 'Retiro 01'], ['retiro02', 'Retiro 02'], ['retiro03', 'Retiro 03'], ['th08', 'TH 08'],
+  ...[22, 23, 24, 25, 26, 27, 28, 29, 30].map(n => ['th' + n, 'TH ' + n])];
+const groupOf = n => n.startsWith('Arm') ? 0 : n.startsWith('Cond') ? 1 : n.startsWith('Ret') ? 2 : 3;
+const FIELDS = [...window.TALHOES.map(f => ({ ...f, name: f.name.replace('IT ', 'TH ') })), ...EXTRA.map(([id, name]) => ({ id, name, ha: null, rings: null }))]
+  .sort((a, b) => groupOf(a.name) - groupOf(b.name) || a.name.localeCompare(b.name));
 const FIELD = Object.fromEntries(FIELDS.map(f => [f.id, f]));
-const AREA = FIELDS.reduce((a, f) => a + f.ha, 0);
+const MAPPED = FIELDS.filter(f => f.rings);
+const AREA = MAPPED.reduce((a, f) => a + f.ha, 0);
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -32,17 +38,30 @@ const brShort = s => s.slice(8) + '/' + s.slice(5, 7);
 const dayName = s => s === today() ? 'Hoje' : s === addDays(today(), -1) ? 'Ontem'
   : toDate(s).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
 const fmt = n => (Math.round(n * 10) / 10).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-const short = n => n.replace('Condomínio ', 'C').replace('IT ', '');
+const short = n => n.replace('Condomínio ', 'C').replace('Retiro ', 'R').replace('Armazém', 'Arm').replace('TH ', '');
 const tileName = n => n.replace('Condomínio', 'Cond.');
 
 /* ---------- estado ---------- */
 const defaultSeason = () => { const d = new Date(); return `${d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1}-09-01`; };
 function load() {
-  const base = { settings: { farm: "Haras Olhos d'Água", user: '', season: defaultSeason(), lastBackup: 0 }, readings: [] };
-  try { const s = JSON.parse(localStorage.getItem(KEY) || '{}'); return { settings: { ...base.settings, ...s.settings }, readings: s.readings || [] }; }
-  catch { return base; }
+  const base = { settings: { farm: 'Fazenda Itaguaia', user: '', season: defaultSeason(), lastBackup: 0, seed: 0 }, readings: [] };
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || '{}'), st = { ...base.settings, ...s.settings };
+    if (st.farm === "Haras Olhos d'Água") st.farm = base.settings.farm; // nome provisório das primeiras versões
+    return { settings: st, readings: s.readings || [] };
+  } catch { return base; }
 }
 let db = load();
+function importSeed() { // coletas da planilha, embutidas no app; entram uma vez por versão da planilha
+  const C = window.COLETAS; if (!C || db.settings.seed >= C.version) return;
+  const map = new Map(db.readings.map(r => [r.id, r])), now = Date.now();
+  for (const [date, row] of Object.entries(C.days)) for (const [fieldId, mm] of Object.entries(row)) {
+    const id = fieldId + '|' + date; map.set(id, { id, fieldId, date, mm, user: 'Planilha', updatedAt: now, deleted: false });
+  }
+  db.readings = [...map.values()]; db.settings.seed = C.version;
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {}
+}
+importSeed();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('Sem espaço para salvar no aparelho'); } };
 const ui = { tab: 'home', period: 'd7', allRank: false };
 const readings = () => db.readings.filter(r => !r.deleted && FIELD[r.fieldId]);
@@ -65,9 +84,9 @@ function index() { // talhão -> { data: mm }
   for (const r of readings()) (m[r.fieldId] ??= {})[r.date] = r.mm;
   return m;
 }
-function farmDays(idx) { // média do dia, ponderada pela área dos talhões lidos
+function farmDays(idx) { // média simples dos pontos lidos em cada dia (nem todos têm área conhecida)
   const acc = {};
-  for (const f of FIELDS) for (const [d, mm] of Object.entries(idx[f.id] || {})) { const a = acc[d] ??= [0, 0]; a[0] += mm * f.ha; a[1] += f.ha; }
+  for (const f of FIELDS) for (const [d, mm] of Object.entries(idx[f.id] || {})) { const a = acc[d] ??= [0, 0]; a[0] += mm; a[1] += 1; }
   return Object.fromEntries(Object.entries(acc).map(([d, a]) => [d, a[0] / a[1]]));
 }
 const sumRange = (days, from, to) => { let s = 0; for (const d in days) if (d >= from && d <= to) s += days[d]; return s; };
@@ -169,7 +188,7 @@ function viewHome() {
 /* ---------- mapa ---------- */
 const K = Math.cos(-14.92 * Math.PI / 180) * 111320, KY = 110540;
 const proj = ([lon, lat]) => [(lon + 51.29) * K, -(lat + 14.92) * KY];
-const GEO = FIELDS.map(f => {
+const GEO = MAPPED.map(f => {
   const rings = f.rings.map(r => r.map(proj)), r = rings[0];
   let a = 0, cx = 0, cy = 0;
   for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const c = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += c; cx += (r[j][0] + r[i][0]) * c; cy += (r[j][1] + r[i][1]) * c; }
@@ -185,7 +204,7 @@ function viewMap() {
       <div class="legend">Chuva acumulada (mm)<i></i><div><span>0</span><span>${fmt(max)}</span></div></div>
       <button class="ibtn mapbtn" data-act="mapreset" aria-label="Centralizar mapa">${I.fit}</button>
     </div>
-    <p class="note">Toque em um talhão para ver os detalhes. Use dois dedos para aproximar.</p>`;
+    <p class="note">Toque em um talhão para ver os detalhes. Use dois dedos para aproximar. ${FIELDS.length - MAPPED.length} pontos da planilha não têm contorno no mapa: ${FIELDS.filter(f => !f.rings).map(f => esc(short(f.name))).join(', ')}.</p>`;
 }
 let mapReset = () => {};
 function initMap() {
@@ -237,7 +256,7 @@ function openField(id) {
   const season = Object.entries(days).filter(([d]) => d >= sr.from && d <= sr.to);
   const best = season.reduce((m, e) => e[1] > m[1] ? e : m, ['', 0]);
   const s = stats('safra'), pos = s.ranked.findIndex(r => r.f.id === id) + 1;
-  openSheet(nav(esc(f.name), `${fmt(f.ha)} ha`) + `<div class="body">
+  openSheet(nav(esc(f.name), f.ha ? `${fmt(f.ha)} ha` : 'Sem contorno no mapa') + `<div class="body">
     <div class="panel"><div class="grid4">${tot}</div></div>
     <div class="sect"><h2>Últimos 30 dias</h2><span>mm por dia</span></div>
     ${barChart(seriesFor(days, 'd30'))}
@@ -341,8 +360,8 @@ function viewHistory() {
   const dates = Object.keys(by).sort().reverse();
   const h = head('Histórico', shareBtn);
   if (!dates.length) return h + `<div class="empty"><h3>Sem lançamentos</h3><p>Os dias lançados aparecem aqui. Toque em um dia para conferir ou corrigir.</p></div><button class="pill" data-act="launch">${I.plus}Lançar chuva</button>`;
-  return h + `<div class="panel">${dates.slice(0, ui.histMax || 60).map(d => {
-    const rs = by[d], area = rs.reduce((a, r) => a + FIELD[r.fieldId].ha, 0), mean = rs.reduce((a, r) => a + r.mm * FIELD[r.fieldId].ha, 0) / area;
+  return h + `<div class="panel">${dates.slice(0, 400).map(d => {
+    const rs = by[d], mean = rs.reduce((a, r) => a + r.mm, 0) / rs.length;
     const top = rs.reduce((m, r) => r.mm > m.mm ? r : m);
     return `<button class="row" data-act="day" data-id="${d}"><div class="grow"><div class="t">${dayName(d)} · ${brShort(d)}</div>
       <div class="s">${rs.length} talhões${top.mm > 0 ? ` · maior: ${esc(FIELD[top.fieldId].name)}, ${fmt(top.mm)} mm` : ' · sem chuva'}</div></div>
@@ -359,16 +378,16 @@ function viewMore() {
       <button class="row" data-act="backup"><div class="grow"><div class="t">Fazer backup</div><div class="s">${s.lastBackup ? 'Último: ' + new Date(s.lastBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Salva todas as leituras em um arquivo'}</div></div>${I.chev}</button>
       <button class="row" data-act="restore"><div class="grow"><div class="t">Importar backup</div><div class="s">Junta as leituras de outro celular, sem duplicar</div></div>${I.chev}</button>
     </div>
-    <div class="sect"><h2>Fazenda</h2><span>${FIELDS.length} talhões · ${fmt(AREA)} ha</span></div>
+    <div class="sect"><h2>Fazenda</h2><span>${FIELDS.length} pontos de coleta</span></div>
     <div class="panel">
       <div class="row"><label class="t" for="sfarm">Nome</label><input id="sfarm" data-set="farm" value="${esc(s.farm)}" maxlength="40" placeholder="Nome da fazenda"></div>
       <div class="row"><label class="t" for="suser">Quem lança</label><input id="suser" data-set="user" value="${esc(s.user)}" maxlength="24" placeholder="Seu nome"></div>
       <div class="row"><label class="grow t" for="sseason">Início da safra</label><input type="date" id="sseason" data-set="season" value="${s.season}" max="${today()}"></div>
     </div>
-    <p class="note">As leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
+    <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.0</p>`;
+    <p class="note">Pluviômetro · versão 2.1</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -430,15 +449,15 @@ async function makePdf(p) {
   };
   const num = { halign: 'right' };
   let y = table(64, 'Chuva por talhão', ['#', 'Talhão', 'Área (ha)', 'Chuva (mm)', 'Comparado à média', 'Dias lidos'],
-    s.ranked.map((r, i) => [i + 1, r.f.name, fmt(r.f.ha), r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
+    s.ranked.map((r, i) => [i + 1, r.f.name, r.f.ha ? fmt(r.f.ha) : '-', r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
     { 0: { cellWidth: 10 }, 2: num, 3: { ...num, fontStyle: 'bold' }, 4: num, 5: num });
   const dates = [...new Set(readings().filter(r => r.date >= s.from && r.date <= s.to).map(r => r.date))].sort().reverse();
-  if (dates.length && dates.length <= 31) {
+  if (dates.length && dates.length <= 40) {
     doc.addPage('a4', 'landscape');
     const cols = FIELDS.map(f => short(f.name));
     doc.setFont('helvetica', 'bold').setFontSize(12).setTextColor(0).text('Leituras por dia (mm)', 10, 14);
     doc.autoTable({ startY: 17, head: [['Data', ...cols, 'Média']], body: dates.map(d => [brShort(d), ...FIELDS.map(f => { const v = s.idx[f.id]?.[d]; return v == null ? '' : fmt(v); }), fmt(s.farm[d])]),
-      theme: 'grid', margin: { left: 10, right: 10 }, styles: { font: 'helvetica', fontSize: 7.500, cellPadding: 1.300, halign: 'right', lineColor: 225, lineWidth: .100 },
+      theme: 'grid', margin: { left: 10, right: 10 }, styles: { font: 'helvetica', fontSize: 6, cellPadding: .900, halign: 'right', lineColor: 225, lineWidth: .100, overflow: 'visible' },
       headStyles: { fillColor: [0, 0, 0], textColor: 255, halign: 'right' }, columnStyles: { 0: { halign: 'left', fontStyle: 'bold' }, [cols.length + 1]: { fontStyle: 'bold' } } });
   }
   const n = doc.getNumberOfPages(), stamp = `Gerado em ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}${db.settings.user ? ' por ' + db.settings.user : ''}`;
@@ -449,7 +468,7 @@ function makeCsv(p) {
   const { from, to } = range(p), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = [['Data', 'Talhão', 'Área (ha)', 'Chuva (mm)', 'Quem lançou']];
   readings().filter(r => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date) || FIELDS.indexOf(FIELD[a.fieldId]) - FIELDS.indexOf(FIELD[b.fieldId]))
-    .forEach(r => rows.push([br(r.date), FIELD[r.fieldId].name, String(FIELD[r.fieldId].ha).replace('.', ','), String(r.mm).replace('.', ','), r.user]));
+    .forEach(r => rows.push([br(r.date), FIELD[r.fieldId].name, String(FIELD[r.fieldId].ha ?? '').replace('.', ','), String(r.mm).replace('.', ','), r.user]));
   return new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' });
 }
 const fileStamp = p => { const r = range(p); return `${r.from}_a_${r.to}`; };
