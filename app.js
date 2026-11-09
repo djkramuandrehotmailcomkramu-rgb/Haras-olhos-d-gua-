@@ -118,7 +118,7 @@ function openSheet(html, { full = false, init } = {}) {
   const w = document.createElement('div');
   w.className = 'wrap' + (full ? ' full' : '');
   w.innerHTML = `<div class="back" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
-  $('#sheets').append(w); sheets.push(w);
+  $('#sheets').append(w); sheets.push(w); w.openedAt = Date.now();
   requestAnimationFrame(() => requestAnimationFrame(() => w.classList.add('in')));
   init?.(w);
   return w;
@@ -236,14 +236,14 @@ function initMap() {
       lastDist = dist; moved = 99;
     }
   });
-  const up = e => {
-    if (P.size === 1 && moved < 8 && e.type === 'pointerup') {
-      const id = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('path[data-id]')?.dataset.id;
-      if (id) openField(id);
-    }
-    P.delete(e.pointerId); lastDist = 0;
-  };
+  const up = e => { P.delete(e.pointerId); lastDist = 0; };
   svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  // Abre no "click" (e não no pointerup): o toque já terminou e não sobra um clique para fechar a folha recém-aberta.
+  svg.addEventListener('click', e => {
+    if (moved >= 12) return;
+    const id = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('path[data-id]')?.dataset.id;
+    if (id) openField(id);
+  });
   svg.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.15 : 0.87, e.clientX - box.left, e.clientY - box.top); }, { passive: false });
 }
 
@@ -387,7 +387,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.1</p>`;
+    <p class="note">Pluviômetro · versão 2.1.1</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -539,6 +539,7 @@ document.addEventListener('click', e => {
   const tab = e.target.closest('[data-tab]');
   if (tab) { ui.tab = tab.dataset.tab; render(); window.scrollTo(0, 0); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
+  if (el.classList.contains('back') && Date.now() - (el.parentNode.openedAt || 0) < 400) return; // ainda é o toque que abriu a folha
   actions[el.dataset.act]?.(el, el.closest('.wrap'));
 });
 document.addEventListener('change', e => {
