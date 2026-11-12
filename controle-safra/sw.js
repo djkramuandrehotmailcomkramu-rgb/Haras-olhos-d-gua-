@@ -1,5 +1,5 @@
 /* Offline: abre do cache na hora e atualiza em segundo plano. Dados do Supabase nunca passam pelo cache. */
-const VERSION = 'safra-1.0.0';
+const VERSION = 'safra-1.1.0';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'inter.woff2',
   'vendor/supabase.js', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));

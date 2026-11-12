@@ -20,7 +20,7 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xx
 const ls = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
 const S = {
-  user: null, perfil: null, safra: null, talhoes: [], cargas: [], fila: ls.get('cs_fila', []),
+  user: null, perfil: null, safra: null, talhoes: [], variedades: [], cargas: [], fila: ls.get('cs_fila', []),
   tab: ls.get('cs_tab', 'lancar'), online: navigator.onLine, periodo: '7d', fTalhao: '', dia: hoje(), sync: false, erroLogin: '', modoCriar: false, aviso: ''
 };
 
@@ -59,11 +59,12 @@ async function carregar() {
       S.talhoes = await pagina(() => sb.from('cs_talhoes').select('*').eq('safra_id', S.safra.id).order('nome'));
       S.cargas = await pagina(() => sb.from('cs_cargas').select('*').eq('safra_id', S.safra.id).order('data', { ascending: false }).order('hora', { ascending: false }).order('criado_em', { ascending: false }));
     }
-    ls.set('cs_cache', { safra: S.safra, talhoes: S.talhoes, cargas: S.cargas });
+    const { data: vs } = await sb.from('cs_variedades').select('*').order('nome'); if (vs) S.variedades = vs;
+    ls.set('cs_cache', { safra: S.safra, talhoes: S.talhoes, cargas: S.cargas, variedades: S.variedades });
     S.online = true;
   } catch (e) {
     const c = ls.get('cs_cache', null);
-    if (c && !S.safra) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; }
+    if (c && !S.safra) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; }
     if (/fetch|Network|Load failed/i.test(String(e.message))) S.online = false; else toast(traduz(e), true);
   }
 }
@@ -157,7 +158,7 @@ function viewLancar() {
   if (!tal.length) return `<div class="card empty">Nenhum talhão cadastrado nesta safra ainda.<br>O gerente precisa cadastrar os talhões primeiro.</div>`;
   return `<div class="pagehead"><h1>Lançar carga</h1><span>${brData(hoje())} · ${agoraHora()}</span></div>
   <form id="fCarga" class="card" autocomplete="off">
-    <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${last.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${t.variedade ? ' · ' + esc(t.variedade) : ''}</option>`).join('')}</select></div>
+    <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${last.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${variedadeDe(t) ? ' · ' + esc(variedadeDe(t).nome) : ''}</option>`).join('')}</select></div>
     <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="14" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist></div>
     <div class="field"><label>Nº da viagem</label><input id="cViagem" inputmode="numeric" pattern="[0-9]*" value="${proxViagem()}" required></div></div>
     <div class="row2"><div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" pattern="[0-9]*" required><div class="hint" id="hTara"></div></div>
@@ -205,6 +206,7 @@ function bindLancar() {
 }
 
 /* ---------- Lista de cargas ---------- */
+const variedadeDe = t => S.variedades.find(v => v.id === t.variedade_id) || null;
 const nomeTal = id => (S.talhoes.find(t => t.id === id) || {}).nome || '—';
 function itemCarga(c) {
   return `<button class="item ${c.status === 'cancelada' ? 'canc' : ''}" data-carga="${c.id}"><div class="n">${c.viagem ?? '·'}</div>
@@ -263,7 +265,7 @@ function viewPainel() {
   const faixas = [['até 13%', 0, 13], ['13–15%', 13, 15], ['15–18%', 15, 18], ['acima de 18%', 18, 99]];
   const fu = faixas.map(([n, a, b]) => [n, comU.filter(c => c.umidade > a - (a === 0 ? 1 : 0) && c.umidade <= b).length]);
   /* por tipo / variedade */
-  const vr = {}; l.forEach(c => { const t = S.talhoes.find(x => x.id === c.talhao_id); const k = (t && (t.variedade || t.tipo)) || 'Sem variedade'; vr[k] = (vr[k] || 0) + Number(c.sacas); });
+  const vr = {}; l.forEach(c => { const t = S.talhoes.find(x => x.id === c.talhao_id); const k = (t && variedadeDe(t) && variedadeDe(t).nome) || 'Sem variedade'; vr[k] = (vr[k] || 0) + Number(c.sacas); });
   const varied = Object.entries(vr).sort((a, b) => b[1] - a[1]);
   const maxV = Math.max(1, ...varied.map(x => x[1]));
   const per = [['hoje', 'Hoje'], ['7d', '7 dias'], ['safra', 'Safra toda']].map(([k, n]) => `<button data-per="${k}" class="${S.periodo === k ? 'on' : ''}">${n}</button>`).join('');
@@ -304,15 +306,14 @@ function viewTalhoes() {
   const l = ativas();
   return `<div class="pagehead"><h1>Talhões</h1><span>${S.talhoes.length} cadastrados</span></div>
   ${ger ? '<button class="btn" data-act="novoTal" style="margin-bottom:16px">Novo talhão</button>' : ''}
-  <div class="card list">${S.talhoes.map(t => { const sc = soma(l.filter(c => c.talhao_id === t.id), 'sacas'); return `<button class="item" ${ger ? `data-tal="${t.id}"` : ''}><div class="n">${t.area_ha ? n0(t.area_ha) : '?'}<small style="font-size:10px">ha</small></div><div class="m"><b>${esc(t.nome)}${t.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${esc(t.variedade || 'sem variedade')}${t.tipo ? ' · ' + esc(t.tipo) : ''}</small></div><div class="v">${n0(sc)} sc<small>${t.area_ha && sc ? n1(sc / t.area_ha) + ' sc/ha' : 'não colhido'}</small></div></button>`; }).join('') || '<div class="empty">Nenhum talhão cadastrado.</div>'}</div>`;
+  <div class="card list">${S.talhoes.map(t => { const sc = soma(l.filter(c => c.talhao_id === t.id), 'sacas'); return `<button class="item" ${ger ? `data-tal="${t.id}"` : ''}><div class="n">${t.area_ha ? n0(t.area_ha) : '?'}<small style="font-size:10px">ha</small></div><div class="m"><b>${esc(t.nome)}${t.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${variedadeDe(t) ? esc(variedadeDe(t).nome) + ' · ' + esc(variedadeDe(t).tipo) : 'sem variedade'}</small></div><div class="v">${n0(sc)} sc<small>${t.area_ha && sc ? n1(sc / t.area_ha) + ' sc/ha' : 'não colhido'}</small></div></button>`; }).join('') || '<div class="empty">Nenhum talhão cadastrado.</div>'}</div>`;
 }
 function abrirTalhao(id) {
   const t = id ? S.talhoes.find(x => x.id === id) : {};
   sheet(`<h2>${id ? 'Editar talhão' : 'Novo talhão'}</h2><form id="fTalhao" data-id="${id || ''}">
   <div class="field"><label>Nome</label><input id="tNome" required value="${esc(t.nome || '')}"></div>
-  <div class="row2"><div class="field"><label>Variedade</label><input id="tVar" value="${esc(t.variedade || '')}"></div>
-  <div class="field"><label>Área (ha)</label><input id="tHa" inputmode="decimal" value="${t.area_ha ?? ''}"></div></div>
-  <div class="field"><label>Tipo</label><select id="tTipo"><option value="">—</option>${['intacta', 'rr', 'convencional'].map(x => `<option value="${x}" ${t.tipo === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+  <div class="field"><label>Área (ha)</label><input id="tHa" inputmode="decimal" value="${t.area_ha ?? ''}"></div>
+  <div class="field"><label>Variedade plantada</label><select id="tVar"><option value="">— a definir —</option>${['intacta', 'rr', 'convencional'].map(tp => `<optgroup label="${tp.toUpperCase()}">${S.variedades.filter(v => v.tipo === tp && (v.ativo || v.id === t.variedade_id)).map(v => `<option value="${v.id}" ${t.variedade_id === v.id ? 'selected' : ''}>${esc(v.nome)}</option>`).join('')}</optgroup>`).join('')}</select></div>
   ${id ? `<div class="field"><label>Situação</label><select id="tAtivo"><option value="1" ${t.ativo ? 'selected' : ''}>Ativo</option><option value="0" ${!t.ativo ? 'selected' : ''}>Inativo</option></select></div>` : ''}
   <button class="btn" type="submit">Salvar</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
 }
@@ -375,7 +376,7 @@ document.addEventListener('submit', async e => {
   if (e.target.id === 'fTalhao') {
     e.preventDefault(); const id = e.target.dataset.id;
     const ha = String($('#tHa').value).replace(',', '.').trim();
-    const row = { nome: $('#tNome').value.trim(), variedade: $('#tVar').value.trim() || null, tipo: $('#tTipo').value || null, area_ha: ha === '' ? null : parseFloat(ha) };
+    const row = { nome: $('#tNome').value.trim(), variedade_id: $('#tVar').value || null, area_ha: ha === '' ? null : parseFloat(ha) };
     if (!row.nome) return toast('Informe o nome.', true);
     if (id) row.ativo = $('#tAtivo').value === '1'; else row.safra_id = S.safra.id;
     const { error } = id ? await sb.from('cs_talhoes').update(row).eq('id', id) : await sb.from('cs_talhoes').insert(row);
@@ -397,12 +398,12 @@ async function iniciar() {
     const novo = session ? session.user : null;
     if (novo && (!S.user || S.user.id !== novo.id)) { S.user = novo; await carregarPerfil(); await carregar(); render(); enviarFila(); }
     else if (!novo && S.user) {
-      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.safra = null;
+      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.variedades = []; S.safra = null;
       try { localStorage.removeItem('cs_cache'); localStorage.removeItem('cs_perfil'); } catch { } /* aparelho compartilhado: não deixa dados da conta */
       render();
     }
   });
-  if (S.user) { S.perfil = ls.get('cs_perfil', null); const c = ls.get('cs_cache', null); if (c) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; } render(); await carregarPerfil(); await carregar(); render(); enviarFila(); }
+  if (S.user) { S.perfil = ls.get('cs_perfil', null); const c = ls.get('cs_cache', null); if (c) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; } render(); await carregarPerfil(); await carregar(); render(); enviarFila(); }
   else render();
 }
 iniciar();
