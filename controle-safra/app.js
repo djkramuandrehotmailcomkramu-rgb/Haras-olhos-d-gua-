@@ -21,7 +21,7 @@ const ls = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?
 
 const S = {
   user: null, perfil: null, safra: null, talhoes: [], variedades: [], cargas: [], fila: ls.get('cs_fila', []),
-  tab: ls.get('cs_tab', 'lancar'), online: navigator.onLine, periodo: '7d', fTalhao: '', dia: hoje(), sync: false, erroLogin: '', modoCriar: false, aviso: ''
+  tab: ls.get('cs_tab', 'lancar'), online: navigator.onLine, periodo: '7d', fTalhao: '', dia: hoje(), sync: false, erroLogin: '', entrando: false, usuarios: []
 };
 
 /* ---------- Mensagens ---------- */
@@ -32,7 +32,10 @@ function toast(msg, err) {
 }
 function traduz(e) {
   const m = (e && e.message) || String(e);
-  if (/Invalid login/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (/Invalid login/i.test(m)) return 'E-mail ou senha incorretos. Confira e tente de novo.';
+  if (/Apenas o gerente/i.test(m)) return 'Só o gerente pode fazer isso.';
+  if (/same password|different from the old/i.test(m)) return 'A nova senha precisa ser diferente da atual.';
+  if (/rate limit|too many/i.test(m)) return 'Muitas tentativas. Espere um minuto e tente de novo.';
   if (/Email not confirmed/i.test(m)) return 'Confirme seu e-mail pelo link que enviamos e entre de novo.';
   if (/already registered/i.test(m)) return 'Este e-mail já tem acesso. Use "Entrar".';
   if (/Password should/i.test(m)) return 'A senha precisa ter pelo menos 6 caracteres.';
@@ -132,13 +135,14 @@ function render() {
 
 /* ---------- Login ---------- */
 function telaLogin() {
+  const em = ls.get('cs_email', '');
   return `<div class="login"><img class="logo" src="icons/icon-192.png" alt="">
   <h1>Controle de Safra</h1><p>Fazenda Lagoa Formosa</p>
-  ${S.erroLogin ? `<div class="msg ${S.erroLogin.startsWith('OK:') ? 'ok' : ''}">${esc(S.erroLogin.replace(/^OK:/, ''))}</div>` : ''}
-  <form id="fLogin"><div class="field"><label>E-mail</label><input id="lEmail" type="email" autocomplete="username" inputmode="email" required></div>
-  <div class="field"><label>Senha</label><input id="lSenha" type="password" autocomplete="${S.modoCriar ? 'new-password' : 'current-password'}" required minlength="6"></div>
-  <button class="btn" type="submit">${S.modoCriar ? 'Criar meu acesso' : 'Entrar'}</button></form>
-  <button class="link" id="lModo">${S.modoCriar ? 'Já tenho acesso — Entrar' : 'Primeiro acesso? Criar senha'}</button></div>`;
+  ${S.erroLogin ? `<div class="msg">${esc(S.erroLogin)}</div>` : ''}
+  <form id="fLogin"><div class="field"><label>E-mail</label><input id="lEmail" type="email" autocomplete="username" inputmode="email" autocapitalize="off" required value="${esc(em)}"></div>
+  <div class="field"><label>Senha</label><div class="pw"><input id="lSenha" type="password" autocomplete="current-password" required minlength="6"><button type="button" class="eye" data-act="verSenha" aria-label="Mostrar senha">Ver</button></div></div>
+  <button class="btn" type="submit" id="lBtn" ${S.entrando ? 'disabled' : ''}>${S.entrando ? 'Entrando…' : 'Entrar'}</button></form>
+  <p class="hint" style="text-align:center;margin-top:16px">Sem acesso ainda? Peça ao gerente para criar o seu.</p></div>`;
 }
 function telaSemAcesso() {
   return `<div class="login"><img class="logo" src="icons/icon-192.png" alt=""><h1>Acesso não liberado</h1>
@@ -321,9 +325,37 @@ function abrirTalhao(id) {
 /* ---------- Mais ---------- */
 let instalar = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); instalar = e; if (S.user) render(); });
+async function carregarUsuarios() {
+  if (!S.perfil || S.perfil.papel !== 'gerente') return;
+  const { data } = await sb.from('cs_perfis').select('*').order('nome'); if (data) S.usuarios = data;
+}
+function abrirSenha() {
+  sheet(`<h2>Trocar minha senha</h2><form id="fSenha">
+  <div class="field"><label>Nova senha</label><input id="sNova" type="password" autocomplete="new-password" minlength="6" required></div>
+  <div class="field"><label>Repita a nova senha</label><input id="sConf" type="password" autocomplete="new-password" minlength="6" required></div>
+  <button class="btn" type="submit">Salvar senha</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
+}
+function abrirUsuario() {
+  sheet(`<h2>Novo acesso</h2><form id="fUsuario" autocomplete="off">
+  <div class="field"><label>Nome</label><input id="uNome" required></div>
+  <div class="field"><label>E-mail (usado para entrar)</label><input id="uEmail" type="email" inputmode="email" autocapitalize="off" required></div>
+  <div class="field"><label>Senha inicial</label><input id="uSenha" type="text" minlength="6" required><div class="hint">Mínimo 6 caracteres. Passe para a pessoa; ela pode trocar depois em Mais.</div></div>
+  <div class="field"><label>Função</label><select id="uPapel"><option value="balanceiro">Balanceiro (lança cargas)</option><option value="gerente">Gerente / Patrão (tudo)</option></select></div>
+  <button class="btn" type="submit">Criar acesso</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
+}
+function abrirRedef(id) {
+  const u = S.usuarios.find(x => x.id === id); if (!u) return;
+  sheet(`<h2>Nova senha para ${esc(u.nome)}</h2><form id="fRedef" data-id="${u.id}" autocomplete="off">
+  <div class="field"><label>Nova senha</label><input id="rSenha" type="text" minlength="6" required></div>
+  <button class="btn" type="submit">Redefinir senha</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
+}
 function viewMais() {
+  const ger = S.perfil.papel === 'gerente';
+  const usuarios = ger ? `<div class="card"><h2>Usuários</h2><div class="list">${S.usuarios.map(u => `<div class="item"><div class="n">${esc((u.nome || '?').slice(0, 1))}</div><div class="m"><b>${esc(u.nome)}${u.ativo ? '' : '<i class="badge">desativado</i>'}</b><small>${u.papel === 'gerente' ? 'Gerente / Patrão' : 'Balanceiro'}</small></div><div style="display:flex;gap:6px"><button class="btn sec sm" data-act="redefinir" data-id="${u.id}">Senha</button>${u.id === S.user.id ? '' : `<button class="btn sec sm" data-act="ativar" data-id="${u.id}">${u.ativo ? 'Desativar' : 'Reativar'}</button>`}</div></div>`).join('') || '<div class="empty">Carregando…</div>'}</div><button class="btn" style="margin-top:12px" data-act="novoUsuario">Novo acesso</button></div>` : '';
   return `<div class="pagehead"><h1>Mais</h1></div>
-  <div class="card"><h2>Conta</h2><div class="kv"><span>Usuário</span><b>${esc(S.perfil.nome)}</b></div><div class="kv"><span>Função</span><b>${S.perfil.papel === 'gerente' ? 'Gerente / Patrão' : 'Balanceiro'}</b></div><div class="kv"><span>E-mail</span><b>${esc(S.user.email)}</b></div></div>
+  <div class="card"><h2>Conta</h2><div class="kv"><span>Usuário</span><b>${esc(S.perfil.nome)}</b></div><div class="kv"><span>Função</span><b>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</b></div><div class="kv"><span>E-mail</span><b>${esc(S.user.email)}</b></div>
+  <button class="btn sec" style="margin-top:12px" data-act="trocarSenha">Trocar minha senha</button></div>
+  ${usuarios}
   <div class="card"><h2>Sincronização</h2><div class="kv"><span>Cargas aguardando envio</span><b>${S.fila.length}</b></div><div class="kv"><span>Internet</span><b>${S.online ? 'Conectado' : 'Sem conexão'}</b></div>
   <div style="display:grid;gap:10px;margin-top:14px"><button class="btn sec" data-act="sync">Sincronizar agora</button><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button>${instalar ? '<button class="btn yel" data-act="instalar">Instalar aplicativo</button>' : ''}</div></div>
   <button class="btn red" data-act="sair">Sair da conta</button>`;
@@ -335,18 +367,28 @@ const fechar = () => { $('#sheet').hidden = true; $('#sheet').innerHTML = ''; };
 
 /* ---------- Eventos ---------- */
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-carga],[data-tal],[data-per],[data-act],#lModo,#lSair');
+  const el = e.target.closest('[data-tab],[data-carga],[data-tal],[data-per],[data-act],#lSair');
   if (e.target.id === 'sheet') return fechar();
   if (!el) return;
-  if (el.dataset.tab) { S.tab = el.dataset.tab; ls.set('cs_tab', S.tab); render(); window.scrollTo(0, 0); }
+  if (el.dataset.tab) { S.tab = el.dataset.tab; ls.set('cs_tab', S.tab); render(); window.scrollTo(0, 0); if (S.tab === 'mais') carregarUsuarios().then(() => { if (S.tab === 'mais') render(); }); }
   else if (el.dataset.carga) abrirCarga(el.dataset.carga);
   else if (el.dataset.tal) abrirTalhao(el.dataset.tal);
   else if (el.dataset.per) { S.periodo = el.dataset.per; render(); }
-  else if (el.id === 'lModo') { S.modoCriar = !S.modoCriar; S.erroLogin = ''; render(); }
   else if (el.id === 'lSair' || el.dataset.act === 'sair') { if (S.fila.length && !confirm('Há cargas ainda não enviadas neste aparelho. Sair mesmo assim?')) return; await sb.auth.signOut(); }
   else {
     const a = el.dataset.act;
     if (a === 'fechar') fechar();
+    else if (a === 'verSenha') { const i = $('#lSenha'); const ver = i.type === 'password'; i.type = ver ? 'text' : 'password'; el.textContent = ver ? 'Ocultar' : 'Ver'; }
+    else if (a === 'trocarSenha') abrirSenha();
+    else if (a === 'novoUsuario') abrirUsuario();
+    else if (a === 'redefinir') abrirRedef(el.dataset.id);
+    else if (a === 'ativar') {
+      const u = S.usuarios.find(x => x.id === el.dataset.id); if (!u) return;
+      if (u.id === S.user.id) return toast('Você não pode desativar o seu próprio acesso.', true);
+      const { error } = await sb.from('cs_perfis').update({ ativo: !u.ativo }).eq('id', u.id);
+      if (error) return toast(traduz(error), true);
+      await carregarUsuarios(); render(); toast(u.ativo ? 'Acesso desativado' : 'Acesso reativado');
+    }
     else if (a === 'csv') exportarCSV();
     else if (a === 'zap') resumoZap();
     else if (a === 'sync') { await enviarFila(); await carregar(); render(); toast(S.online ? 'Dados atualizados' : 'Sem conexão', !S.online); }
@@ -367,11 +409,36 @@ document.addEventListener('change', e => {
 });
 document.addEventListener('submit', async e => {
   if (e.target.id === 'fLogin') {
-    e.preventDefault(); const email = $('#lEmail').value.trim().toLowerCase(), senha = $('#lSenha').value;
-    const fn = S.modoCriar ? sb.auth.signUp({ email, password: senha }) : sb.auth.signInWithPassword({ email, password: senha });
-    const { data, error } = await fn;
-    if (error) { S.erroLogin = traduz(error); return render(); }
-    if (S.modoCriar && !data.session) { S.erroLogin = 'OK:Acesso criado. Se o sistema pedir, confirme o e-mail pelo link enviado e depois use "Entrar".'; S.modoCriar = false; render(); }
+    e.preventDefault(); if (S.entrando) return;
+    const email = $('#lEmail').value.trim().toLowerCase(), senha = $('#lSenha').value;
+    S.entrando = true; S.erroLogin = ''; render();
+    const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+    S.entrando = false;
+    if (error) { S.erroLogin = traduz(error); render(); const i = $('#lEmail'); if (i) i.value = email; return; }
+    ls.set('cs_email', email);
+  }
+  if (e.target.id === 'fSenha') {
+    e.preventDefault(); const n = $('#sNova').value, c = $('#sConf').value;
+    if (n.length < 6) return toast('A senha precisa ter pelo menos 6 caracteres.', true);
+    if (n !== c) return toast('As duas senhas não são iguais.', true);
+    const { error } = await sb.auth.updateUser({ password: n });
+    if (error) return toast(traduz(error), true);
+    fechar(); toast('Senha alterada');
+  }
+  if (e.target.id === 'fUsuario') {
+    e.preventDefault(); const f = e.target;
+    const r = { p_email: $('#uEmail').value.trim(), p_senha: $('#uSenha').value, p_nome: $('#uNome').value.trim(), p_papel: $('#uPapel').value };
+    const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    const { error } = await sb.rpc('cs_criar_usuario', r);
+    btn.disabled = false;
+    if (error) return toast(traduz(error), true);
+    fechar(); await carregarUsuarios(); render(); toast('Acesso criado para ' + r.p_nome);
+  }
+  if (e.target.id === 'fRedef') {
+    e.preventDefault(); const n = $('#rSenha').value;
+    const { error } = await sb.rpc('cs_redefinir_senha', { p_perfil: e.target.dataset.id, p_senha: n });
+    if (error) return toast(traduz(error), true);
+    fechar(); toast('Senha redefinida');
   }
   if (e.target.id === 'fTalhao') {
     e.preventDefault(); const id = e.target.dataset.id;
@@ -398,7 +465,7 @@ async function iniciar() {
     const novo = session ? session.user : null;
     if (novo && (!S.user || S.user.id !== novo.id)) { S.user = novo; await carregarPerfil(); await carregar(); render(); enviarFila(); }
     else if (!novo && S.user) {
-      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.variedades = []; S.safra = null;
+      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.variedades = []; S.usuarios = []; S.safra = null;
       try { localStorage.removeItem('cs_cache'); localStorage.removeItem('cs_perfil'); } catch { } /* aparelho compartilhado: não deixa dados da conta */
       render();
     }

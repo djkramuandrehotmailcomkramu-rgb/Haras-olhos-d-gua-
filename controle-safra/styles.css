@@ -118,3 +118,5 @@ th:first-child,td:first-child{text-align:left;font-weight:600}
 .msg{padding:12px 14px;border-radius:14px;background:#F8E1DD;color:var(--red);font-size:14px;margin-bottom:14px}
 .msg.ok{background:var(--verde-bg);color:var(--verde-esc)}
 .link{color:var(--azul-esc);font-weight:600;text-decoration:underline;font-size:15px;display:block;text-align:center;margin-top:14px}
+.pw{position:relative}.pw input{padding-right:76px}.eye{position:absolute;right:6px;top:6px;height:40px;padding:0 14px;border-radius:12px;background:var(--azul-bg);color:var(--azul-esc);font-weight:600;font-size:14px}
+.btn:disabled{opacity:.6}
