@@ -178,11 +178,12 @@ function telaSemAcesso() {
 
 /* ---------- Lançar viagem ---------- */
 const TIPOS = [['intacta', 'Intacta'], ['rr', 'RR'], ['convencional', 'Convencional']];
-function snapshotForm() { const f = $('#fCarga'); if (!f) return null; return Object.fromEntries([...f.elements].filter(e => e.id && e.type !== 'file' && !['cTipo', 'cVar'].includes(e.id)).map(e => [e.id, e.value])); }
+function snapshotForm() { const f = $('#fCarga'); if (!f) return null; return Object.fromEntries([...f.elements].filter(e => e.id && e.type !== 'file' && !['cTipo', 'cVar'].includes(e.id) && (e.id !== 'cViagem' || S.viagemEditada)).map(e => [e.id, e.value])); }
 function restoreForm(v) { for (const [k, val] of Object.entries(v)) { const e = document.getElementById(k); if (e) e.value = val; } }
 const veiculoDe = placa => S.veiculos.find(v => v.placa === placa) || null;
 const ultimoPorPlaca = placa => { const v = veiculoDe(placa); if (v && v.tara_padrao) return v.tara_padrao; const c = todasCargas().find(x => x.placa === placa); return c ? c.tara : null; };
-function proxViagem() { return todasCargas().reduce((m, c) => Math.max(m, c.viagem || 0), 0) + 1; }
+/* próxima viagem = maior número das viagens ATIVAS + 1 (um número cancelado no fim da fila é reaproveitado); 'Reutilizar número' força um número cancelado do meio */
+function proxViagem() { return S.viagemForcada || ativas().reduce((m, c) => Math.max(m, c.viagem || 0), 0) + 1; }
 const varOpts = tipo => S.variedades.filter(v => v.ativo && v.tipo === tipo).map(v => `<option value="${v.id}" ${S.lt.vari === v.id ? 'selected' : ''}>${esc(v.nome)}</option>`).join('');
 function alertasViagem(d) {
   const a = [], liq = d.bruto - d.tara;
@@ -274,6 +275,7 @@ function bindLancar() {
   g('cBruto').addEventListener('input', e => e.target.classList.remove('conferir'));
   g('hTara').addEventListener('click', () => { if (g('hTara').dataset.t) { g('cTara').value = maskMilhar(g('hTara').dataset.t); calc(); g('cBruto').focus(); } });
   ['cTara', 'cBruto'].forEach(id => g(id).addEventListener('input', e => { e.target.value = maskMilhar(e.target.value); }));
+  g('cViagem').addEventListener('input', () => { S.viagemEditada = true; });
   g('cUmid').addEventListener('input', e => { e.target.value = maskDec(e.target.value); });
   ['cTara', 'cBruto', 'cUmid', 'cViagem'].forEach(id => g(id).addEventListener('input', calc));
   g('fCarga').addEventListener('submit', async ev => {
@@ -290,6 +292,7 @@ function bindLancar() {
     if (al.length && !confirm(al.join('\n') + '\n\nSalvar mesmo assim?')) return;
     const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid };
     if (S.foto) { fotoSalva(r.client_id, S.foto); URL.revokeObjectURL(S.fotoUrl); S.foto = null; S.fotoUrl = null; }
+    S.viagemForcada = null; S.viagemEditada = false;
     S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id }; ls.set('cs_ult', S.lt);
     toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara) / 60) + ' sacas');
     S.tab = 'lancar'; S.limpar = true; render();
@@ -354,7 +357,7 @@ function abrirCarga(id) {
   <div class="kv"><span>Tara</span><b>${n0(c.tara)} kg</b></div><div class="kv"><span>Peso bruto</span><b>${n0(c.bruto)} kg</b></div>
   <div class="kv"><span>Peso líquido</span><b>${n0(c.liquido)} kg</b></div><div class="kv"><span>Sacas</span><b>${n1(c.sacas)}</b></div>
   <div class="kv"><span>Umidade</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'}</b></div>
-  ${c.status === 'cancelada' ? `<div class="msg" style="margin-top:12px">Cancelada: ${esc(c.motivo_cancelamento)}</div>` : ''}
+  ${c.status === 'cancelada' ? `<div class="msg" style="margin-top:12px">Cancelada: ${esc(c.motivo_cancelamento)}</div>${c.viagem && !ativas().some(x => x.viagem === c.viagem) ? `<button class="btn yel" style="margin-bottom:10px" data-act="reusarNumero" data-n="${c.viagem}">Reutilizar número ${c.viagem}</button>` : ''}` : ''}
   ${c._pend ? '<div class="hint" style="margin:10px 0">Salva no aparelho, aguardando internet para enviar.</div>' : ''}
   ${c.status === 'ativa' && pode ? (c._pend ? `<button class="btn red" style="margin-top:14px" data-act="descartar" data-id="${c.client_id}">Descartar carga</button>` : `<div class="field" style="margin-top:14px"><label>Motivo do cancelamento</label><input id="cMotivo" placeholder="ex.: pesagem digitada errado"></div><button class="btn red" data-act="cancelar" data-id="${c.id}">Cancelar carga</button>`) : ''}
   <button class="btn sec" style="margin-top:10px" data-act="fechar">Fechar</button>`);
@@ -592,6 +595,7 @@ document.addEventListener('click', async e => {
     else if (a === 'csv') exportarCSV();
     else if (a === 'csvResumo') exportarResumoCSV();
     else if (a === 'zapCarga') compartilhaViagem(el.dataset.id);
+    else if (a === 'reusarNumero') { S.viagemForcada = parseInt(el.dataset.n, 10); fechar(); S.tab = 'lancar'; render(); toast('A próxima viagem será a ' + S.viagemForcada); }
     else if (a === 'zapDia') window.open('https://wa.me/?text=' + encodeURIComponent(textoDia(resumoDia(S.dia))), '_blank');
     else if (a === 'fecharDia') {
       const r = resumoDia(S.dia);
