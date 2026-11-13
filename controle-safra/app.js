@@ -187,6 +187,7 @@ const varOpts = tipo => S.variedades.filter(v => v.ativo && v.tipo === tipo).map
 function alertasViagem(d) {
   const a = [], liq = d.bruto - d.tara;
   if (liq > 80000) a.push('Peso líquido acima de 80.000 kg.');
+  if (liq > 0 && liq < 5000) a.push(`Peso líquido muito baixo (${n0(liq)} kg). Confira o peso bruto e a tara.`);
   const mesmas = ativas().filter(c => c.placa === d.placa);
   if (mesmas.length >= 3) {
     const m = mesmas.reduce((s, c) => s + Number(c.liquido), 0) / mesmas.length;
@@ -196,6 +197,7 @@ function alertasViagem(d) {
   if (t0 && d.tara && Math.abs(d.tara - t0) > 300) a.push(`Tara (${n0(d.tara)} kg) difere da última desta placa (${n0(t0)} kg).`);
   if (ativas().some(c => c.viagem === d.viagem && c.placa === d.placa && c.data === hoje())) a.push(`Já existe a viagem ${d.viagem} desta placa hoje.`);
   if (d.umid != null && d.umid > 18) a.push(`Umidade alta (${n1(d.umid)}%).`);
+  if (d.umid != null && d.umid < 8) a.push(`Umidade muito baixa (${n1(d.umid)}%). Confira.`);
   return a;
 }
 function viewLancar() {
@@ -264,11 +266,12 @@ function bindLancar() {
     try {
       const r = await lerPesoFoto(f);
       if (!r.valor) return msg('Não consegui ler o número. Digite o peso bruto.');
-      g('cBruto').value = maskMilhar(r.valor); calc();
-      msg(`Peso lido: <b>${n0(r.valor)} kg</b>. Confira antes de salvar.` + (r.candidatos.length > 1 ? `<div class="cands">Outros números na foto: ${r.candidatos.slice(1).map(n => `<button type="button" data-peso="${n}">${n0(n)}</button>`).join('')}</div>` : ''));
+      g('cBruto').value = maskMilhar(r.valor); g('cBruto').classList.add('conferir'); calc();
+      msg(`Peso lido: <b>${n0(r.valor)} kg</b>. Confira com a foto antes de salvar.` + (r.candidatos.length > 1 ? `<div class="cands">Outros números na foto: ${r.candidatos.slice(1).map(n => `<button type="button" data-peso="${n}">${n0(n)}</button>`).join('')}</div>` : ''));
     } catch { msg('Sem internet para ler a foto agora. Digite o peso bruto; a foto fica guardada.'); }
   });
-  g('fotoBox').addEventListener('click', e => { const b = e.target.closest('[data-peso]'); if (b) { g('cBruto').value = maskMilhar(b.dataset.peso); calc(); } });
+  g('fotoBox').addEventListener('click', e => { const b = e.target.closest('[data-peso]'); if (b) { g('cBruto').value = maskMilhar(b.dataset.peso); g('cBruto').classList.remove('conferir'); calc(); } });
+  g('cBruto').addEventListener('input', e => e.target.classList.remove('conferir'));
   g('hTara').addEventListener('click', () => { if (g('hTara').dataset.t) { g('cTara').value = maskMilhar(g('hTara').dataset.t); calc(); g('cBruto').focus(); } });
   ['cTara', 'cBruto'].forEach(id => g(id).addEventListener('input', e => { e.target.value = maskMilhar(e.target.value); }));
   g('cUmid').addEventListener('input', e => { e.target.value = maskDec(e.target.value); });
