@@ -239,3 +239,31 @@ details.mais.card{padding:14px 16px}details.mais:not(.card){margin-top:6px}
 .tcard .tf{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700;color:var(--tx2)}
 .acoes{margin-top:0}
 .acoes>.btn-acao:last-child:nth-child(odd){grid-column:1/-1}
+
+/* ===== Resumo geral no formato da planilha ===== */
+table.rs.tabplan{min-width:660px;border-collapse:separate;border-spacing:0;font-size:13px}
+table.rs.tabplan th{background:var(--azul-esc);color:#fff;font-weight:800;font-size:11px;letter-spacing:.04em;padding:10px 8px;text-align:right;border-bottom:0;white-space:nowrap}
+table.rs.tabplan th:first-child{border-radius:12px 0 0 0}table.rs.tabplan th:last-child{border-radius:0 12px 0 0}
+table.rs.tabplan th:nth-child(2),table.rs.tabplan th:last-child,table.rs.tabplan th.stk{text-align:left}
+table.rs.tabplan td{padding:10px 8px;text-align:right;border-bottom:1px solid var(--line);vertical-align:middle;background:var(--card)}
+table.rs.tabplan tr:nth-child(odd) td{background:#F6F1E0}
+table.rs.tabplan td.tl,table.rs.tabplan td.stk{text-align:left}
+table.rs.tabplan td.tl{white-space:nowrap;font-weight:600;color:var(--tx2)}
+table.rs.tabplan td small{display:block;color:var(--tx2);font-weight:600;font-size:10px}
+table.rs.tabplan .stk{position:sticky;left:0;z-index:2;font-weight:800;white-space:nowrap;box-shadow:2px 0 4px -2px rgba(34,52,61,.18);min-width:118px}
+table.rs.tabplan th.stk{background:var(--azul-esc);z-index:3}
+table.rs.tabplan tr.tot td,table.rs.tabplan tr.tot2 td{background:var(--azul-bg);font-weight:800;border-top:2px solid var(--azul-esc)}
+table.rs.tabplan tr.tot2 td{border-top:0;background:#D7E4E8}
+.chip{display:inline-block;padding:3px 10px;border-radius:99px;background:var(--verde-bg);color:var(--verde-esc);font-weight:800;border:1px solid #CFE0BC}
+.media-geral{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:11px 14px;border-radius:14px;background:var(--azul-esc);color:#fff;font-size:12px;font-weight:700}
+.media-geral b{font-size:17px;font-weight:800;color:var(--amarelo)}
+@media print{table.rs.tabplan .stk{position:static;box-shadow:none}.tscroll{overflow:visible}}
+/* compacta a tabela para caber Talhão…Média na tela do celular (Qualidade fica à direita, com rolagem) */
+.card.rise:has(table.tabplan){padding:12px 8px}.card.rise:has(table.tabplan) h2{padding:0 6px}
+table.rs.tabplan{min-width:440px;font-size:11px}
+table.rs.tabplan th{padding:9px 5px;font-size:9.5px;white-space:normal;line-height:1.15;vertical-align:bottom}
+table.rs.tabplan td{padding:9px 5px;line-height:1.2}
+table.rs.tabplan .stk{min-width:78px;max-width:92px;white-space:normal;font-size:11px}
+table.rs.tabplan td.tl{white-space:normal;min-width:66px;font-size:10.5px}
+table.rs.tabplan td:last-child{white-space:nowrap}
+table.rs.tabplan .chip{padding:2px 7px;font-size:11px}

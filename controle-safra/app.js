@@ -447,6 +447,9 @@ function viewPainel() {
   /* talhões */
   const porTal = S.talhoes.map(t => { const sc = soma(l.filter(x => x.talhao_id === t.id), 'sacas'), tot = soma(ativas().filter(x => x.talhao_id === t.id), 'sacas'), hc = Number(t.area_colhida_ha || 0); return { t, sc, pr: hc ? tot / hc : 0 }; }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
   const maxSc = Math.max(1, ...porTal.map(x => x.sc));
+  const rank = S.talhoes.map(t => { const hc = Number(t.area_colhida_ha || 0), tot = soma(ativas().filter(x => x.talhao_id === t.id), 'sacas'); return { t, hc, tot, pr: hc && tot ? tot / hc : 0 }; }).filter(x => x.pr > 0).sort((a, b) => b.pr - a.pr);
+  const maxPr = Math.max(1, ...rank.map(x => x.pr));
+  const semHa = S.talhoes.filter(t => !Number(t.area_colhida_ha || 0) && ativas().some(c => c.talhao_id === t.id)).map(t => t.nome);
   const linhaTal = x => `<div class="bar"><div class="lb">${esc(x.t.nome)}</div><div class="tr"><i class="${S.anim ? 'anim' : ''}" style="width:${x.sc / maxSc * 100}%"></i></div><div class="vl"><b>${n0(x.sc)}</b> sc${x.pr ? ' · ' + n1(x.pr) + '/ha' : ''}</div></div>`;
   /* detalhes */
   const vei = {}; l.forEach(c => { const v = vei[c.placa] ||= { n: 0, sc: 0 }; v.n++; v.sc += Number(c.sacas); });
@@ -459,16 +462,17 @@ function viewPainel() {
   return `<div class="pagehead"><h1>Painel</h1><span>Safra ${esc(S.safra.nome)}</span></div>
   <div class="chips">${per}</div>
   <div class="field"><select id="fTal" aria-label="Talhão"><option value="">Todos os talhões</option>${S.talhoes.map(t => `<option value="${t.id}" ${S.fTalhao === t.id ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></div>
-  <div class="hero2 rise"><div class="hl"><span>Sacas colhidas</span><b data-fit data-count="${sacas}">${n0(sacas)}</b><em>sc</em>
-    <div class="hsub">${n0(l.length)} viagens · ${n1(kg / 1000)} t${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}</div></div>
-    <div class="hr">${anel(areaTot ? haColh / areaTot : 0, 'Hectares colhidos')}<small>ha colhidos</small></div></div>
-  <div class="tiles rise"><div class="tile"><span>Média geral</span><b data-fit>${haColh ? n1(mediaGeral) : '—'}</b><em>sc/ha</em></div>
+  <div class="hero2 rise"><div class="hl"><span>Média geral da safra</span><b data-fit ${haColh ? `data-count="${mediaGeral}" data-dec="1"` : ''}>${haColh ? n1(mediaGeral) : '—'}</b><em>sc/ha</em>
+    <div class="hsub">${n0(baseSc)} sacas · ${n1(haColh)} ha colhidos${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}</div></div>
+    <div class="hr">${anel(areaTot ? haColh / areaTot : 0, 'Hectares colhidos')}<small>da área total</small></div></div>
+  <div class="tiles rise"><div class="tile"><span>Sacas ${S.periodo === 'hoje' ? 'hoje' : S.periodo === '7d' ? '7 dias' : 'da safra'}</span><b data-fit>${n0(sacas)}</b><em>sc · ${n0(l.length)} viagens</em></div>
     <div class="tile"><span>Colhidos</span><b data-fit>${n1(haColh)}</b><em>ha</em></div>
     <div class="tile"><span>Restantes</span><b data-fit>${n1(haRest)}</b><em>ha</em></div></div>
   ${haColh ? '' : '<div class="alerta">Informe os hectares colhidos de cada talhão (aba Talhões) para ver as médias por hectare.</div>'}
+  <div class="card rise"><h2>Média por talhão<small>sc/ha na safra · só talhões com hectares colhidos</small></h2>${rank.map(x => `<div class="bar"><div class="lb">${esc(x.t.nome)}</div><div class="tr"><i class="${S.anim ? 'anim' : ''}" style="width:${x.pr / maxPr * 100}%"></i></div><div class="vl"><b>${n1(x.pr)}</b> sc/ha · ${n1(x.hc)} ha</div></div>`).join('') || '<div class="empty">Ainda sem hectares colhidos informados.</div>'}${rank.length && haColh ? `<div class="media-geral"><span>Média geral da safra</span><b>${n1(mediaGeral)} sc/ha</b></div>` : ''}${semHa.length ? `<div class="hint" style="margin-top:8px">Informe os hectares de: ${esc(semHa.join(', '))}.</div>` : ''}</div>
   <div class="card chart rise"><h2>${S.periodo === 'hoje' ? 'Produção por hora' : 'Produção por dia'}<small>barras = sacas no período · linha = acumulado</small></h2>${ks.length ? graficoProducao(ks.map(rot), ks.map(k => grp[k]), 'Produção') : '<div class="empty">Sem viagens no período.</div>'}</div>
-  <div class="card rise"><h2>Sacas por talhão</h2>${porTal.slice(0, 8).map(linhaTal).join('') || '<div class="empty">Sem dados no período.</div>'}${porTal.length > 8 ? `<details class="mais"><summary>Ver todos (${porTal.length})</summary>${porTal.slice(8).map(linhaTal).join('')}</details>` : ''}</div>
   <details class="mais card"><summary>Mais detalhes</summary>
+    <h3>Sacas por talhão</h3>${porTal.map(linhaTal).join('') || '<div class="empty">Sem dados no período.</div>'}
     <h3>Por variedade</h3>${varied.map(([k, v]) => `<div class="bar"><div class="lb">${esc(k)}</div><div class="tr"><i style="width:${v / maxV * 100}%"></i></div><div class="vl">${n0(v)} sc</div></div>`).join('') || '<div class="empty">—</div>'}
     <h3>Umidade das viagens</h3>${comU.length ? fu.map(([k, v]) => `<div class="bar"><div class="lb">${k}</div><div class="tr"><i style="width:${v / Math.max(1, comU.length) * 100}%"></i></div><div class="vl">${v}</div></div>`).join('') : '<div class="empty">Nenhuma umidade informada.</div>'}
     <h3>Por veículo</h3>${veic.length ? `<div class="tscroll"><table class="rs"><tr><th>Placa</th><th>Viagens</th><th>Sacas</th><th>Média</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(fmtPlaca(p))}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table></div>` : '<div class="empty">Sem dados.</div>'}</details>
@@ -494,9 +498,11 @@ function dadosResumo() {
   const talhoes = S.talhoes.map(t => {
     const c = l.filter(x => x.talhao_id === t.id), ha = Number(t.area_colhida_ha || 0), sc = soma(c, 'sacas');
     const comU = c.filter(x => x.umidade != null);
-    const vars = [...new Set(c.map(nomeVar).filter(Boolean))];
-    return { t, ha, n: c.length, kg: soma(c, 'liquido'), sc, scHa: ha && sc ? sc / ha : 0, dias: new Set(c.map(x => x.data)).size, umid: comU.length ? soma(comU, 'umidade') / comU.length : null, vars };
-  });
+    let vs = [...new Map(c.map(x => S.variedades.find(y => y.id === x.variedade_id)).filter(Boolean).map(v => [v.id, v])).values()];
+    if (!vs.length && variedadeDe(t)) vs = [variedadeDe(t)];
+    const vars = vs.map(v => v.nome), quals = [...new Set(vs.map(v => (TIPOS.find(z => z[0] === v.tipo) || [0, v.tipo])[1]))];
+    return { t, ha, n: c.length, kg: soma(c, 'liquido'), sc, scHa: ha && sc ? sc / ha : 0, dias: new Set(c.map(x => x.data)).size, umid: comU.length ? soma(comU, 'umidade') / comU.length : null, vars, quals };
+  }).sort((a, b) => a.t.nome.localeCompare(b.t.nome, 'pt-BR'));
   const tipos = TIPOS.map(([k, nome]) => {
     const c = l.filter(x => { const v = S.variedades.find(y => y.id === x.variedade_id); return v && v.tipo === k; });
     const ids = new Set(c.map(x => x.talhao_id));
@@ -512,28 +518,31 @@ function viewResumo() {
   const haTot = soma(S.talhoes.filter(t => t.ativo), 'area_ha'), scTot = soma(l, 'sacas'), kgTot = soma(l, 'liquido');
   const desc = l.reduce((a, c) => a + descCarga(c), 0), haColh = soma(S.talhoes, 'area_colhida_ha'), haRest = Math.max(haTot - haColh, 0);
   const comU = l.filter(c => c.umidade != null), umidMed = comU.length ? soma(comU, 'umidade') / comU.length : null;
-  const linhas = R.talhoes.map(x => `<tr><td>${esc(x.t.nome)}${x.vars.length ? `<small>${esc(x.vars.join(', '))}</small>` : ''}</td><td>${x.n || '—'}</td><td>${x.n ? n0(x.kg) : '—'}</td><td><b>${x.n ? n0(x.sc) : '—'}</b></td><td><b>${x.scHa ? n1(x.scHa) : '—'}</b></td><td>${x.ha ? n1(x.ha) : '—'}</td><td>${x.dias || '—'}</td><td>${x.umid != null ? n1(x.umid) : '—'}</td></tr>`).join('');
+  const linhas = R.talhoes.map(x => `<tr><td class="stk">${esc(x.t.nome)}</td><td class="tl">${x.vars.length ? esc(x.vars.join(' / ')) : '—'}</td><td>${x.ha ? n1(x.ha) : '—'}${x.t.area_ha ? `<small>de ${n1(x.t.area_ha)}</small>` : ''}</td><td>${x.n ? n0(x.kg) : '—'}</td><td><b>${x.n ? n0(x.sc) : '—'}</b></td><td>${x.scHa ? `<span class="chip">${n1(x.scHa)}</span>` : '—'}</td><td class="tl">${x.quals.length ? esc(x.quals.join(' / ')) : '—'}</td></tr>`).join('');
   const p = S.params || PADRAO;
   return `<div class="pagehead"><h1>Resumo</h1><span>Safra ${esc(S.safra.nome)}</span></div>
-  <div class="hero2 rise"><div class="hl"><span>Sacas colhidas (peso líquido ÷ 60)</span><b data-fit data-count="${scTot}">${n0(scTot)}</b><em>sc</em>
-    <div class="hsub">${n0(l.length)} viagens · ${n1(kgTot / 1000)} t${umidMed == null ? '' : ' · umid. ' + n1(umidMed) + '%'}</div></div>
-    <div class="hr">${anel(haTot ? haColh / haTot : 0, 'Hectares colhidos')}<small>ha colhidos</small></div></div>
-  <div class="tiles four rise"><div class="tile"><span>Média geral</span><b data-fit>${haColh ? n1(scTot / haColh) : '—'}</b><em>sc/ha</em></div>
+  <div class="hero2 rise"><div class="hl"><span>Média geral da safra</span><b data-fit ${haColh ? `data-count="${scTot / haColh}" data-dec="1"` : ''}>${haColh ? n1(scTot / haColh) : '—'}</b><em>sc/ha</em>
+    <div class="hsub">${n0(scTot)} sacas · ${n1(haColh)} ha colhidos${umidMed == null ? '' : ' · umid. ' + n1(umidMed) + '%'}</div></div>
+    <div class="hr">${anel(haTot ? haColh / haTot : 0, 'Hectares colhidos')}<small>da área total</small></div></div>
+  <div class="tiles four rise"><div class="tile"><span>Sacas colhidas</span><b data-fit>${n0(scTot)}</b><em>sc · ${n0(l.length)} viagens</em></div>
     <div class="tile"><span>Média dos talhões</span><b data-fit>${mTal.length ? n1(mediaTal) : '—'}</b><em>sc/ha</em></div>
     <div class="tile"><span>Colhidos</span><b data-fit>${n1(haColh)}</b><em>ha</em></div>
     <div class="tile"><span>Restantes</span><b data-fit>${n1(haRest)}</b><em>ha</em></div></div>
   ${haColh ? '' : '<div class="alerta">Para calcular as médias por hectare, informe os hectares colhidos de cada talhão na aba Talhões.</div>'}
-  <div class="card"><h2>Por talhão</h2><div class="tscroll"><table class="rs"><tr><th>Talhão</th><th>Viagens</th><th>Peso líq. (kg)</th><th>Sacas</th><th>sc/ha</th><th>ha colh.</th><th>Dias</th><th>Umid. %</th></tr>${linhas}
-  <tr class="tot"><td>TOTAL</td><td>${l.length}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? n1(scTot / haColh) : '—'}</td><td>${haColh ? n1(haColh) : '—'}</td><td>${new Set(l.map(c => c.data)).size}</td><td>${umidMed == null ? '—' : n1(umidMed)}</td></tr>
-  <tr class="tot"><td>MÉDIA DOS TALHÕES</td><td></td><td></td><td></td><td>${mTal.length ? n1(mediaTal) : '—'}</td><td></td><td></td><td></td></tr></table></div></div>
+  <div class="card rise"><h2>Resumo geral por talhão</h2><div class="tscroll"><table class="rs tabplan"><tr><th class="stk">Talhão</th><th>Variedade</th><th>Há</th><th>Peso líq. (kg)</th><th>Sacas</th><th>Média</th><th>Qualidade</th></tr>${linhas}
+  <tr class="tot"><td class="stk">TOTAL</td><td></td><td>${haColh ? n1(haColh) : '—'}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? `<span class="chip">${n1(scTot / haColh)}</span>` : '—'}</td><td></td></tr>
+  <tr class="tot2"><td class="stk">MÉDIA DOS TALHÕES</td><td></td><td></td><td></td><td></td><td>${mTal.length ? `<span class="chip">${n1(mediaTal)}</span>` : '—'}</td><td></td></tr></table></div></div>
   <div class="card"><h2>Média por tipo de soja</h2><div class="tscroll"><table class="rs"><tr><th>Tipo</th><th>Viagens</th><th>Sacas</th><th>ha</th><th>sc/ha</th></tr>${R.tipos.map(t => `<tr><td>${t.nome}</td><td>${t.n || '—'}</td><td>${t.sc ? n0(t.sc) : '—'}</td><td>${t.ha ? n1(t.ha) : '—'}</td><td>${t.scHa ? n1(t.scHa) : '—'}</td></tr>`).join('')}</table></div><div class="hint">Hectares = soma dos hectares colhidos informados nos talhões que receberam viagens daquele tipo.</div></div>
   <div class="card"><h2>Por variedade</h2><div class="tscroll"><table class="rs"><tr><th>Variedade</th><th>Tipo</th><th>Viagens</th><th>Sacas</th></tr>${R.variedades.map(v => `<tr><td>${esc(v.nome)}</td><td>${esc(v.tipo)}</td><td>${v.n}</td><td>${n0(v.sc)}</td></tr>`).join('') || '<tr><td colspan="4">Sem viagens.</td></tr>'}</table></div></div>
   <div class="acoes noprint">${acao('csvResumo', 'baixar', 'Baixar resumo', 'arquivo CSV')}${acao('imprimir', 'imprimir', 'Imprimir', 'ou salvar em PDF', 'am')}</div>`;
 }
 function exportarResumoCSV() {
   const R = dadosResumo();
-  const cab = ['Talhão', 'Variedades', 'Viagens', 'Peso líquido kg', 'Sacas', 'sc/ha', 'ha colhidos', 'Dias', 'Umidade média %'];
-  const lin = R.talhoes.map(x => [x.t.nome, x.vars.join(' / '), x.n, x.kg, x.sc.toFixed(2).replace('.', ','), x.scHa.toFixed(2).replace('.', ','), x.ha, x.dias, x.umid != null ? x.umid.toFixed(1).replace('.', ',') : '']);
+  const cab = ['Talhão', 'Variedade', 'Há (colhidos)', 'Peso líquido kg', 'Sacas', 'Média sc/ha', 'Qualidade'];
+  const f2 = v => Number(v).toFixed(2).replace('.', ',');
+  const lin = R.talhoes.map(x => [x.t.nome, x.vars.join(' / '), x.ha ? f2(x.ha) : '', x.kg, f2(x.sc), x.scHa ? f2(x.scHa) : '', x.quals.join(' / ')]);
+  const haC = soma(S.talhoes, 'area_colhida_ha'), scT = soma(R.l, 'sacas');
+  lin.push(['TOTAL', '', f2(haC), soma(R.l, 'liquido'), f2(scT), haC ? f2(scT / haC) : '', '']);
   const csv = '﻿' + [cab, ...lin].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = `resumo-safra-${S.safra.nome.replace('/', '-')}-${hoje()}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
