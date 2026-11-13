@@ -1,5 +1,5 @@
 /* Offline: responde do cache na hora e atualiza em segundo plano; a versão nova aparece na abertura seguinte. */
-const VERSION = 'pluvio-2.2.0';
+const VERSION = 'pluvio-2.3.0';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'coletas.js', 'manifest.webmanifest', 'fonts/inter.woff2',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'vendor/jspdf.umd.min.js', 'vendor/jspdf.plugin.autotable.min.js'];
