@@ -309,7 +309,7 @@ function viewMore() {
   const s = db.settings;
   return head('Mais') + `
     <div class="panel">
-      <button class="row" data-act="share"><div class="grow"><div class="t">Enviar relatório</div><div class="s">WhatsApp, PDF ou planilha</div></div>${I.chev}</button>
+      <button class="row" data-act="share"><div class="grow"><div class="t">Enviar relatório</div><div class="s">WhatsApp, PDF ou Excel</div></div>${I.chev}</button>
       <button class="row" data-act="backup"><div class="grow"><div class="t">Fazer backup</div><div class="s">${s.lastBackup ? 'Último: ' + new Date(s.lastBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Salva todas as leituras em um arquivo'}</div></div>${I.chev}</button>
       <button class="row" data-act="restore"><div class="grow"><div class="t">Importar backup</div><div class="s">Junta as leituras de outro celular, sem duplicar</div></div>${I.chev}</button>
     </div>
@@ -322,7 +322,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.2</p>`;
+    <p class="note">Pluviômetro · versão 2.3</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -338,7 +338,8 @@ function openShare() {
     <div class="stack" style="margin-top:0">
       <button class="pill wa" data-act="wa">Enviar no WhatsApp</button>
       <button class="pill" data-act="pdf">Salvar em PDF</button>
-      <button class="pill ghost" data-act="csv">Exportar planilha (CSV)</button>
+      <button class="pill" data-act="xlsx">Exportar para Excel</button>
+      <button class="pill ghost" data-act="csv">Lista simples (CSV)</button>
     </div>`;
   openSheet(nav('Relatório') + `<div class="body" id="sharebody">${body()}</div>`, { init: w => { w.period = () => p; w.setPeriod = v => { p = v; $('#sharebody', w).innerHTML = body(); }; } });
 }
@@ -406,6 +407,51 @@ function makeCsv(p) {
     .forEach(r => rows.push([br(r.date), FIELD[r.fieldId].name, String(r.mm).replace('.', ','), r.user]));
   return new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' });
 }
+/* Excel (.xlsx) gerado no próprio aparelho, sem biblioteca: linhas = pluviômetros, colunas = datas, primeira linha e duas primeiras colunas congeladas. */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zip(files, type) { // zip sem compressão
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const u16 = n => [n & 255, (n >> 8) & 255], u32 = n => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255];
+  for (const f of files) {
+    const name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+    const head = new Uint8Array([0x50, 0x4b, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0)]);
+    parts.push(head, name, data);
+    cen.push(new Uint8Array([0x50, 0x4b, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), name);
+    off += head.length + name.length + data.length;
+  }
+  const size = cen.reduce((a, b) => a + b.length, 0);
+  parts.push(...cen, new Uint8Array([0x50, 0x4b, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(size), ...u32(off), 0, 0]));
+  return new Blob(parts, { type });
+}
+function makeXlsx(p) {
+  const s = stats(p);
+  const dates = [...new Set(readings().filter(r => r.date >= s.from && r.date <= s.to).map(r => r.date))].sort();
+  if (!dates.length) return null;
+  const col = i => { let n = i + 1, c = ''; while (n) { c = String.fromCharCode(65 + (n - 1) % 26) + c; n = Math.floor((n - 1) / 26); } return c; };
+  const x = v => String(v).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const r1 = v => Math.round(v * 10) / 10;
+  const txt = (r, c, v, st) => `<c r="${col(c)}${r}" s="${st}" t="inlineStr"><is><t>${x(v)}</t></is></c>`;
+  const num = (r, c, v, st) => `<c r="${col(c)}${r}" s="${st}"><v>${v}</v></c>`;
+  const rows = [`<row r="1" ht="24" customHeight="1">${txt(1, 0, 'Pluviômetro', 1)}${txt(1, 1, 'Acumulado (mm)', 1)}${dates.map((d, i) => txt(1, i + 2, brShort(d), 1)).join('')}</row>`];
+  s.rows.forEach((r, k) => {
+    const n = k + 2;
+    rows.push(`<row r="${n}">${txt(n, 0, r.f.name, 3)}${r.n ? num(n, 1, r1(r.mm), 4) : txt(n, 1, '', 4)}${dates.map((d, i) => { const v = s.idx[r.f.id]?.[d]; return v == null ? '' : num(n, i + 2, v, 2); }).join('')}</row>`);
+  });
+  const f = s.rows.length + 2;
+  rows.push(`<row r="${f}">${txt(f, 0, 'Média da fazenda', 5)}${num(f, 1, r1(s.mean), 5)}${dates.map((d, i) => num(f, i + 2, r1(s.farm[d] ?? 0), 5)).join('')}</row>`);
+  const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', rel = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  const sheet = `${head}<worksheet ${ns}><sheetViews><sheetView workbookViewId="0" tabSelected="1"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/><selection pane="topRight" activeCell="C1" sqref="C1"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/><selection pane="bottomRight" activeCell="C2" sqref="C2"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="18"/><cols><col min="1" max="1" width="20" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="${dates.length + 2}" width="8.5" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
+  const styles = `${head}<styleSheet ${ns}><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF000000"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  return zip([
+    { name: '[Content_Types].xml', data: `${head}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+    { name: '_rels/.rels', data: `${head}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: 'xl/workbook.xml', data: `${head}<workbook ${ns} xmlns:r="${rel}"><sheets><sheet name="Chuva" sheetId="1" r:id="rId1"/></sheets></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', data: `${head}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="${rel}/styles" Target="styles.xml"/></Relationships>` },
+    { name: 'xl/styles.xml', data: styles },
+    { name: 'xl/worksheets/sheet1.xml', data: sheet },
+  ], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+}
 const fileStamp = p => { const r = range(p); return `${r.from}_a_${r.to}`; };
 
 /* ---------- backup ---------- */
@@ -460,6 +506,7 @@ const actions = {
     catch (e) { console.error(e); toast('Não foi possível gerar o PDF'); }
     el.disabled = false; el.textContent = 'Salvar em PDF';
   },
+  xlsx: () => { const p = sharePeriod(), b = makeXlsx(p); if (!b) return toast('Não há leituras neste período'); deliver(b, `chuva-${fileStamp(p)}.xlsx`, 'Chuva (Excel)'); },
   csv: () => { const p = sharePeriod(); deliver(makeCsv(p), `chuva-${fileStamp(p)}.csv`, 'Leituras de chuva'); },
   backup,
   restore: () => $('#file').click(),
