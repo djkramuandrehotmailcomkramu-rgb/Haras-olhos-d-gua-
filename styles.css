@@ -88,18 +88,6 @@ button.row:active{background:var(--s2)}
 .empty h3{margin:0 0 8px;font-size:22px;font-weight:300}
 .empty p{margin:0 auto 22px;color:var(--tx2);font-size:15px;max-width:300px}
 
-/* Mapa */
-.mapcard{position:relative;height:calc(100dvh - var(--safe-t) - var(--safe-b) - 280px);min-height:320px;background:var(--s1);border-radius:18px;overflow:hidden}
-.mapcard svg.map{width:100%;height:100%;display:block;touch-action:none}
-.map .f{stroke:rgba(255,255,255,.55);stroke-width:1;vector-effect:non-scaling-stroke}
-.map .f.none{fill:var(--s2);stroke:var(--tx3)}
-.map text{fill:#fff;stroke:rgba(0,0,0,.75);stroke-width:.24em;paint-order:stroke;text-anchor:middle;font-weight:500;pointer-events:none}
-.map text .m{font-weight:300}
-.legend{position:absolute;left:14px;top:14px;font-size:11px;color:var(--tx2);width:132px}
-.legend i{display:block;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(var(--rain-rgb),.12),rgba(var(--rain-rgb),1));margin:6px 0 4px}
-.legend div{display:flex;justify-content:space-between}
-.mapbtn{position:absolute;right:12px;top:12px;background:rgba(0,0,0,.5)}
-
 /* Barra inferior */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
   border-top:1px solid var(--line);padding:8px max(6px,calc(50% - 280px)) calc(var(--safe-b) + 6px)}
