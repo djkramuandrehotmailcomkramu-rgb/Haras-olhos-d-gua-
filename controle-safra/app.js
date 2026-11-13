@@ -136,6 +136,12 @@ const I = {
   chart: '<path d="M4 20V10m6 10V4m6 16v-7m5 7H3"/>', field: '<path d="M3 7l9-4 9 4-9 4-9-4Zm0 5l9 4 9-4M3 17l9 4 9-4"/>',
   more: '<path d="M4 7h16M4 12h16M4 17h16"/>', table: '<path d="M4 5h16v14H4V5Zm0 5h16M4 14h16M10 5v14"/>'
 };
+I.chave = '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3"/>';
+I.sync = '<path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 20v-5h-5"/>';
+I.sair = '<path d="M9 4H5v16h4"/><path d="M16 8l4 4-4 4"/><path d="M20 12H9"/>';
+I.mais = '<path d="M12 5v14M5 12h14"/>';
+I.cadeado = '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+I.abrir = '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.500-2"/>';
 I.baixar = '<path d="M12 4v11"/><path d="m7.5 11 4.500 4.500L16.500 11"/><path d="M5 19.500h14"/>';
 I.zap = '<path d="M20.500 11.500a8.500 8.500 0 0 1-12.600 7.400L3.500 20.500l1.600-4.700A8.500 8.500 0 1 1 20.500 11.500Z"/><path d="M9.200 8.800c.3 2.600 2.800 5.100 5.800 5.800l1.200-1.300-2-1-.9.700c-.9-.4-1.700-1.200-2.100-2.100l.7-.9-1-2Z"/>';
 I.imprimir = '<path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/>';
@@ -247,8 +253,12 @@ function viewLancar() {
   const tal = S.talhoes.filter(t => t.ativo);
   if (!tal.length) return `<div class="card empty">Nenhum talhão cadastrado nesta safra ainda.<br>O gerente precisa cadastrar os talhões primeiro.</div>`;
   const tipo = S.lt.tipo || 'intacta';
+  const hojeL = ativas().filter(c => c.data === hoje());
   return `<div class="pagehead"><h1>Lançar viagem</h1><span>${brData(hoje())} · ${agoraHora()}</span></div>
-  <form id="fCarga" class="card" autocomplete="off">
+  <div class="tiles mini rise"><div class="tile"><span>Hoje</span><b data-fit>${hojeL.length}</b><em>viagens</em></div>
+    <div class="tile"><span>Sacas hoje</span><b data-fit>${n0(soma(hojeL, 'sacas'))}</b><em>sc</em></div>
+    <div class="tile"><span>Próxima</span><b data-fit>${proxViagem()}</b><em>nº da viagem</em></div></div>
+  <form id="fCarga" class="card rise" autocomplete="off">
     <div class="viagem"><label>Viagem nº</label><input id="cViagem" inputmode="numeric" pattern="[0-9]*" value="${proxViagem()}" required></div>
     <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${S.lt.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${variedadeDe(t) ? ' · ' + esc(variedadeDe(t).nome) : ''}</option>`).join('')}</select></div>
     <div class="field"><label>Tipo de soja</label><div class="tipos" id="cTipos">${TIPOS.map(([k, n]) => `<button type="button" data-tipo="${k}" class="${tipo === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
@@ -356,12 +366,20 @@ const diaFechado = d => S.fech.includes(d);
 function viewCargas() {
   const lista = todasCargas().filter(c => c.data === S.dia);
   const at = lista.filter(c => c.status === 'ativa'), ger = S.perfil.papel === 'gerente', fechado = diaFechado(S.dia);
-  return `<div class="pagehead"><h1>Viagens</h1><span>${at.length} viagens · ${n1(soma(at, 'sacas'))} sc</span></div>
-  <div class="card"><div class="field" style="margin:0"><label>Dia ${fechado ? '<i class="badge">fechado</i>' : ''}</label><input type="date" id="dDia" value="${S.dia}"></div>
-  ${ger && !fechado && at.length ? '<button class="btn yel" style="margin-top:12px" data-act="fecharDia">Fechar o dia e enviar resumo</button>' : ''}
-  ${fechado ? `<div class="acoes um">${acao('zapDia', 'zap', 'Reenviar resumo do dia', 'pelo WhatsApp', 'wa')}</div>` : ''}
-  ${fechado && ger ? '<button class="btn red" style="margin-top:10px" data-act="reabrirDia">Reabrir o dia</button>' : ''}</div>
-  <div class="card list">${lista.map(itemCarga).join('') || '<div class="empty">Nenhuma viagem neste dia.</div>'}</div>`;
+  const sc = soma(at, 'sacas'), kg = soma(at, 'liquido'), canc = lista.length - at.length;
+  const comU = at.filter(c => c.umidade != null), umid = comU.length ? soma(comU, 'umidade') / comU.length : null;
+  const botoes = [
+    ger && !fechado && at.length ? acao('fecharDia', 'cadeado', 'Fechar o dia', 'e enviar resumo', 'am') : '',
+    fechado ? acao('zapDia', 'zap', 'Reenviar resumo', 'pelo WhatsApp', 'wa') : '',
+    fechado && ger ? acao('reabrirDia', 'abrir', 'Reabrir o dia', 'permite alterar', 'verm') : ''
+  ].filter(Boolean);
+  return `<div class="pagehead"><h1>Viagens</h1><span>${brData(S.dia)}</span></div>
+  <div class="hero2 rise"><div class="hl"><span>Sacas do dia</span><b data-fit data-count="${sc}" data-dec="1">${n1(sc)}</b><em>sc</em>
+    <div class="hsub">${at.length} viagens · ${n1(kg / 1000)} t${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}${canc ? ' · ' + canc + ' cancelada' + (canc > 1 ? 's' : '') : ''}</div></div>
+    <div class="hr"><span class="selo ${fechado ? 'fech' : 'aberto'}">${fechado ? 'Dia fechado' : 'Dia aberto'}</span></div></div>
+  <div class="card rise"><div class="field" style="margin:0"><label>Escolher o dia</label><input type="date" id="dDia" value="${S.dia}"></div></div>
+  ${botoes.length ? `<div class="acoes ${botoes.length === 1 ? 'um' : ''}">${botoes.join('')}</div>` : ''}
+  <div class="card list rise">${lista.map(itemCarga).join('') || '<div class="empty">Nenhuma viagem neste dia.</div>'}</div>`;
 }
 function resumoDia(dia) {
   const d = ativas().filter(c => c.data === dia), por = {}, pv = {};
@@ -523,11 +541,24 @@ function exportarResumoCSV() {
 
 /* ---------- Talhões ---------- */
 function viewTalhoes() {
-  const ger = S.perfil.papel === 'gerente';
-  const l = ativas();
+  const ger = S.perfil.papel === 'gerente', l = ativas();
+  const ativos = S.talhoes.filter(t => t.ativo), areaTot = soma(ativos, 'area_ha'), haColh = soma(S.talhoes, 'area_colhida_ha');
+  const scT = t => soma(l.filter(c => c.talhao_id === t.id), 'sacas');
+  const colhendo = S.talhoes.filter(t => scT(t) > 0).length;
+  const card = t => {
+    const sc = scT(t), ha = Number(t.area_ha || 0), hc = Number(t.area_colhida_ha || 0), pct = ha ? Math.min(100, hc / ha * 100) : 0, v = variedadeDe(t);
+    return `<button class="tcard ${t.ativo ? '' : 'off'}" ${ger ? `data-tal="${t.id}"` : ''}>
+      <div class="tt"><div class="tn"><b>${esc(t.nome)}${t.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${v ? esc(v.nome) + ' · ' + esc(v.tipo) : 'sem variedade'}</small></div>
+      <div class="tv"><b>${n0(sc)}</b><small>sc${hc && sc ? ' · ' + n1(sc / hc) + '/ha' : ''}</small></div></div>
+      <div class="prog"><i class="${S.anim ? 'anim' : ''}" style="width:${pct}%"></i></div>
+      <div class="tf"><span>${n1(hc)} ha colhidos</span><span>${ha ? n1(Math.max(ha - hc, 0)) + ' ha restam' : 'sem área'}</span></div></button>`;
+  };
   return `<div class="pagehead"><h1>Talhões</h1><span>${S.talhoes.length} cadastrados</span></div>
-  ${ger ? '<button class="btn" data-act="novoTal" style="margin-bottom:16px">Novo talhão</button>' : ''}
-  <div class="card list">${S.talhoes.map(t => { const sc = soma(l.filter(c => c.talhao_id === t.id), 'sacas'); return `<button class="item" ${ger ? `data-tal="${t.id}"` : ''}><div class="n">${t.area_ha ? n0(t.area_ha) : '?'}<small style="font-size:10px">ha</small></div><div class="m"><b>${esc(t.nome)}${t.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${variedadeDe(t) ? esc(variedadeDe(t).nome) + ' · ' + esc(variedadeDe(t).tipo) : 'sem variedade'}</small></div><div class="v">${n0(sc)} sc<small>${t.area_colhida_ha && sc ? n1(sc / t.area_colhida_ha) + ' sc/ha' : (sc ? 'ha colhidos?' : 'não colhido')}</small></div></button>`; }).join('') || '<div class="empty">Nenhum talhão cadastrado.</div>'}</div>`;
+  <div class="hero2 rise"><div class="hl"><span>Hectares colhidos</span><b data-fit data-count="${haColh}" data-dec="1">${n1(haColh)}</b><em>ha</em>
+    <div class="hsub">${n1(Math.max(areaTot - haColh, 0))} ha restantes · ${colhendo} de ${ativos.length} talhões com colheita</div></div>
+    <div class="hr">${anel(areaTot ? haColh / areaTot : 0, 'Hectares colhidos')}<small>da área total</small></div></div>
+  ${ger ? `<div class="acoes um">${acao('novoTal', 'mais', 'Novo talhão', 'cadastrar uma área', 'vd')}</div>` : ''}
+  <div class="tlist rise">${S.talhoes.map(card).join('') || '<div class="card empty">Nenhum talhão cadastrado nesta safra.</div>'}</div>`;
 }
 function abrirTalhao(id) {
   const t = id ? S.talhoes.find(x => x.id === id) : {};
@@ -597,14 +628,17 @@ function abrirVeiculo(placa) {
 function viewMais() {
   const ger = S.perfil.papel === 'gerente';
   const usuarios = ger ? `<div class="card"><h2>Usuários</h2><div class="list">${S.usuarios.map(u => `<div class="item"><div class="n">${esc((u.nome || '?').slice(0, 1))}</div><div class="m"><b>${esc(u.nome)}${u.ativo ? '' : '<i class="badge">desativado</i>'}</b><small>${u.papel === 'gerente' ? 'Gerente / Patrão' : 'Balanceiro'}</small></div><div style="display:flex;gap:6px"><button class="btn sec sm" data-act="redefinir" data-id="${u.id}">Senha</button>${u.id === S.user.id ? '' : `<button class="btn sec sm" data-act="ativar" data-id="${u.id}">${u.ativo ? 'Desativar' : 'Reativar'}</button>`}</div></div>`).join('') || '<div class="empty">Carregando…</div>'}</div><button class="btn" style="margin-top:12px" data-act="novoUsuario">Novo acesso</button></div>` : '';
+  const nome = S.perfil.nome || 'Usuário';
+  const botoes = [acao('trocarSenha', 'chave', 'Trocar senha', 'da sua conta'), acao('sync', 'sync', 'Sincronizar', 'enviar agora'), acao('csv', 'baixar', 'Baixar planilha', 'arquivo CSV'), instalar ? acao('instalar', 'baixar', 'Instalar app', 'na tela inicial', 'am') : ''].filter(Boolean).join('');
   return `<div class="pagehead"><h1>Mais</h1></div>
-  <div class="card"><h2>Conta</h2><div class="kv"><span>Usuário</span><b>${esc(S.perfil.nome)}</b></div><div class="kv"><span>Função</span><b>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</b></div><div class="kv"><span>E-mail</span><b>${esc(S.user.email)}</b></div>
-  <button class="btn sec" style="margin-top:12px" data-act="trocarSenha">Trocar minha senha</button></div>
+  <div class="hero2 rise"><div class="avatar">${esc(nome.slice(0, 1))}</div><div class="hl"><span>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</span><b data-fit style="font-size:26px">${esc(nome)}</b><div class="hsub">${esc(S.user.email)}</div></div></div>
+  <div class="tiles rise"><div class="tile"><span>A enviar</span><b data-fit>${S.fila.length}</b><em>viagens</em></div>
+    <div class="tile"><span>Conexão</span><b data-fit style="font-size:20px">${S.online ? 'Online' : 'Offline'}</b><em>${S.online ? 'sincronizado' : 'salvando local'}</em></div>
+    <div class="tile"><span>Safra</span><b data-fit style="font-size:20px">${S.safra ? esc(S.safra.nome) : '—'}</b><em>aberta</em></div></div>
+  <div class="acoes">${botoes}</div>
   ${usuarios}
   ${cardVeiculos(ger)}
-  <div class="card"><h2>Sincronização</h2><div class="kv"><span>Cargas aguardando envio</span><b>${S.fila.length}</b></div><div class="kv"><span>Internet</span><b>${S.online ? 'Conectado' : 'Sem conexão'}</b></div>
-  <div style="display:grid;gap:10px;margin-top:14px"><button class="btn sec" data-act="sync">Sincronizar agora</button><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button>${instalar ? '<button class="btn yel" data-act="instalar">Instalar aplicativo</button>' : ''}</div></div>
-  <button class="btn red" data-act="sair">Sair da conta</button>`;
+  <div class="acoes um">${acao('sair', 'sair', 'Sair da conta', 'encerrar a sessão neste aparelho', 'verm')}</div>`;
 }
 
 /* ---------- Sheet ---------- */
