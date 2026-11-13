@@ -38,6 +38,16 @@ function variantes(canvas) {
   const g = new Uint8Array(d.length / 4); let lo = 255, hi = 0;
   for (let i = 0, j = 0; i < d.length; i += 4, j++) { const v = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) | 0; g[j] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
   const esc = hi > lo ? 255 / (hi - lo) : 1, out = [];
+  { /* visor de LED: só pixels muito brilhantes e coloridos viram "tinta" (apaga caderno, botões e etiquetas) */
+    const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
+    const cx = c.getContext('2d'), o = cx.createImageData(c.width, c.height); let n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+      const tinta = mx > 140 && (mx - mn) / mx > 0.5; if (tinta) n++;
+      const v = tinta ? 0 : 255; o.data[i] = o.data[i + 1] = o.data[i + 2] = v; o.data[i + 3] = 255;
+    }
+    cx.putImageData(o, 0, 0); c.led = n > canvas.width * canvas.height * 0.0008 && n < canvas.width * canvas.height * 0.2; if (c.led) out.push(c);
+  }
   for (const inv of [false, true]) {
     const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height;
     const cx = c.getContext('2d'), o = cx.createImageData(c.width, c.height);
@@ -60,15 +70,22 @@ function pesosNoTexto(txt) {
 }
 async function lerPesoFoto(blob) {
   const w = await ocrWorker(), bmp = await bitmapDe(blob), base = desenha(bmp, 1500);
-  const votos = new Map();
-  for (const modo of ['6', '11']) {
-    await w.setParameters({ tessedit_pageseg_mode: modo });
-    for (const c of variantes(base)) {
+  const todas = [], vars = variantes(base);
+  for (const c of vars) {
+    for (const modo of ['11', '6']) {      /* 11 = texto solto (acha o visor), 6 = bloco */
+      await w.setParameters({ tessedit_pageseg_mode: modo });
       const { data } = await w.recognize(c);
-      for (const p of data.words || []) for (const n of pesosNoTexto(p.text)) votos.set(n, (votos.get(n) || 0) + Math.max(p.confidence, 1) * String(n).length);
+      for (const p of data.words || []) {
+        const h = p.bbox ? p.bbox.y1 - p.bbox.y0 : 1;
+        for (const n of pesosNoTexto(p.text)) todas.push({ n, conf: Math.max(p.confidence, 1), h, led: !!c.led });
+      }
+      if (c.led && todas.some(x => x.led)) break;
     }
-    if (votos.size) break;
+    if (c.led && todas.some(x => x.led)) break;   /* achou no visor de LED: não precisa olhar o resto da foto */
   }
+  /* o número do visor é o maior da foto: pesa pela altura dos dígitos (caderno e etiquetas são pequenos) */
+  const hmax = Math.max(1, ...todas.map(x => x.h)), votos = new Map();
+  for (const x of todas) { if (x.h < hmax * 0.4) continue; votos.set(x.n, (votos.get(x.n) || 0) + x.conf * x.h * x.h); }
   const lista = [...votos.entries()].sort((a, b) => b[1] - a[1]).map(x => x[0]);
   return { valor: lista[0] || null, candidatos: lista.slice(0, 4) };
 }

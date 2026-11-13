@@ -149,3 +149,5 @@ input,select,textarea{text-transform:none}input.up{text-transform:uppercase}
 table.rs th{font-weight:800}table.rs td b{font-weight:800}table.rs td:first-child{font-weight:800}
 .fotoprev{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:14px;margin-top:10px}
 .cands{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}.cands button{padding:6px 12px;border-radius:99px;background:var(--azul-bg);color:var(--azul-esc);font-weight:700;font-size:13px}
+
+input.conferir{border-color:var(--amarelo)!important;box-shadow:0 0 0 3px rgba(255,204,51,.45)!important}
