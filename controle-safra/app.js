@@ -15,7 +15,9 @@ const agoraHora = () => { const d = new Date(); return `${pad(d.getHours())}:${p
 const brData = s => s ? s.split('-').reverse().join('/') : '';
 const diasAtras = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const normPlaca = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-const fmtPlaca = p => p;
+const fmtPlaca = p => { const n = normPlaca(p); return /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(n) ? n.slice(0, 3) + '-' + n.slice(3) : n; };
+const maskMilhar = v => { const d = String(v || '').replace(/\D/g, '').replace(/^0+(?=\d)/, ''); return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.'); };
+const maskDec = v => { let t = String(v || '').replace(/[^0-9.,]/g, '').replace('.', ','); if (/,/.test(t)) { const [a, ...b] = t.split(','); return a.slice(0, 3) + ',' + b.join('').replace(/\D/g, '').slice(0, 2); } return t.length >= 3 ? t.slice(0, 2) + ',' + t.slice(2, 4) : t; };
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
 const ls = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
@@ -104,6 +106,9 @@ async function enviarFila() {
 /* Desconto de umidade e impureza (parametrizável; padrão = fórmula Aprosoja MS, base 14%, impureza 1%) */
 const PADRAO = { umidade_base: 14, impureza_tol: 1, modo: 'formula', perc_por_ponto: 1.5 };
 function descontoKg(liq, umid, imp) {
+  return { imp: 0, umid: 0, total: 0 }; /* desconto desativado: sacas = peso líquido ÷ 60 */
+}
+function descontoKgAntigo(liq, umid, imp) {
   const p = S.params || PADRAO; liq = Number(liq) || 0;
   if (p.modo === 'nenhum' || liq <= 0) return { imp: 0, umid: 0, total: 0 };
   const ub = Number(p.umidade_base), it = Number(p.impureza_tol);
@@ -191,7 +196,6 @@ function alertasViagem(d) {
   if (t0 && d.tara && Math.abs(d.tara - t0) > 300) a.push(`Tara (${n0(d.tara)} kg) difere da última desta placa (${n0(t0)} kg).`);
   if (ativas().some(c => c.viagem === d.viagem && c.placa === d.placa && c.data === hoje())) a.push(`Já existe a viagem ${d.viagem} desta placa hoje.`);
   if (d.umid != null && d.umid > 18) a.push(`Umidade alta (${n1(d.umid)}%).`);
-  if (d.imp != null && d.imp > 3) a.push(`Impureza alta (${n1(d.imp)}%).`);
   return a;
 }
 function viewLancar() {
@@ -205,11 +209,10 @@ function viewLancar() {
     <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${S.lt.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${variedadeDe(t) ? ' · ' + esc(variedadeDe(t).nome) : ''}</option>`).join('')}</select></div>
     <div class="field"><label>Tipo de soja</label><div class="tipos" id="cTipos">${TIPOS.map(([k, n]) => `<button type="button" data-tipo="${k}" class="${tipo === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="field"><label>Variedade</label><select id="cVar" required><option value="">Selecione a variedade…</option>${varOpts(tipo)}</select></div>
-    <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="14" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist><div class="hint" id="hVei"></div></div>
-    <div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" pattern="[0-9]*" required><div class="hint" id="hTara"></div></div></div>
-    <div class="row2"><div class="field"><label>Peso bruto (kg)</label><input id="cBruto" inputmode="numeric" pattern="[0-9]*" required></div>
-    <div class="field"><label>Umidade % (opcional)</label><input id="cUmid" inputmode="decimal" placeholder="ex.: 13,5"></div></div>
-    <div class="field"><label>Impureza % (opcional)</label><input id="cImp" inputmode="decimal" placeholder="ex.: 0,8"></div>
+    <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="16" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist><div class="hint" id="hVei"></div></div>
+    <div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" placeholder="ex.: 14.000" required><div class="hint" id="hTara"></div></div></div>
+    <div class="row2"><div class="field"><label>Peso bruto (kg)</label><input id="cBruto" inputmode="numeric" placeholder="ex.: 40.940" required></div>
+    <div class="field"><label>Umidade %</label><input id="cUmid" inputmode="decimal" placeholder="ex.: 13,5"></div></div>
     <div class="preview" id="prev"></div>
     <div id="cAlertas"></div>
     <button class="btn" type="submit">Salvar viagem</button>
@@ -220,13 +223,11 @@ function bindLancar() {
   const g = id => document.getElementById(id); if (!g('fCarga')) return;
   const num = id => parseInt(String(g(id).value).replace(/\D/g, ''), 10) || 0;
   const dec = id => { const u = String(g(id).value).replace(',', '.').trim(); return u === '' ? null : parseFloat(u); };
-  const dados = () => ({ placa: normPlaca(g('cPlaca').value), tara: num('cTara'), bruto: num('cBruto'), viagem: num('cViagem'), umid: dec('cUmid'), imp: dec('cImp') });
+  const dados = () => ({ placa: normPlaca(g('cPlaca').value), tara: num('cTara'), bruto: num('cBruto'), viagem: num('cViagem'), umid: dec('cUmid'), imp: null });
   const calc = () => {
     const d = dados(), l = d.bruto - d.tara, bad = d.bruto && d.tara && l <= 0, liq = Math.max(l, 0);
-    const ds = descontoKg(liq, d.umid, d.imp), pag = (liq - ds.total) / 60;
     g('prev').innerHTML = `<div class="${bad ? 'bad' : ''}"><span>${bad ? 'Bruto menor que a tara!' : 'Peso líquido'}</span><b>${n0(liq)} <small>kg</small></b></div>
-      <div><span>Desconto</span><b>${n0(ds.total)} <small>kg</small></b></div>
-      <div class="${bad ? 'bad' : ''}"><span>Sacas a pagar</span><b>${n1(pag)} <small>sc</small></b></div>`;
+      <div class="${bad ? 'bad' : ''}"><span>Sacas</span><b>${n1(liq / 60)} <small>sc</small></b></div>`;
     const al = d.bruto > d.tara ? alertasViagem(d) : [];
     g('cAlertas').innerHTML = al.length ? `<div class="alerta">${al.map(x => '⚠ ' + esc(x)).join('<br>')}</div>` : '';
   };
@@ -244,14 +245,16 @@ function bindLancar() {
     if (v) { S.lt.tipo = v.tipo; S.lt.vari = v.id; pinta(); }
   });
   g('cPlaca').addEventListener('input', e => {
-    e.target.value = normPlaca(e.target.value);
-    const t = ultimoPorPlaca(e.target.value), v = veiculoDe(e.target.value);
+    const np = normPlaca(e.target.value); e.target.value = fmtPlaca(np);
+    const t = ultimoPorPlaca(np), v = veiculoDe(np);
     g('hVei').textContent = v && (v.transportadora || v.motorista) ? [v.transportadora, v.motorista].filter(Boolean).join(' · ') : '';
     if (t) { g('hTara').textContent = (v && v.tara_padrao ? 'Tara padrão: ' : 'Última tara: ') + n0(t) + ' kg (toque para usar)'; g('hTara').dataset.t = t; } else { g('hTara').textContent = ''; delete g('hTara').dataset.t; }
     calc();
   });
-  g('hTara').addEventListener('click', () => { if (g('hTara').dataset.t) { g('cTara').value = g('hTara').dataset.t; calc(); g('cBruto').focus(); } });
-  ['cTara', 'cBruto', 'cUmid', 'cImp', 'cViagem'].forEach(id => g(id).addEventListener('input', calc));
+  g('hTara').addEventListener('click', () => { if (g('hTara').dataset.t) { g('cTara').value = maskMilhar(g('hTara').dataset.t); calc(); g('cBruto').focus(); } });
+  ['cTara', 'cBruto'].forEach(id => g(id).addEventListener('input', e => { e.target.value = maskMilhar(e.target.value); }));
+  g('cUmid').addEventListener('input', e => { e.target.value = maskDec(e.target.value); });
+  ['cTara', 'cBruto', 'cUmid', 'cViagem'].forEach(id => g(id).addEventListener('input', calc));
   g('fCarga').addEventListener('submit', async ev => {
     ev.preventDefault();
     const d = dados();
@@ -262,12 +265,11 @@ function bindLancar() {
     if (!d.tara || !d.bruto) return toast('Informe tara e peso bruto.', true);
     if (d.bruto <= d.tara) return toast('O peso bruto precisa ser maior que a tara.', true);
     if (d.umid !== null && !(d.umid >= 0 && d.umid <= 60)) return toast('Umidade inválida.', true);
-    if (d.imp !== null && !(d.imp >= 0 && d.imp <= 100)) return toast('Impureza inválida.', true);
     const al = alertasViagem(d);
     if (al.length && !confirm(al.join('\n') + '\n\nSalvar mesmo assim?')) return;
-    const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid, impureza: d.imp };
+    const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid };
     S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id }; ls.set('cs_ult', S.lt);
-    toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara - descontoKg(d.bruto - d.tara, d.umid, d.imp).total) / 60) + ' sacas');
+    toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara) / 60) + ' sacas');
     S.tab = 'lancar'; S.limpar = true; render();
     g('cPlaca') && document.getElementById('cPlaca').focus();
     enviarFila();
@@ -281,7 +283,7 @@ const nomeVar = c => { const v = S.variedades.find(x => x.id === c.variedade_id)
 const nomeTal = id => (S.talhoes.find(t => t.id === id) || {}).nome || '—';
 function itemCarga(c) {
   return `<button class="item ${c.status === 'cancelada' ? 'canc' : ''}" data-carga="${c.id}"><div class="n">${c.viagem ?? '·'}</div>
-  <div class="m"><b>${esc(c.placa)}${c._pend ? '<i class="badge">a enviar</i>' : ''}</b><small>${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}</small></div>
+  <div class="m"><b>${esc(fmtPlaca(c.placa))}${c._pend ? '<i class="badge">a enviar</i>' : ''}</b><small>${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}</small></div>
   <div class="v">${n1(sacasPagas(c))} sc<small>${n0(c.liquido)} kg</small></div></button>`;
 }
 const diaFechado = d => S.fech.includes(d);
@@ -300,11 +302,11 @@ function resumoDia(dia) {
   return { dia, viagens: d.length, kg: soma(d, 'liquido'), sacas: soma(d, 'sacas'), descontos_kg: d.reduce((a, c) => a + descCarga(c), 0), por_talhao: Object.values(por), por_variedade: Object.values(pv) };
 }
 function textoDia(r) {
-  return `*Colheita ${S.safra.nome} — Lagoa Formosa*\nFechamento de ${brData(r.dia)}\n\n${r.viagens} viagens · ${n0(r.sacas)} sacas (${n1(r.kg / 1000)} t)\nSacas a pagar: ${n0(r.sacas - r.descontos_kg / 60)}\n\n*Por talhão*\n${r.por_talhao.map(x => `• ${x.nome}: ${x.n} viag. · ${n0(x.sc)} sc`).join('\n')}\n\n*Por variedade*\n${r.por_variedade.map(x => `• ${x.nome}: ${n0(x.sc)} sc`).join('\n')}\n\nAcumulado da safra: ${n0(soma(ativas(), 'sacas'))} sacas`;
+  return `*Colheita ${S.safra.nome} — Lagoa Formosa*\nFechamento de ${brData(r.dia)}\n\n${r.viagens} viagens · ${n0(r.sacas)} sacas (${n1(r.kg / 1000)} t)\n\n*Por talhão*\n${r.por_talhao.map(x => `• ${x.nome}: ${x.n} viag. · ${n0(x.sc)} sc`).join('\n')}\n\n*Por variedade*\n${r.por_variedade.map(x => `• ${x.nome}: ${n0(x.sc)} sc`).join('\n')}\n\nAcumulado da safra: ${n0(soma(ativas(), 'sacas'))} sacas`;
 }
 function textoViagem(c) {
-  const u = c.umidade != null ? n1(c.umidade) + '%' : '—', i = c.impureza != null ? n1(c.impureza) + '%' : '—';
-  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${c.placa}\n\nPeso líquido: ${n0(c.liquido)} kg (${n1(c.sacas)} sc)\nUmidade ${u} · Impureza ${i}\nDesconto: ${n0(descCarga(c))} kg\n*A pagar: ${n1(sacasPagas(c))} sacas*`;
+  const u = c.umidade != null ? n1(c.umidade) + '%' : '—';
+  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\nUmidade: ${u}\n*Sacas: ${n1(c.sacas)}*`;
 }
 function abrirCarga(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
@@ -312,13 +314,12 @@ function abrirCarga(id) {
   sheet(`<div class="vhero"><div class="vn"><small>Viagem</small>${c.viagem ?? '·'}</div>
     <div class="vt">${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''}</div>
     <div class="vp">${n0(c.liquido)} <small>kg líquidos</small></div>
-    <div class="vs">${esc(c.placa)} · ${n1(sacasPagas(c))} sc a pagar</div></div>
+    <div class="vs">${esc(fmtPlaca(c.placa))} · ${n1(c.sacas)} sc</div></div>
   <button class="btn zap" data-act="zapCarga" data-id="${c.id}">Enviar no WhatsApp</button>
   <div class="kv" style="margin-top:12px"><span>Data e hora</span><b>${brData(c.data)} ${(c.hora || '').slice(0, 5)}</b></div>
   <div class="kv"><span>Tara</span><b>${n0(c.tara)} kg</b></div><div class="kv"><span>Peso bruto</span><b>${n0(c.bruto)} kg</b></div>
   <div class="kv"><span>Peso líquido</span><b>${n0(c.liquido)} kg</b></div><div class="kv"><span>Sacas</span><b>${n1(c.sacas)}</b></div>
-  <div class="kv"><span>Umidade / impureza</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'} / ${c.impureza != null ? n1(c.impureza) + '%' : '—'}</b></div>
-  <div class="kv"><span>Desconto</span><b>${n0(descCarga(c))} kg → ${n1(sacasPagas(c))} sc a pagar</b></div>
+  <div class="kv"><span>Umidade</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'}</b></div>
   ${c.status === 'cancelada' ? `<div class="msg" style="margin-top:12px">Cancelada: ${esc(c.motivo_cancelamento)}</div>` : ''}
   ${c._pend ? '<div class="hint" style="margin:10px 0">Salva no aparelho, aguardando internet para enviar.</div>' : ''}
   ${c.status === 'ativa' && pode ? (c._pend ? `<button class="btn red" style="margin-top:14px" data-act="descartar" data-id="${c.client_id}">Descartar carga</button>` : `<div class="field" style="margin-top:14px"><label>Motivo do cancelamento</label><input id="cMotivo" placeholder="ex.: pesagem digitada errado"></div><button class="btn red" data-act="cancelar" data-id="${c.id}">Cancelar carga</button>`) : ''}
@@ -416,9 +417,7 @@ function viewResumo() {
   const linhas = R.talhoes.map(x => `<tr><td>${esc(x.t.nome)}${x.vars.length ? `<small>${esc(x.vars.join(', '))}</small>` : ''}</td><td>${x.n || '—'}</td><td>${x.n ? n0(x.kg) : '—'}</td><td><b>${x.n ? n0(x.sc) : '—'}</b></td><td><b>${x.scHa ? n1(x.scHa) : '—'}</b></td><td>${x.ha ? n1(x.ha) : '—'}</td><td>${x.dias || '—'}</td><td>${x.umid != null ? n1(x.umid) : '—'}</td></tr>`).join('');
   const p = S.params || PADRAO;
   return `<div class="pagehead"><h1>Resumo da safra</h1><span>Safra ${esc(S.safra.nome)}</span></div>
-  <div class="kpis"><div class="kpi g"><span>Sacas (peso líquido ÷ 60)</span><b>${n0(scTot)} <small>sc</small></b></div>
-  <div class="kpi"><span>Descontos (umid./impureza)</span><b>${n0(desc / 60)} <small>sc</small></b></div>
-  <div class="kpi y"><span>Sacas a pagar</span><b>${n0(scTot - desc / 60)} <small>sc</small></b></div>
+  <div class="kpis"><div class="kpi y"><span>Sacas (peso líquido ÷ 60)</span><b>${n0(scTot)} <small>sc</small></b></div>
   <div class="kpi"><span>Produtividade média</span><b>${n1(haColh ? scTot / haColh : 0)} <small>sc/ha</small></b></div>
   <div class="kpi"><span>Hectares colhidos</span><b>${n1(haColh)} <small>ha</small></b></div>
   <div class="kpi"><span>Hectares restantes</span><b>${n1(haRest)} <small>ha</small></b></div>
@@ -427,7 +426,6 @@ function viewResumo() {
   <tr class="tot"><td>TOTAL</td><td>${l.length}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? n1(scTot / haColh) : '—'}</td><td>${haColh ? n1(haColh) : '—'}</td><td>${new Set(l.map(c => c.data)).size}</td><td>${umidMed == null ? '—' : n1(umidMed)}</td></tr></table></div></div>
   <div class="card"><h2>Média por tipo de soja</h2><div class="tscroll"><table class="rs"><tr><th>Tipo</th><th>Viagens</th><th>Sacas</th><th>ha</th><th>sc/ha</th></tr>${R.tipos.map(t => `<tr><td>${t.nome}</td><td>${t.n || '—'}</td><td>${t.sc ? n0(t.sc) : '—'}</td><td>${t.ha ? n1(t.ha) : '—'}</td><td>${t.scHa ? n1(t.scHa) : '—'}</td></tr>`).join('')}</table></div><div class="hint">Hectares = soma dos hectares colhidos informados nos talhões que receberam viagens daquele tipo.</div></div>
   <div class="card"><h2>Por variedade</h2><div class="tscroll"><table class="rs"><tr><th>Variedade</th><th>Tipo</th><th>Viagens</th><th>Sacas</th></tr>${R.variedades.map(v => `<tr><td>${esc(v.nome)}</td><td>${esc(v.tipo)}</td><td>${v.n}</td><td>${n0(v.sc)}</td></tr>`).join('') || '<tr><td colspan="4">Sem viagens.</td></tr>'}</table></div></div>
-  <div class="hint" style="margin-bottom:12px">Desconto: ${p.modo === 'nenhum' ? 'desligado' : `base ${n1(p.umidade_base)}% de umidade, impureza tolerada ${n1(p.impureza_tol)}%${p.modo === 'tabela' ? `, ${n1(p.perc_por_ponto)}% por ponto` : ' (fórmula Aprosoja)'}`}. ${p.origem ? esc(p.origem) : ''}</div>
   <div class="row2 noprint"><button class="btn sec" data-act="csvResumo">Baixar resumo (CSV)</button><button class="btn yel" data-act="imprimir">Imprimir / salvar PDF</button></div>`;
 }
 function exportarResumoCSV() {
@@ -519,7 +517,6 @@ function viewMais() {
   <div class="card"><h2>Conta</h2><div class="kv"><span>Usuário</span><b>${esc(S.perfil.nome)}</b></div><div class="kv"><span>Função</span><b>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</b></div><div class="kv"><span>E-mail</span><b>${esc(S.user.email)}</b></div>
   <button class="btn sec" style="margin-top:12px" data-act="trocarSenha">Trocar minha senha</button></div>
   ${usuarios}
-  ${cardDesconto(ger)}
   ${cardVeiculos(ger)}
   <div class="card"><h2>Sincronização</h2><div class="kv"><span>Cargas aguardando envio</span><b>${S.fila.length}</b></div><div class="kv"><span>Internet</span><b>${S.online ? 'Conectado' : 'Sem conexão'}</b></div>
   <div style="display:grid;gap:10px;margin-top:14px"><button class="btn sec" data-act="sync">Sincronizar agora</button><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button>${instalar ? '<button class="btn yel" data-act="instalar">Instalar aplicativo</button>' : ''}</div></div>
