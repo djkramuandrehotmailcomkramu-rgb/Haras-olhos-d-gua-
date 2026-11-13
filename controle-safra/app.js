@@ -212,9 +212,9 @@ function viewLancar() {
     <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="16" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist><div class="hint" id="hVei"></div></div>
     <div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" placeholder="ex.: 14.000" required><div class="hint" id="hTara"></div></div></div>
     <div class="field"><label>Foto da balança (peso bruto)</label>
-      <label class="btn sec" for="cFoto" style="cursor:pointer">${S.fotoUrl ? 'Trocar a foto' : 'Tirar foto da balança'}</label>
-      <input id="cFoto" type="file" accept="image/*" capture="environment" hidden>
-      <div id="fotoBox">${S.fotoUrl ? `<img class="fotoprev" src="${S.fotoUrl}" alt="foto da balança">` : '<div class="hint">A foto lê o peso sozinha. Se preferir, digite o peso abaixo.</div>'}</div></div>
+      <label class="btn sec" for="cFoto" style="cursor:pointer">${S.fotoUrl ? 'Trocar a foto' : 'Escolher foto da balança'}</label>
+      <input id="cFoto" type="file" accept="image/*" hidden>
+      <div id="fotoBox">${S.fotoUrl ? `<img class="fotoprev" src="${S.fotoUrl}" alt="foto da balança">` : '<div class="hint">Escolha a foto da balança que está na galeria ou nos arquivos. O app lê o peso sozinho. Se preferir, digite o peso abaixo.</div>'}</div></div>
     <div class="row2"><div class="field"><label>Peso bruto (kg)</label><input id="cBruto" inputmode="numeric" placeholder="ex.: 40.940" required></div>
     <div class="field"><label>Umidade %</label><input id="cUmid" inputmode="decimal" placeholder="ex.: 13,5"></div></div>
     <div class="preview" id="prev"></div>
