@@ -302,15 +302,21 @@ function resumoDia(dia) {
 function textoDia(r) {
   return `*Colheita ${S.safra.nome} — Lagoa Formosa*\nFechamento de ${brData(r.dia)}\n\n${r.viagens} viagens · ${n0(r.sacas)} sacas (${n1(r.kg / 1000)} t)\nSacas a pagar: ${n0(r.sacas - r.descontos_kg / 60)}\n\n*Por talhão*\n${r.por_talhao.map(x => `• ${x.nome}: ${x.n} viag. · ${n0(x.sc)} sc`).join('\n')}\n\n*Por variedade*\n${r.por_variedade.map(x => `• ${x.nome}: ${n0(x.sc)} sc`).join('\n')}\n\nAcumulado da safra: ${n0(soma(ativas(), 'sacas'))} sacas`;
 }
+function textoViagem(c) {
+  const u = c.umidade != null ? n1(c.umidade) + '%' : '—', i = c.impureza != null ? n1(c.impureza) + '%' : '—';
+  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${c.placa}\n\nPeso líquido: ${n0(c.liquido)} kg (${n1(c.sacas)} sc)\nUmidade ${u} · Impureza ${i}\nDesconto: ${n0(descCarga(c))} kg\n*A pagar: ${n1(sacasPagas(c))} sacas*`;
+}
 function abrirCarga(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
   const pode = S.perfil.papel === 'gerente' || (c.data >= diasAtras(1));
-  sheet(`<h2>Viagem ${c.viagem ?? ''} · ${esc(c.placa)}</h2>
-  <div class="kv"><span>Talhão</span><b>${esc(nomeTal(c.talhao_id))}</b></div>
-  <div class="kv"><span>Data e hora</span><b>${brData(c.data)} ${(c.hora || '').slice(0, 5)}</b></div>
+  sheet(`<div class="vhero"><div class="vn"><small>Viagem</small>${c.viagem ?? '·'}</div>
+    <div class="vt">${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''}</div>
+    <div class="vp">${n0(c.liquido)} <small>kg líquidos</small></div>
+    <div class="vs">${esc(c.placa)} · ${n1(sacasPagas(c))} sc a pagar</div></div>
+  <button class="btn zap" data-act="zapCarga" data-id="${c.id}">Enviar no WhatsApp</button>
+  <div class="kv" style="margin-top:12px"><span>Data e hora</span><b>${brData(c.data)} ${(c.hora || '').slice(0, 5)}</b></div>
   <div class="kv"><span>Tara</span><b>${n0(c.tara)} kg</b></div><div class="kv"><span>Peso bruto</span><b>${n0(c.bruto)} kg</b></div>
   <div class="kv"><span>Peso líquido</span><b>${n0(c.liquido)} kg</b></div><div class="kv"><span>Sacas</span><b>${n1(c.sacas)}</b></div>
-  <div class="kv"><span>Variedade</span><b>${esc(nomeVar(c) || '—')}</b></div>
   <div class="kv"><span>Umidade / impureza</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'} / ${c.impureza != null ? n1(c.impureza) + '%' : '—'}</b></div>
   <div class="kv"><span>Desconto</span><b>${n0(descCarga(c))} kg → ${n1(sacasPagas(c))} sc a pagar</b></div>
   ${c.status === 'cancelada' ? `<div class="msg" style="margin-top:12px">Cancelada: ${esc(c.motivo_cancelamento)}</div>` : ''}
@@ -548,6 +554,7 @@ document.addEventListener('click', async e => {
     }
     else if (a === 'csv') exportarCSV();
     else if (a === 'csvResumo') exportarResumoCSV();
+    else if (a === 'zapCarga') { const c = todasCargas().find(x => String(x.id) === el.dataset.id); if (c) window.open('https://wa.me/?text=' + encodeURIComponent(textoViagem(c)), '_blank'); }
     else if (a === 'zapDia') window.open('https://wa.me/?text=' + encodeURIComponent(textoDia(resumoDia(S.dia))), '_blank');
     else if (a === 'fecharDia') {
       const r = resumoDia(S.dia);

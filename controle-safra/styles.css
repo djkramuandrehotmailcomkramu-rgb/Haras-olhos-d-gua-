@@ -136,3 +136,8 @@ table.rs{min-width:520px}
 table.rs td small{display:block;color:var(--tx2);font-weight:400;font-size:11px}
 table.rs tr.tot td{font-weight:700;border-top:2px solid var(--azul-esc);background:var(--azul-bg)}
 @media print{.tabbar,.side,.top,.noprint,#toast{display:none!important}.body{width:100%}main{max-width:none;padding:0}body{background:#fff}.card{break-inside:avoid;border:1px solid #ccc}}
+
+.vhero{background:var(--azul-esc);color:#fff;border-radius:20px;padding:16px 18px;margin-bottom:12px;text-align:center}
+.vhero .vn{font-size:56px;font-weight:700;line-height:1;letter-spacing:-.02em}.vhero .vn small{display:block;font-size:13px;font-weight:600;opacity:.85;letter-spacing:0;margin-bottom:4px}
+.vhero .vt{font-size:19px;font-weight:600;margin-top:8px}.vhero .vp{font-size:34px;font-weight:700;margin-top:6px;color:var(--amarelo)}.vhero .vp small{font-size:14px;font-weight:500;color:#fff;opacity:.9}.vhero .vs{font-size:13px;opacity:.85;margin-top:4px}
+.btn.zap{background:#25D366;color:#073b1a}
