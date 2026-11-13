@@ -324,7 +324,7 @@ function resumoDia(dia) {
   return { dia, viagens: d.length, kg: soma(d, 'liquido'), sacas: soma(d, 'sacas'), descontos_kg: d.reduce((a, c) => a + descCarga(c), 0), por_talhao: Object.values(por), por_variedade: Object.values(pv) };
 }
 function textoDia(r) {
-  return `*Colheita ${S.safra.nome} — Lagoa Formosa*\nFechamento de ${brData(r.dia)}\n\n${r.viagens} viagens · ${n0(r.sacas)} sacas (${n1(r.kg / 1000)} t)\n\n*Por talhão*\n${r.por_talhao.map(x => `• ${x.nome}: ${x.n} viag. · ${n0(x.sc)} sc`).join('\n')}\n\n*Por variedade*\n${r.por_variedade.map(x => `• ${x.nome}: ${n0(x.sc)} sc`).join('\n')}\n\nAcumulado da safra: ${n0(soma(ativas(), 'sacas'))} sacas`;
+  return `*Colheita ${S.safra.nome} — Lagoa Formosa*\nFechamento de ${brData(r.dia)}\n\n${r.viagens} viagens · ${n0(r.sacas)} sacas (${n1(r.kg / 1000)} t)\n\n*Por talhão*\n${r.por_talhao.map(x => `• ${x.nome}: ${x.n} viag. · ${n0(x.sc)} sc`).join('\n')}\n\n*Por variedade*\n${r.por_variedade.map(x => `• ${x.nome}: ${n0(x.sc)} sc`).join('\n')}\n\nAcumulado da safra: ${n0(soma(ativas(), 'sacas'))} sacas${soma(S.talhoes, 'area_colhida_ha') ? '\nMédia geral: ' + n1(soma(ativas(), 'sacas') / soma(S.talhoes, 'area_colhida_ha')) + ' sc/ha' : ''}`;
 }
 function textoViagem(c) {
   const u = c.umidade != null ? n1(c.umidade) + '%' : '—';
@@ -445,6 +445,7 @@ function dadosResumo() {
 }
 function viewResumo() {
   const R = dadosResumo(), l = R.l;
+  const mTal = R.talhoes.filter(x => x.scHa > 0), mediaTal = mTal.length ? mTal.reduce((a, x) => a + x.scHa, 0) / mTal.length : 0;
   const haTot = soma(S.talhoes.filter(t => t.ativo), 'area_ha'), scTot = soma(l, 'sacas'), kgTot = soma(l, 'liquido');
   const desc = l.reduce((a, c) => a + descCarga(c), 0), haColh = soma(S.talhoes, 'area_colhida_ha'), haRest = Math.max(haTot - haColh, 0);
   const comU = l.filter(c => c.umidade != null), umidMed = comU.length ? soma(comU, 'umidade') / comU.length : null;
@@ -452,12 +453,15 @@ function viewResumo() {
   const p = S.params || PADRAO;
   return `<div class="pagehead"><h1>Resumo da safra</h1><span>Safra ${esc(S.safra.nome)}</span></div>
   <div class="kpis"><div class="kpi y"><span>Sacas (peso líquido ÷ 60)</span><b>${n0(scTot)} <small>sc</small></b></div>
-  <div class="kpi"><span>Produtividade média</span><b>${n1(haColh ? scTot / haColh : 0)} <small>sc/ha</small></b></div>
+  <div class="kpi g"><span>Média geral (sc/ha)</span><b>${haColh ? n1(scTot / haColh) : '—'} <small>sc/ha</small></b></div>
+  <div class="kpi g"><span>Média dos talhões (sc/ha)</span><b>${mTal.length ? n1(mediaTal) : '—'} <small>sc/ha</small></b></div>
   <div class="kpi"><span>Hectares colhidos</span><b>${n1(haColh)} <small>ha</small></b></div>
   <div class="kpi"><span>Hectares restantes</span><b>${n1(haRest)} <small>ha</small></b></div>
   <div class="kpi"><span>Umidade média</span><b>${umidMed == null ? '—' : n1(umidMed) + ' <small>%</small>'}</b></div></div>
+  ${haColh ? '' : '<div class="alerta">Para calcular as médias por hectare, informe os hectares colhidos de cada talhão na aba Talhões.</div>'}
   <div class="card"><h2>Por talhão</h2><div class="tscroll"><table class="rs"><tr><th>Talhão</th><th>Viagens</th><th>Peso líq. (kg)</th><th>Sacas</th><th>sc/ha</th><th>ha colh.</th><th>Dias</th><th>Umid. %</th></tr>${linhas}
-  <tr class="tot"><td>TOTAL</td><td>${l.length}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? n1(scTot / haColh) : '—'}</td><td>${haColh ? n1(haColh) : '—'}</td><td>${new Set(l.map(c => c.data)).size}</td><td>${umidMed == null ? '—' : n1(umidMed)}</td></tr></table></div></div>
+  <tr class="tot"><td>TOTAL</td><td>${l.length}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? n1(scTot / haColh) : '—'}</td><td>${haColh ? n1(haColh) : '—'}</td><td>${new Set(l.map(c => c.data)).size}</td><td>${umidMed == null ? '—' : n1(umidMed)}</td></tr>
+  <tr class="tot"><td>MÉDIA DOS TALHÕES</td><td></td><td></td><td></td><td>${mTal.length ? n1(mediaTal) : '—'}</td><td></td><td></td><td></td></tr></table></div></div>
   <div class="card"><h2>Média por tipo de soja</h2><div class="tscroll"><table class="rs"><tr><th>Tipo</th><th>Viagens</th><th>Sacas</th><th>ha</th><th>sc/ha</th></tr>${R.tipos.map(t => `<tr><td>${t.nome}</td><td>${t.n || '—'}</td><td>${t.sc ? n0(t.sc) : '—'}</td><td>${t.ha ? n1(t.ha) : '—'}</td><td>${t.scHa ? n1(t.scHa) : '—'}</td></tr>`).join('')}</table></div><div class="hint">Hectares = soma dos hectares colhidos informados nos talhões que receberam viagens daquele tipo.</div></div>
   <div class="card"><h2>Por variedade</h2><div class="tscroll"><table class="rs"><tr><th>Variedade</th><th>Tipo</th><th>Viagens</th><th>Sacas</th></tr>${R.variedades.map(v => `<tr><td>${esc(v.nome)}</td><td>${esc(v.tipo)}</td><td>${v.n}</td><td>${n0(v.sc)}</td></tr>`).join('') || '<tr><td colspan="4">Sem viagens.</td></tr>'}</table></div></div>
   <div class="row2 noprint"><button class="btn sec" data-act="csvResumo">Baixar resumo (CSV)</button><button class="btn yel" data-act="imprimir">Imprimir / salvar PDF</button></div>`;
