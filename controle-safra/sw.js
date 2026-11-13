@@ -1,5 +1,5 @@
 /* Offline: abre do cache na hora e atualiza em segundo plano. Dados do Supabase nunca passam pelo cache. */
-const VERSION = 'safra-1.5.1';
+const VERSION = 'safra-1.5.2';
 const CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 const FILES = ['./', 'index.html', 'styles.css', 'foto.js', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
