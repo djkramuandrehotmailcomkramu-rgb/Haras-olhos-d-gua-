@@ -141,3 +141,9 @@ table.rs tr.tot td{font-weight:700;border-top:2px solid var(--azul-esc);backgrou
 .vhero .vn{font-size:56px;font-weight:700;line-height:1;letter-spacing:-.02em}.vhero .vn small{display:block;font-size:13px;font-weight:600;opacity:.85;letter-spacing:0;margin-bottom:4px}
 .vhero .vt{font-size:19px;font-weight:600;margin-top:8px}.vhero .vp{font-size:34px;font-weight:700;margin-top:6px;color:var(--amarelo)}.vhero .vp small{font-size:14px;font-weight:500;color:#fff;opacity:.9}.vhero .vs{font-size:13px;opacity:.85;margin-top:4px}
 .btn.zap{background:#25D366;color:#073b1a}
+
+/* tudo em maiúsculas (o que se digita nos campos fica como digitado); negrito no que importa */
+body{text-transform:uppercase}
+input,select,textarea{text-transform:none}input.up{text-transform:uppercase}
+.kpi span,.preview span,label{font-weight:700}.kpi b,.kv b,.item .v,.item .m b{font-weight:800}
+table.rs th{font-weight:800}table.rs td b{font-weight:800}table.rs td:first-child{font-weight:800}
