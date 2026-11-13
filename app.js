@@ -322,7 +322,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.3</p>`;
+    <p class="note">Pluviômetro · versão 2.4</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -433,16 +433,26 @@ function makeXlsx(p) {
   const r1 = v => Math.round(v * 10) / 10;
   const txt = (r, c, v, st) => `<c r="${col(c)}${r}" s="${st}" t="inlineStr"><is><t>${x(v)}</t></is></c>`;
   const num = (r, c, v, st) => `<c r="${col(c)}${r}" s="${st}"><v>${v}</v></c>`;
-  const rows = [`<row r="1" ht="24" customHeight="1">${txt(1, 0, 'Pluviômetro', 1)}${txt(1, 1, 'Acumulado (mm)', 1)}${dates.map((d, i) => txt(1, i + 2, brShort(d), 1)).join('')}</row>`];
+  const blank = (r, c, st) => `<c r="${col(c)}${r}" s="${st}"/>`; // célula vazia mantém a cor da linha zebrada
+  // estilos: 1 cabeçalho | 2-4 linha clara (valor, nome, acumulado) | 5-7 linha cinza | 8-9 rodapé (nome, valor)
+  const rows = [`<row r="1" ht="24" customHeight="1">${txt(1, 0, 'Pluviômetro', 1)}${txt(1, 1, 'Acum. (mm)', 1)}${dates.map((d, i) => txt(1, i + 2, brShort(d), 1)).join('')}</row>`];
   s.rows.forEach((r, k) => {
-    const n = k + 2;
-    rows.push(`<row r="${n}">${txt(n, 0, r.f.name, 3)}${r.n ? num(n, 1, r1(r.mm), 4) : txt(n, 1, '', 4)}${dates.map((d, i) => { const v = s.idx[r.f.id]?.[d]; return v == null ? '' : num(n, i + 2, v, 2); }).join('')}</row>`);
+    const n = k + 2, z = k % 2, stVal = z ? 5 : 2, stName = z ? 6 : 3, stAcc = z ? 7 : 4;
+    rows.push(`<row r="${n}">${txt(n, 0, r.f.name, stName)}${r.n ? num(n, 1, r1(r.mm), stAcc) : blank(n, 1, stAcc)}${dates.map((d, i) => { const v = s.idx[r.f.id]?.[d]; return v == null ? blank(n, i + 2, stVal) : num(n, i + 2, v, stVal); }).join('')}</row>`);
   });
   const f = s.rows.length + 2;
-  rows.push(`<row r="${f}">${txt(f, 0, 'Média da fazenda', 5)}${num(f, 1, r1(s.mean), 5)}${dates.map((d, i) => num(f, i + 2, r1(s.farm[d] ?? 0), 5)).join('')}</row>`);
+  rows.push(`<row r="${f}" ht="20" customHeight="1">${txt(f, 0, 'Média da fazenda', 8)}${num(f, 1, r1(s.mean), 9)}${dates.map((d, i) => num(f, i + 2, r1(s.farm[d] ?? 0), 9)).join('')}</row>`);
   const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', rel = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-  const sheet = `${head}<worksheet ${ns}><sheetViews><sheetView workbookViewId="0" tabSelected="1"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/><selection pane="topRight" activeCell="C1" sqref="C1"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/><selection pane="bottomRight" activeCell="C2" sqref="C2"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="18"/><cols><col min="1" max="1" width="20" customWidth="1"/><col min="2" max="2" width="16" customWidth="1"/><col min="3" max="${dates.length + 2}" width="8.5" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
-  const styles = `${head}<styleSheet ${ns}><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF000000"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf><xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="right"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  // Congelados: linha 1 (datas) e colunas A e B (nome e acumulado). Colunas estreitas para o painel fixo caber na tela do celular.
+  const sheet = `${head}<worksheet ${ns}><sheetViews><sheetView workbookViewId="0" tabSelected="1" showGridLines="0"><pane xSplit="2" ySplit="1" topLeftCell="C2" activePane="bottomRight" state="frozen"/><selection pane="topRight" activeCell="C1" sqref="C1"/><selection pane="bottomLeft" activeCell="A2" sqref="A2"/><selection pane="bottomRight" activeCell="C2" sqref="C2"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="18"/><cols><col min="1" max="1" width="17" customWidth="1"/><col min="2" max="2" width="11.5" customWidth="1"/><col min="3" max="${dates.length + 2}" width="8.5" customWidth="1"/></cols><sheetData>${rows.join('')}</sheetData></worksheet>`;
+  const fill = c => `<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`;
+  const xf = (font, fl, h) => `<xf numFmtId="0" fontId="${font}" fillId="${fl}" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${h}" vertical="center"/></xf>`;
+  const styles = `${head}<styleSheet ${ns}><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>`
+    + `<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fill('FF000000')}${fill('FFFFFFFF')}${fill('FFE3E3E3')}${fill('FFBDBDBD')}</fills>`
+    + `<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFCFCFCF"/></left><right style="thin"><color rgb="FFCFCFCF"/></right><top style="thin"><color rgb="FFCFCFCF"/></top><bottom style="thin"><color rgb="FFCFCFCF"/></bottom><diagonal/></border></borders>`
+    + `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>`
+    + `<cellXfs count="10"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>${xf(2, 2, 'center')}${xf(0, 3, 'right')}${xf(1, 3, 'left')}${xf(1, 3, 'right')}${xf(0, 4, 'right')}${xf(1, 4, 'left')}${xf(1, 4, 'right')}${xf(1, 5, 'left')}${xf(1, 5, 'right')}</cellXfs>`
+    + `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   return zip([
     { name: '[Content_Types].xml', data: `${head}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
     { name: '_rels/.rels', data: `${head}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${rel}/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
@@ -543,6 +553,10 @@ $('#file').addEventListener('change', async e => { const f = e.target.files[0]; 
 
 render();
 if (!db.settings.user) askUser();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const had = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded && !sheets.length) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+}
 navigator.storage?.persist?.();
 })();
