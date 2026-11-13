@@ -136,6 +136,10 @@ const I = {
   chart: '<path d="M4 20V10m6 10V4m6 16v-7m5 7H3"/>', field: '<path d="M3 7l9-4 9 4-9 4-9-4Zm0 5l9 4 9-4M3 17l9 4 9-4"/>',
   more: '<path d="M4 7h16M4 12h16M4 17h16"/>', table: '<path d="M4 5h16v14H4V5Zm0 5h16M4 14h16M10 5v14"/>'
 };
+I.baixar = '<path d="M12 4v11"/><path d="m7.5 11 4.500 4.500L16.500 11"/><path d="M5 19.500h14"/>';
+I.zap = '<path d="M20.500 11.500a8.500 8.500 0 0 1-12.600 7.400L3.500 20.500l1.600-4.700A8.500 8.500 0 1 1 20.500 11.500Z"/><path d="M9.200 8.800c.3 2.600 2.800 5.100 5.800 5.800l1.200-1.300-2-1-.9.700c-.9-.4-1.700-1.200-2.100-2.100l.7-.9-1-2Z"/>';
+I.imprimir = '<path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/>';
+const acao = (act, ic, titulo, sub, cls = '') => `<button class="btn-acao ${cls}" data-act="${act}"><span class="ic">${ico(ic)}</span><span class="tx"><b data-fit>${titulo}</b><small>${sub}</small></span></button>`;
 const ico = k => `<svg viewBox="0 0 24 24">${I[k]}</svg>`;
 
 /* ---------- Render raiz ---------- */
@@ -355,7 +359,7 @@ function viewCargas() {
   return `<div class="pagehead"><h1>Viagens</h1><span>${at.length} viagens · ${n1(soma(at, 'sacas'))} sc</span></div>
   <div class="card"><div class="field" style="margin:0"><label>Dia ${fechado ? '<i class="badge">fechado</i>' : ''}</label><input type="date" id="dDia" value="${S.dia}"></div>
   ${ger && !fechado && at.length ? '<button class="btn yel" style="margin-top:12px" data-act="fecharDia">Fechar o dia e enviar resumo</button>' : ''}
-  ${fechado ? '<button class="btn sec" style="margin-top:12px" data-act="zapDia">Reenviar resumo do dia (WhatsApp)</button>' : ''}
+  ${fechado ? `<div class="acoes um">${acao('zapDia', 'zap', 'Reenviar resumo do dia', 'pelo WhatsApp', 'wa')}</div>` : ''}
   ${fechado && ger ? '<button class="btn red" style="margin-top:10px" data-act="reabrirDia">Reabrir o dia</button>' : ''}</div>
   <div class="card list">${lista.map(itemCarga).join('') || '<div class="empty">Nenhuma viagem neste dia.</div>'}</div>`;
 }
@@ -450,7 +454,7 @@ function viewPainel() {
     <h3>Por variedade</h3>${varied.map(([k, v]) => `<div class="bar"><div class="lb">${esc(k)}</div><div class="tr"><i style="width:${v / maxV * 100}%"></i></div><div class="vl">${n0(v)} sc</div></div>`).join('') || '<div class="empty">—</div>'}
     <h3>Umidade das viagens</h3>${comU.length ? fu.map(([k, v]) => `<div class="bar"><div class="lb">${k}</div><div class="tr"><i style="width:${v / Math.max(1, comU.length) * 100}%"></i></div><div class="vl">${v}</div></div>`).join('') : '<div class="empty">Nenhuma umidade informada.</div>'}
     <h3>Por veículo</h3>${veic.length ? `<div class="tscroll"><table class="rs"><tr><th>Placa</th><th>Viagens</th><th>Sacas</th><th>Média</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(fmtPlaca(p))}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table></div>` : '<div class="empty">Sem dados.</div>'}</details>
-  <div class="row2 noprint"><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button><button class="btn yel" data-act="zap">Resumo no WhatsApp</button></div>`;
+  <div class="acoes noprint">${acao('csv', 'baixar', 'Baixar planilha', 'arquivo CSV')}${acao('zap', 'zap', 'Enviar resumo', 'pelo WhatsApp', 'wa')}</div>`;
 }
 function exportarCSV() {
   const cab = ['Data', 'Hora', 'Viagem', 'Placa', 'Talhão', 'Tara kg', 'Bruto kg', 'Líquido kg', 'Sacas', 'Umidade %', 'Status'];
@@ -506,7 +510,7 @@ function viewResumo() {
   <tr class="tot"><td>MÉDIA DOS TALHÕES</td><td></td><td></td><td></td><td>${mTal.length ? n1(mediaTal) : '—'}</td><td></td><td></td><td></td></tr></table></div></div>
   <div class="card"><h2>Média por tipo de soja</h2><div class="tscroll"><table class="rs"><tr><th>Tipo</th><th>Viagens</th><th>Sacas</th><th>ha</th><th>sc/ha</th></tr>${R.tipos.map(t => `<tr><td>${t.nome}</td><td>${t.n || '—'}</td><td>${t.sc ? n0(t.sc) : '—'}</td><td>${t.ha ? n1(t.ha) : '—'}</td><td>${t.scHa ? n1(t.scHa) : '—'}</td></tr>`).join('')}</table></div><div class="hint">Hectares = soma dos hectares colhidos informados nos talhões que receberam viagens daquele tipo.</div></div>
   <div class="card"><h2>Por variedade</h2><div class="tscroll"><table class="rs"><tr><th>Variedade</th><th>Tipo</th><th>Viagens</th><th>Sacas</th></tr>${R.variedades.map(v => `<tr><td>${esc(v.nome)}</td><td>${esc(v.tipo)}</td><td>${v.n}</td><td>${n0(v.sc)}</td></tr>`).join('') || '<tr><td colspan="4">Sem viagens.</td></tr>'}</table></div></div>
-  <div class="row2 noprint"><button class="btn sec" data-act="csvResumo">Baixar resumo (CSV)</button><button class="btn yel" data-act="imprimir">Imprimir / salvar PDF</button></div>`;
+  <div class="acoes noprint">${acao('csvResumo', 'baixar', 'Baixar resumo', 'arquivo CSV')}${acao('imprimir', 'imprimir', 'Imprimir', 'ou salvar em PDF', 'am')}</div>`;
 }
 function exportarResumoCSV() {
   const R = dadosResumo();

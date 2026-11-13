@@ -199,3 +199,19 @@ details.mais.card{padding:14px 16px}details.mais:not(.card){margin-top:6px}
 
 .gprod text{font-size:10.5px}.gprod text.v{font-size:10.5px}.gprod text.ac{font-size:11.5px}
 .bar .lb{width:42%}.bar .vl{width:30%;font-size:12px}
+
+/* ===== botões de ação modernos ===== */
+.acoes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 16px}.acoes.um{grid-template-columns:1fr;margin-top:12px}
+.btn-acao{display:flex;align-items:center;gap:10px;min-width:0;min-height:66px;padding:10px 12px;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--sombra);color:var(--tx);text-align:left;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+.btn-acao:hover{box-shadow:0 2px 4px rgba(34,52,61,.08),0 10px 22px rgba(34,52,61,.1)}.btn-acao:active{transform:scale(.97);filter:brightness(.97)}
+.btn-acao .ic{flex:none;width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:var(--azul-bg);color:var(--azul-esc);transition:transform .2s}
+.btn-acao:hover .ic{transform:translateY(-2px)}
+.btn-acao .ic svg{width:22px;height:22px}
+.btn-acao .tx{min-width:0;display:block}.btn-acao .tx b{display:block;font-size:14px;font-weight:800;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn-acao .tx small{display:block;font-size:11px;font-weight:600;color:var(--tx2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn-acao.wa{background:linear-gradient(135deg,#2BD96B,#1FB855);border-color:transparent;color:#06361a}.btn-acao.wa .ic{background:rgba(255,255,255,.4);color:#06361a}.btn-acao.wa small{color:#0a4a24}
+.btn-acao.am{background:linear-gradient(135deg,#FFD84D,var(--amarelo));border-color:transparent}.btn-acao.am .ic{background:rgba(255,255,255,.5);color:var(--tx)}.btn-acao.am small{color:#5a4300}
+.btn{box-shadow:var(--sombra);transition:transform .15s ease,filter .15s ease,box-shadow .15s ease}.btn:active{transform:scale(.98)}
+@media print{.acoes{display:none!important}}
+.btn-acao .tx small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15}
+@media (max-width:350px){.btn-acao{padding:8px;gap:8px}.btn-acao .ic{width:32px;height:32px;border-radius:11px}.btn-acao .ic svg{width:18px;height:18px}}
