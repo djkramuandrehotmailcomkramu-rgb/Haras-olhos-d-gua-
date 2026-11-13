@@ -139,10 +139,46 @@ const I = {
 const ico = k => `<svg viewBox="0 0 24 24">${I[k]}</svg>`;
 
 /* ---------- Render raiz ---------- */
+/* números que cabem no quadro: reduz a fonte até não passar da borda */
+function ajustaFontes() {
+  document.querySelectorAll('[data-fit]').forEach(el => {
+    el.style.fontSize = ''; let fs = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth + 1 && fs > 12) { fs -= 1; el.style.fontSize = fs + 'px'; }
+  });
+}
+/* números que "contam" até o valor ao abrir a aba (curto, respeita redução de movimento) */
+function animaNumeros() {
+  if (!S.anim || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const fim = Number(el.dataset.count), dec = Number(el.dataset.dec || 0), t0 = performance.now(), fmt = v => dec ? n1(v) : n0(v);
+    const passo = t => { const k = Math.min(1, (t - t0) / 650), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(fim * e); if (k < 1) requestAnimationFrame(passo); else { el.textContent = fmt(fim); ajustaFontes(); } };
+    requestAnimationFrame(passo);
+  });
+}
+window.addEventListener('resize', () => ajustaFontes());
+function anel(pct, titulo) {
+  const r = 38, c = 2 * Math.PI * r, p = Math.max(0, Math.min(1, pct)), o = c * (1 - p);
+  return `<svg viewBox="0 0 100 100" class="anel" role="img" aria-label="${esc(titulo)}"><circle class="trilho" cx="50" cy="50" r="${r}"/><circle class="prog ${S.anim ? 'anim' : ''}" cx="50" cy="50" r="${r}" style="--c:${c.toFixed(1)};--o:${o.toFixed(1)}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${o.toFixed(1)}" transform="rotate(-90 50 50)"/><text x="50" y="54" text-anchor="middle">${pct > 0 ? Math.round(p * 100) + '%' : '—'}</text></svg>`;
+}
+/* barras arredondadas (valor de cada período) + linha do acumulado */
+function graficoProducao(chaves, valores, rot) {
+  const n = chaves.length, W = 420, H = 210, L = 6, R = 44, T = 24, B = 26, iw = W - L - R, ih = H - T - B;
+  const maxV = Math.max(1, ...valores), acum = []; valores.reduce((a, v, i) => (acum[i] = a + v), 0);
+  const maxA = Math.max(1, acum[n - 1] || 1), slot = iw / n, bw = Math.min(34, slot * 0.58);
+  const X = i => L + slot * i + slot / 2, Yb = v => T + ih - (v / maxV) * ih, Ya = v => T + ih - (v / maxA) * ih;
+  const bars = valores.map((v, i) => { const h = Math.max(3, T + ih - Yb(v)); return `<rect class="b" style="--i:${i}" x="${(X(i) - bw / 2).toFixed(1)}" y="${(T + ih - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(9, bw / 2).toFixed(1)}"/>${n <= 9 ? `<text class="v" x="${X(i).toFixed(1)}" y="${(T + ih - h - 6).toFixed(1)}" text-anchor="middle">${n0(v)}</text>` : ''}`; }).join('');
+  const pts = acum.map((v, i) => `${X(i).toFixed(1)},${Ya(v).toFixed(1)}`);
+  const linha = n > 1 ? `<path class="acum" pathLength="1" d="M${pts.join(' L')}"/>` : '';
+  const area = n > 1 ? `<path class="area" d="M${X(0).toFixed(1)},${T + ih} L${pts.join(' L')} L${X(n - 1).toFixed(1)},${T + ih} Z"/>` : '';
+  const fim = `<circle class="pt" cx="${X(n - 1).toFixed(1)}" cy="${Ya(acum[n - 1]).toFixed(1)}" r="5"/><text class="ac" x="${(W - 4).toFixed(1)}" y="${(Ya(acum[n - 1]) + 4).toFixed(1)}" text-anchor="end">${n0(acum[n - 1])}</text>`;
+  const eixo = chaves.map((k, i) => (n <= 10 || i % 2 === 0) ? `<text class="x" x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(k)}</text>` : '').join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="gprod ${S.anim ? 'anim' : ''}" role="img" aria-label="${esc(rot)}"><defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="s1"/><stop offset="1" class="s2"/></linearGradient><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="a1"/><stop offset="1" class="a2"/></linearGradient></defs><line class="base" x1="${L}" y1="${T + ih}" x2="${W - R + 8}" y2="${T + ih}"/>${area}${bars}${linha}${fim}${eixo}</svg>`;
+}
 function render() {
   const app = $('#app');
   if (!S.user) return app.innerHTML = telaLogin();
   if (!S.perfil) return app.innerHTML = telaSemAcesso();
+  S.anim = !!S.animar; S.animar = false;
   const tabs = [['lancar', 'Viagem', 'plus'], ['cargas', 'Viagens', 'list'], ['resumo', 'Resumo', 'table'], ['painel', 'Painel', 'chart'], ['talhoes', 'Talhões', 'field'], ['mais', 'Mais', 'more']];
   const nf = S.fila.length;
   const nav = tabs.map(([k, l, i]) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''}">${ico(i)}<span>${l}</span>${k === 'mais' && nf ? `<i class="dot">${nf}</i>` : ''}</button>`).join('');
@@ -153,10 +189,11 @@ function render() {
   app.innerHTML = `<div class="shell">
     <header class="top"><div><b>Controle de Safra</b><small>Fazenda Lagoa Formosa${S.safra ? ' · ' + esc(S.safra.nome) : ''}</small></div>${net}</header>
     <aside class="side"><div class="brand"><b>Controle de Safra</b><small>Fazenda Lagoa Formosa${S.safra ? '<br>Safra ' + esc(S.safra.nome) : ''}</small></div><nav class="tabbar" id="tabbar">${nav}</nav></aside>
-    <div class="body"><main>${!S.safra ? '<div class="card empty">Nenhuma safra aberta. Peça ao gerente para abrir a safra.</div>' : f()}</main></div></div>`;
+    <div class="body"><main class="${S.anim ? 'enter' : ''}">${!S.safra ? '<div class="card empty">Nenhuma safra aberta. Peça ao gerente para abrir a safra.</div>' : f()}</main></div></div>`;
   if (keep) restoreForm(keep);
   window.scrollTo(0, scrollY);
   if (S.tab === 'lancar') bindLancar();
+  ajustaFontes(); animaNumeros();
 }
 
 /* ---------- Login ---------- */
@@ -377,44 +414,43 @@ const soma = (l, k) => l.reduce((a, c) => a + Number(c[k] || 0), 0);
 function viewPainel() {
   const l = filtrar(), sacas = soma(l, 'sacas'), kg = soma(l, 'liquido');
   const comU = l.filter(c => c.umidade != null), umid = comU.length ? soma(comU, 'umidade') / comU.length : null;
-  const areaTot = soma(S.talhoes.filter(t => t.ativo), 'area_ha');
-  /* por talhão */
-  const porTal = S.talhoes.map(t => { const c = l.filter(x => x.talhao_id === t.id); const sc = soma(c, 'sacas'); return { t, sc, n: c.length, ha: Number(t.area_ha || 0), pr: t.area_ha ? sc / t.area_ha : 0 }; }).filter(x => x.sc > 0).sort((a, b) => b.pr - a.pr);
-  const maxPr = Math.max(1, ...porTal.map(x => x.pr));
-  const haColh = porTal.reduce((a, x) => a + x.ha, 0);
-  const prod = haColh ? porTal.reduce((a, x) => a + x.sc, 0) / haColh : 0;
-  /* por dia */
-  const dias = {}; l.forEach(c => { dias[c.data] = (dias[c.data] || 0) + Number(c.sacas); });
-  const dk = Object.keys(dias).sort().slice(-14), maxD = Math.max(1, ...dk.map(d => dias[d]));
-  const W = 600, H = 170, bw = W / Math.max(dk.length, 1);
-  const bars = dk.map((d, i) => { const h = Math.max(2, dias[d] / maxD * (H - 36)); return `<rect class="b" x="${i * bw + bw * .15}" y="${H - 22 - h}" width="${bw * .7}" height="${h}" rx="4"/><text x="${i * bw + bw / 2}" y="${H - 8}" text-anchor="middle">${d.slice(8)}/${d.slice(5, 7)}</text><text x="${i * bw + bw / 2}" y="${H - 26 - h}" text-anchor="middle">${n0(dias[d])}</text>`; }).join('');
-  /* por veículo */
+  const tF = S.fTalhao ? S.talhoes.find(t => t.id === S.fTalhao) : null;
+  const areaTot = tF ? Number(tF.area_ha || 0) : soma(S.talhoes.filter(t => t.ativo), 'area_ha');
+  const haColh = tF ? Number(tF.area_colhida_ha || 0) : soma(S.talhoes, 'area_colhida_ha'), haRest = Math.max(areaTot - haColh, 0);
+  const baseSc = soma(tF ? ativas().filter(c => c.talhao_id === tF.id) : ativas(), 'sacas'), mediaGeral = haColh ? baseSc / haColh : 0;
+  /* produção: por hora (hoje) ou por dia */
+  const grp = {}; l.forEach(c => { const k = S.periodo === 'hoje' ? String(c.hora || '00').slice(0, 2) : c.data; grp[k] = (grp[k] || 0) + Number(c.sacas); });
+  const ks = Object.keys(grp).sort().slice(S.periodo === 'hoje' ? -24 : -14);
+  const rot = k => S.periodo === 'hoje' ? k + 'h' : k.slice(8) + '/' + k.slice(5, 7);
+  /* talhões */
+  const porTal = S.talhoes.map(t => { const sc = soma(l.filter(x => x.talhao_id === t.id), 'sacas'), tot = soma(ativas().filter(x => x.talhao_id === t.id), 'sacas'), hc = Number(t.area_colhida_ha || 0); return { t, sc, pr: hc ? tot / hc : 0 }; }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc);
+  const maxSc = Math.max(1, ...porTal.map(x => x.sc));
+  const linhaTal = x => `<div class="bar"><div class="lb">${esc(x.t.nome)}</div><div class="tr"><i class="${S.anim ? 'anim' : ''}" style="width:${x.sc / maxSc * 100}%"></i></div><div class="vl"><b>${n0(x.sc)}</b> sc${x.pr ? ' · ' + n1(x.pr) + '/ha' : ''}</div></div>`;
+  /* detalhes */
   const vei = {}; l.forEach(c => { const v = vei[c.placa] ||= { n: 0, sc: 0 }; v.n++; v.sc += Number(c.sacas); });
   const veic = Object.entries(vei).sort((a, b) => b[1].sc - a[1].sc);
-  /* umidade */
   const faixas = [['até 13%', 0, 13], ['13–15%', 13, 15], ['15–18%', 15, 18], ['acima de 18%', 18, 99]];
   const fu = faixas.map(([n, a, b]) => [n, comU.filter(c => c.umidade > a - (a === 0 ? 1 : 0) && c.umidade <= b).length]);
-  /* por tipo / variedade */
-  const vr = {}; l.forEach(c => { const t = S.talhoes.find(x => x.id === c.talhao_id); const k = (t && variedadeDe(t) && variedadeDe(t).nome) || 'Sem variedade'; vr[k] = (vr[k] || 0) + Number(c.sacas); });
-  const varied = Object.entries(vr).sort((a, b) => b[1] - a[1]);
-  const maxV = Math.max(1, ...varied.map(x => x[1]));
+  const vr = {}; l.forEach(c => { const t = S.talhoes.find(x => x.id === c.talhao_id); const k = (t && variedadeDe(t) && variedadeDe(t).nome) || nomeVar(c) || 'Sem variedade'; vr[k] = (vr[k] || 0) + Number(c.sacas); });
+  const varied = Object.entries(vr).sort((a, b) => b[1] - a[1]), maxV = Math.max(1, ...varied.map(x => x[1]));
   const per = [['hoje', 'Hoje'], ['7d', '7 dias'], ['safra', 'Safra toda']].map(([k, n]) => `<button data-per="${k}" class="${S.periodo === k ? 'on' : ''}">${n}</button>`).join('');
-  return `<div class="pagehead"><h1>Dashboard</h1><span>Safra ${esc(S.safra.nome)}</span></div>
+  return `<div class="pagehead"><h1>Painel</h1><span>Safra ${esc(S.safra.nome)}</span></div>
   <div class="chips">${per}</div>
-  <div class="card"><label>Talhão</label><select id="fTal"><option value="">Todos os talhões</option>${S.talhoes.map(t => `<option value="${t.id}" ${S.fTalhao === t.id ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></div>
-  <div class="kpis"><div class="kpi g"><span>Sacas colhidas</span><b>${n0(sacas)} <small>sc</small></b></div>
-  <div class="kpi"><span>Toneladas</span><b>${n1(kg / 1000)} <small>t</small></b></div>
-  <div class="kpi"><span>Cargas</span><b>${n0(l.length)}</b></div>
-  <div class="kpi y"><span>Produtividade média</span><b>${n1(prod)} <small>sc/ha</small></b></div>
-  <div class="kpi"><span>Média por carga</span><b>${n1(l.length ? sacas / l.length : 0)} <small>sc</small></b></div>
-  <div class="kpi"><span>Umidade média</span><b>${umid == null ? '—' : n1(umid) + ' <small>%</small>'}</b></div></div>
-  <div class="grid2"><div class="card chart"><h2>Sacas por dia</h2>${dk.length ? `<svg viewBox="0 0 ${W} ${H}">${bars}</svg>` : '<div class="empty">Sem cargas no período.</div>'}</div>
-  <div class="card"><h2>Talhões com colheita</h2><div class="kpi g" style="border:0;padding:0;background:none"><b style="font-size:34px">${porTal.length}<small> de ${S.talhoes.filter(t => t.ativo).length}</small></b></div><div class="hint">${n1(haColh)} ha de ${n1(areaTot)} ha cadastrados</div></div></div>
-  <div class="card"><h2>Produtividade por talhão (sc/ha)</h2>${porTal.map(x => `<div class="bar"><div class="lb">${esc(x.t.nome)}</div><div class="tr"><i style="width:${x.pr / maxPr * 100}%"></i></div><div class="vl"><b>${n1(x.pr)}</b> · ${n0(x.sc)} sc</div></div>`).join('') || '<div class="empty">Sem dados no período.</div>'}</div>
-  <div class="grid2"><div class="card"><h2>Por variedade</h2>${varied.map(([k, v]) => `<div class="bar"><div class="lb">${esc(k)}</div><div class="tr"><i style="width:${v / maxV * 100}%"></i></div><div class="vl">${n0(v)} sc</div></div>`).join('') || '<div class="empty">—</div>'}</div>
-  <div class="card"><h2>Umidade das cargas</h2>${comU.length ? fu.map(([k, v]) => `<div class="bar"><div class="lb">${k}</div><div class="tr"><i style="width:${v / Math.max(1, comU.length) * 100}%"></i></div><div class="vl">${v} cargas</div></div>`).join('') : '<div class="empty">Nenhuma umidade informada.</div>'}</div></div>
-  <div class="card"><h2>Por veículo</h2>${veic.length ? `<table><tr><th>Placa</th><th>Cargas</th><th>Sacas</th><th>Média/carga</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(p)}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table>` : '<div class="empty">Sem dados.</div>'}</div>
-  <div class="row2"><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button><button class="btn yel" data-act="zap">Resumo no WhatsApp</button></div>`;
+  <div class="field"><select id="fTal" aria-label="Talhão"><option value="">Todos os talhões</option>${S.talhoes.map(t => `<option value="${t.id}" ${S.fTalhao === t.id ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</select></div>
+  <div class="hero2 rise"><div class="hl"><span>Sacas colhidas</span><b data-fit data-count="${sacas}">${n0(sacas)}</b><em>sc</em>
+    <div class="hsub">${n0(l.length)} viagens · ${n1(kg / 1000)} t${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}</div></div>
+    <div class="hr">${anel(areaTot ? haColh / areaTot : 0, 'Hectares colhidos')}<small>ha colhidos</small></div></div>
+  <div class="tiles rise"><div class="tile"><span>Média geral</span><b data-fit>${haColh ? n1(mediaGeral) : '—'}</b><em>sc/ha</em></div>
+    <div class="tile"><span>Colhidos</span><b data-fit>${n1(haColh)}</b><em>ha</em></div>
+    <div class="tile"><span>Restantes</span><b data-fit>${n1(haRest)}</b><em>ha</em></div></div>
+  ${haColh ? '' : '<div class="alerta">Informe os hectares colhidos de cada talhão (aba Talhões) para ver as médias por hectare.</div>'}
+  <div class="card chart rise"><h2>${S.periodo === 'hoje' ? 'Produção por hora' : 'Produção por dia'}<small>barras = sacas no período · linha = acumulado</small></h2>${ks.length ? graficoProducao(ks.map(rot), ks.map(k => grp[k]), 'Produção') : '<div class="empty">Sem viagens no período.</div>'}</div>
+  <div class="card rise"><h2>Sacas por talhão</h2>${porTal.slice(0, 8).map(linhaTal).join('') || '<div class="empty">Sem dados no período.</div>'}${porTal.length > 8 ? `<details class="mais"><summary>Ver todos (${porTal.length})</summary>${porTal.slice(8).map(linhaTal).join('')}</details>` : ''}</div>
+  <details class="mais card"><summary>Mais detalhes</summary>
+    <h3>Por variedade</h3>${varied.map(([k, v]) => `<div class="bar"><div class="lb">${esc(k)}</div><div class="tr"><i style="width:${v / maxV * 100}%"></i></div><div class="vl">${n0(v)} sc</div></div>`).join('') || '<div class="empty">—</div>'}
+    <h3>Umidade das viagens</h3>${comU.length ? fu.map(([k, v]) => `<div class="bar"><div class="lb">${k}</div><div class="tr"><i style="width:${v / Math.max(1, comU.length) * 100}%"></i></div><div class="vl">${v}</div></div>`).join('') : '<div class="empty">Nenhuma umidade informada.</div>'}
+    <h3>Por veículo</h3>${veic.length ? `<div class="tscroll"><table class="rs"><tr><th>Placa</th><th>Viagens</th><th>Sacas</th><th>Média</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(fmtPlaca(p))}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table></div>` : '<div class="empty">Sem dados.</div>'}</details>
+  <div class="row2 noprint"><button class="btn sec" data-act="csv">Baixar planilha (CSV)</button><button class="btn yel" data-act="zap">Resumo no WhatsApp</button></div>`;
 }
 function exportarCSV() {
   const cab = ['Data', 'Hora', 'Viagem', 'Placa', 'Talhão', 'Tara kg', 'Bruto kg', 'Líquido kg', 'Sacas', 'Umidade %', 'Status'];
@@ -456,13 +492,14 @@ function viewResumo() {
   const comU = l.filter(c => c.umidade != null), umidMed = comU.length ? soma(comU, 'umidade') / comU.length : null;
   const linhas = R.talhoes.map(x => `<tr><td>${esc(x.t.nome)}${x.vars.length ? `<small>${esc(x.vars.join(', '))}</small>` : ''}</td><td>${x.n || '—'}</td><td>${x.n ? n0(x.kg) : '—'}</td><td><b>${x.n ? n0(x.sc) : '—'}</b></td><td><b>${x.scHa ? n1(x.scHa) : '—'}</b></td><td>${x.ha ? n1(x.ha) : '—'}</td><td>${x.dias || '—'}</td><td>${x.umid != null ? n1(x.umid) : '—'}</td></tr>`).join('');
   const p = S.params || PADRAO;
-  return `<div class="pagehead"><h1>Resumo da safra</h1><span>Safra ${esc(S.safra.nome)}</span></div>
-  <div class="kpis"><div class="kpi y"><span>Sacas (peso líquido ÷ 60)</span><b>${n0(scTot)} <small>sc</small></b></div>
-  <div class="kpi g"><span>Média geral (sc/ha)</span><b>${haColh ? n1(scTot / haColh) : '—'} <small>sc/ha</small></b></div>
-  <div class="kpi g"><span>Média dos talhões (sc/ha)</span><b>${mTal.length ? n1(mediaTal) : '—'} <small>sc/ha</small></b></div>
-  <div class="kpi"><span>Hectares colhidos</span><b>${n1(haColh)} <small>ha</small></b></div>
-  <div class="kpi"><span>Hectares restantes</span><b>${n1(haRest)} <small>ha</small></b></div>
-  <div class="kpi"><span>Umidade média</span><b>${umidMed == null ? '—' : n1(umidMed) + ' <small>%</small>'}</b></div></div>
+  return `<div class="pagehead"><h1>Resumo</h1><span>Safra ${esc(S.safra.nome)}</span></div>
+  <div class="hero2 rise"><div class="hl"><span>Sacas colhidas (peso líquido ÷ 60)</span><b data-fit data-count="${scTot}">${n0(scTot)}</b><em>sc</em>
+    <div class="hsub">${n0(l.length)} viagens · ${n1(kgTot / 1000)} t${umidMed == null ? '' : ' · umid. ' + n1(umidMed) + '%'}</div></div>
+    <div class="hr">${anel(haTot ? haColh / haTot : 0, 'Hectares colhidos')}<small>ha colhidos</small></div></div>
+  <div class="tiles four rise"><div class="tile"><span>Média geral</span><b data-fit>${haColh ? n1(scTot / haColh) : '—'}</b><em>sc/ha</em></div>
+    <div class="tile"><span>Média dos talhões</span><b data-fit>${mTal.length ? n1(mediaTal) : '—'}</b><em>sc/ha</em></div>
+    <div class="tile"><span>Colhidos</span><b data-fit>${n1(haColh)}</b><em>ha</em></div>
+    <div class="tile"><span>Restantes</span><b data-fit>${n1(haRest)}</b><em>ha</em></div></div>
   ${haColh ? '' : '<div class="alerta">Para calcular as médias por hectare, informe os hectares colhidos de cada talhão na aba Talhões.</div>'}
   <div class="card"><h2>Por talhão</h2><div class="tscroll"><table class="rs"><tr><th>Talhão</th><th>Viagens</th><th>Peso líq. (kg)</th><th>Sacas</th><th>sc/ha</th><th>ha colh.</th><th>Dias</th><th>Umid. %</th></tr>${linhas}
   <tr class="tot"><td>TOTAL</td><td>${l.length}</td><td>${n0(kgTot)}</td><td>${n0(scTot)}</td><td>${haColh ? n1(scTot / haColh) : '—'}</td><td>${haColh ? n1(haColh) : '—'}</td><td>${new Set(l.map(c => c.data)).size}</td><td>${umidMed == null ? '—' : n1(umidMed)}</td></tr>
@@ -575,7 +612,7 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-tab],[data-carga],[data-tal],[data-per],[data-act],#lSair');
   if (e.target.id === 'sheet') return fechar();
   if (!el) return;
-  if (el.dataset.tab) { S.tab = el.dataset.tab; ls.set('cs_tab', S.tab); render(); window.scrollTo(0, 0); if (S.tab === 'mais') carregarUsuarios().then(() => { if (S.tab === 'mais') render(); }); }
+  if (el.dataset.tab) { S.animar = el.dataset.tab !== S.tab; S.tab = el.dataset.tab; ls.set('cs_tab', S.tab); render(); window.scrollTo(0, 0); if (S.tab === 'mais') carregarUsuarios().then(() => { if (S.tab === 'mais') render(); }); }
   else if (el.dataset.carga) abrirCarga(el.dataset.carga);
   else if (el.dataset.tal) abrirTalhao(el.dataset.tal);
   else if (el.dataset.per) { S.periodo = el.dataset.per; render(); }
