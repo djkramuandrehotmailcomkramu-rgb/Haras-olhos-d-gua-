@@ -328,7 +328,7 @@ function textoDia(r) {
 }
 function textoViagem(c) {
   const u = c.umidade != null ? n1(c.umidade) + '%' : '—';
-  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\nUmidade: ${u}\n*Sacas: ${n1(c.sacas)}*`;
+  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\n*Sacas: ${n1(c.sacas)}*\nUmidade: ${u}`;
 }
 async function compartilhaViagem(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
