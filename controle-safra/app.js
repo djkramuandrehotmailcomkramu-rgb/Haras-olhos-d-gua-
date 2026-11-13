@@ -144,7 +144,7 @@ function render() {
   const net = `<span class="net ${S.online ? '' : 'off'}">${S.online ? (nf ? nf + ' a enviar' : 'Conectado') : 'Sem internet' + (nf ? ' · ' + nf + ' salvas' : '')}</span>`;
   const f = { lancar: viewLancar, cargas: viewCargas, resumo: viewResumo, painel: viewPainel, talhoes: viewTalhoes, mais: viewMais }[S.tab];
   const scrollY = window.scrollY;
-  const keep = S.tab === 'lancar' ? snapshotForm() : null;
+  const keep = S.tab === 'lancar' && !S.limpar ? snapshotForm() : null; S.limpar = false;
   app.innerHTML = `<div class="shell">
     <header class="top"><div><b>Controle de Safra</b><small>Fazenda Lagoa Formosa${S.safra ? ' · ' + esc(S.safra.nome) : ''}</small></div>${net}</header>
     <aside class="side"><div class="brand"><b>Controle de Safra</b><small>Fazenda Lagoa Formosa${S.safra ? '<br>Safra ' + esc(S.safra.nome) : ''}</small></div><nav class="tabbar" id="tabbar">${nav}</nav></aside>
@@ -268,7 +268,7 @@ function bindLancar() {
     const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid, impureza: d.imp };
     S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id }; ls.set('cs_ult', S.lt);
     toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara - descontoKg(d.bruto - d.tara, d.umid, d.imp).total) / 60) + ' sacas');
-    S.tab = 'lancar'; render();
+    S.tab = 'lancar'; S.limpar = true; render();
     g('cPlaca') && document.getElementById('cPlaca').focus();
     enviarFila();
   });
