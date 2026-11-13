@@ -3,15 +3,14 @@
 'use strict';
 
 const KEY = 'pluvio.v2';
-// Pontos de coleta: os 20 talhões com contorno (KML) e os pontos da planilha que não têm contorno no mapa.
-const EXTRA = [['armazem', 'Armazém'], ['retiro01', 'Retiro 01'], ['retiro02', 'Retiro 02'], ['retiro03', 'Retiro 03'], ['th08', 'TH 08'],
-  ...[22, 23, 24, 25, 26, 27, 28, 29, 30].map(n => ['th' + n, 'TH ' + n])];
-const groupOf = n => n.startsWith('Arm') ? 0 : n.startsWith('Cond') ? 1 : n.startsWith('Ret') ? 2 : 3;
-const FIELDS = [...window.TALHOES.map(f => ({ ...f, name: f.name.replace('IT ', 'TH ') })), ...EXTRA.map(([id, name]) => ({ id, name, ha: null, rings: null }))]
-  .sort((a, b) => groupOf(a.name) - groupOf(b.name) || a.name.localeCompare(b.name));
+// Cadastro: somente os 34 pontos que têm pluviômetro (os ids antigos são mantidos para não perder leituras).
+const FIELDS = [['armazem', 'Armazém'],
+  ['condominio01', 'Condomínio 01'], ['condominio02', 'Condomínio 02'], ['condominio03', 'Condomínio 03'],
+  ['retiro01', 'Retiro 01'], ['retiro02', 'Retiro 02'], ['retiro03', 'Retiro 03'],
+  ...[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    .map(n => [(n === 8 || n >= 22 ? 'th' : 'it') + String(n).padStart(2, '0'), 'TH ' + String(n).padStart(2, '0')])]
+  .map(([id, name]) => ({ id, name }));
 const FIELD = Object.fromEntries(FIELDS.map(f => [f.id, f]));
-const MAPPED = FIELDS.filter(f => f.rings);
-const AREA = MAPPED.reduce((a, f) => a + f.ha, 0);
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,7 +22,6 @@ const I = {
   fwd: '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
   del: '<svg viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7 6-7Zm3 4 5 6m0-6-5 6"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
-  fit: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
 };
 
 /* ---------- datas e números ---------- */
@@ -132,8 +130,7 @@ const nav = (title, sub = '', left = '') => `<div class="nav">${left || '<span><
 
 function render() {
   $$('#tabbar [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
-  $('#view').innerHTML = ({ home: viewHome, map: viewMap, history: viewHistory, more: viewMore })[ui.tab]();
-  if (ui.tab === 'map') initMap();
+  $('#view').innerHTML = ({ home: viewHome, history: viewHistory, more: viewMore })[ui.tab]();
 }
 
 /* ---------- gráfico de barras ---------- */
@@ -185,68 +182,6 @@ function viewHome() {
     <div class="panel">${rank}</div>`;
 }
 
-/* ---------- mapa ---------- */
-const K = Math.cos(-14.92 * Math.PI / 180) * 111320, KY = 110540;
-const proj = ([lon, lat]) => [(lon + 51.29) * K, -(lat + 14.92) * KY];
-const GEO = MAPPED.map(f => {
-  const rings = f.rings.map(r => r.map(proj)), r = rings[0];
-  let a = 0, cx = 0, cy = 0;
-  for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const c = r[j][0] * r[i][1] - r[i][0] * r[j][1]; a += c; cx += (r[j][0] + r[i][0]) * c; cy += (r[j][1] + r[i][1]) * c; }
-  return { id: f.id, d: rings.map(r => 'M' + r.map(p => p[0].toFixed(0) + ' ' + p[1].toFixed(0)).join('L') + 'Z').join(''), c: [cx / (3 * a), cy / (3 * a)], pts: rings.flat() };
-});
-function viewMap() {
-  const s = stats(), max = Math.max(s.max, 1), by = Object.fromEntries(s.rows.map(r => [r.f.id, r]));
-  const paths = GEO.map(g => { const r = by[g.id]; return r.n ? `<path class="f" data-id="${g.id}" d="${g.d}" fill="rgba(var(--rain-rgb),${(0.12 + 0.88 * r.mm / max).toFixed(2)})"/>` : `<path class="f none" data-id="${g.id}" d="${g.d}"/>`; }).join('');
-  const labels = GEO.map(g => { const r = by[g.id], x = g.c[0].toFixed(0); return `<text x="${x}" y="${g.c[1].toFixed(0)}">${esc(short(r.f.name))}${r.n ? `<tspan class="m" x="${x}" dy="1.150em">${fmt(r.mm)}</tspan>` : ''}</text>`; }).join('');
-  return head('Mapa', shareBtn) + chips(ui.period) + `
-    <div class="mapcard">
-      <svg class="map" role="img" aria-label="Mapa dos talhões">${paths}<g id="labels">${labels}</g></svg>
-      <div class="legend">Chuva acumulada (mm)<i></i><div><span>0</span><span>${fmt(max)}</span></div></div>
-      <button class="ibtn mapbtn" data-act="mapreset" aria-label="Centralizar mapa">${I.fit}</button>
-    </div>
-    <p class="note">Toque em um talhão para ver os detalhes. Use dois dedos para aproximar. ${FIELDS.length - MAPPED.length} pontos da planilha não têm contorno no mapa: ${FIELDS.filter(f => !f.rings).map(f => esc(short(f.name))).join(', ')}.</p>`;
-}
-let mapReset = () => {};
-function initMap() {
-  const svg = $('svg.map'); if (!svg) return;
-  const box = svg.getBoundingClientRect(), all = GEO.flatMap(g => g.pts);
-  const x0 = Math.min(...all.map(p => p[0])), x1 = Math.max(...all.map(p => p[0])), y0 = Math.min(...all.map(p => p[1])), y1 = Math.max(...all.map(p => p[1]));
-  let w = (x1 - x0) * 1.12, h = (y1 - y0) * 1.12; const ar = box.width / box.height;
-  if (w / h < ar) w = h * ar; else h = w / ar;
-  const base = { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h };
-  let vb = { ...base };
-  const apply = () => { svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); $('#labels', svg).setAttribute('font-size', (vb.w / box.width * 11).toFixed(1)); };
-  mapReset = () => { vb = { ...base }; apply(); };
-  apply();
-  const zoom = (f, px, py) => {
-    const nw = Math.min(base.w * 1.2, Math.max(base.w / 14, vb.w * f)), k = nw / vb.w;
-    const sx = vb.x + px / box.width * vb.w, sy = vb.y + py / box.height * vb.h;
-    vb = { x: sx - px / box.width * nw, y: sy - py / box.height * vb.h * k, w: nw, h: vb.h * k }; apply();
-  };
-  const P = new Map(); let moved = 0, lastDist = 0;
-  svg.addEventListener('pointerdown', e => { svg.setPointerCapture(e.pointerId); P.set(e.pointerId, [e.clientX, e.clientY]); if (P.size === 1) moved = 0; lastDist = 0; });
-  svg.addEventListener('pointermove', e => {
-    const p = P.get(e.pointerId); if (!p) return;
-    const dx = e.clientX - p[0], dy = e.clientY - p[1];
-    P.set(e.pointerId, [e.clientX, e.clientY]);
-    if (P.size === 1) { moved += Math.abs(dx) + Math.abs(dy); const k = vb.w / box.width; vb.x -= dx * k; vb.y -= dy * k; apply(); }
-    else if (P.size === 2) {
-      const [a, b] = [...P.values()], dist = Math.hypot(a[0] - b[0], a[1] - b[1]);
-      if (lastDist) zoom(lastDist / dist, (a[0] + b[0]) / 2 - box.left, (a[1] + b[1]) / 2 - box.top);
-      lastDist = dist; moved = 99;
-    }
-  });
-  const up = e => { P.delete(e.pointerId); lastDist = 0; };
-  svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
-  // Abre no "click" (e não no pointerup): o toque já terminou e não sobra um clique para fechar a folha recém-aberta.
-  svg.addEventListener('click', e => {
-    if (moved >= 12) return;
-    const id = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('path[data-id]')?.dataset.id;
-    if (id) openField(id);
-  });
-  svg.addEventListener('wheel', e => { e.preventDefault(); zoom(e.deltaY > 0 ? 1.15 : 0.87, e.clientX - box.left, e.clientY - box.top); }, { passive: false });
-}
-
 /* ---------- detalhe do talhão ---------- */
 function openField(id) {
   const f = FIELD[id], days = index()[id] || {}, t = today();
@@ -256,7 +191,7 @@ function openField(id) {
   const season = Object.entries(days).filter(([d]) => d >= sr.from && d <= sr.to);
   const best = season.reduce((m, e) => e[1] > m[1] ? e : m, ['', 0]);
   const s = stats('safra'), pos = s.ranked.findIndex(r => r.f.id === id) + 1;
-  openSheet(nav(esc(f.name), f.ha ? `${fmt(f.ha)} ha` : 'Sem contorno no mapa') + `<div class="body">
+  openSheet(nav(esc(f.name), 'Pluviômetro') + `<div class="body">
     <div class="panel"><div class="grid4">${tot}</div></div>
     <div class="sect"><h2>Últimos 30 dias</h2><span>mm por dia</span></div>
     ${barChart(seriesFor(days, 'd30'))}
@@ -364,7 +299,7 @@ function viewHistory() {
     const rs = by[d], mean = rs.reduce((a, r) => a + r.mm, 0) / rs.length;
     const top = rs.reduce((m, r) => r.mm > m.mm ? r : m);
     return `<button class="row" data-act="day" data-id="${d}"><div class="grow"><div class="t">${dayName(d)} · ${brShort(d)}</div>
-      <div class="s">${rs.length} talhões${top.mm > 0 ? ` · maior: ${esc(FIELD[top.fieldId].name)}, ${fmt(top.mm)} mm` : ' · sem chuva'}</div></div>
+      <div class="s">${rs.length} ${rs.length === 1 ? 'talhão' : 'talhões'}${top.mm > 0 ? ` · maior: ${esc(FIELD[top.fieldId].name)}, ${fmt(top.mm)} mm` : ' · sem chuva'}</div></div>
       <div class="mm"><b>${fmt(mean)}<small>mm</small></b></div>${I.chev}</button>`;
   }).join('')}</div><p class="note">Média da fazenda em cada dia. Toque em um dia para ver e corrigir os talhões.</p>`;
 }
@@ -378,7 +313,7 @@ function viewMore() {
       <button class="row" data-act="backup"><div class="grow"><div class="t">Fazer backup</div><div class="s">${s.lastBackup ? 'Último: ' + new Date(s.lastBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Salva todas as leituras em um arquivo'}</div></div>${I.chev}</button>
       <button class="row" data-act="restore"><div class="grow"><div class="t">Importar backup</div><div class="s">Junta as leituras de outro celular, sem duplicar</div></div>${I.chev}</button>
     </div>
-    <div class="sect"><h2>Fazenda</h2><span>${FIELDS.length} pontos de coleta</span></div>
+    <div class="sect"><h2>Fazenda</h2><span>${FIELDS.length} pluviômetros</span></div>
     <div class="panel">
       <div class="row"><label class="t" for="sfarm">Nome</label><input id="sfarm" data-set="farm" value="${esc(s.farm)}" maxlength="40" placeholder="Nome da fazenda"></div>
       <div class="row"><label class="t" for="suser">Quem lança</label><input id="suser" data-set="user" value="${esc(s.user)}" maxlength="24" placeholder="Seu nome"></div>
@@ -387,7 +322,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.1.1</p>`;
+    <p class="note">Pluviômetro · versão 2.2</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -448,9 +383,9 @@ async function makePdf(p) {
     return doc.lastAutoTable.finalY;
   };
   const num = { halign: 'right' };
-  let y = table(64, 'Chuva por talhão', ['#', 'Talhão', 'Área (ha)', 'Chuva (mm)', 'Comparado à média', 'Dias lidos'],
-    s.ranked.map((r, i) => [i + 1, r.f.name, r.f.ha ? fmt(r.f.ha) : '-', r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
-    { 0: { cellWidth: 10 }, 2: num, 3: { ...num, fontStyle: 'bold' }, 4: num, 5: num });
+  let y = table(64, 'Chuva por talhão', ['#', 'Pluviômetro', 'Chuva (mm)', 'Comparado à média', 'Dias lidos'],
+    s.ranked.map((r, i) => [i + 1, r.f.name, r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
+    { 0: { cellWidth: 10 }, 2: { ...num, fontStyle: 'bold' }, 3: num, 4: num });
   const dates = [...new Set(readings().filter(r => r.date >= s.from && r.date <= s.to).map(r => r.date))].sort().reverse();
   if (dates.length && dates.length <= 40) {
     doc.addPage('a4', 'landscape');
@@ -466,9 +401,9 @@ async function makePdf(p) {
 }
 function makeCsv(p) {
   const { from, to } = range(p), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Data', 'Talhão', 'Área (ha)', 'Chuva (mm)', 'Quem lançou']];
+  const rows = [['Data', 'Pluviômetro', 'Chuva (mm)', 'Quem lançou']];
   readings().filter(r => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date) || FIELDS.indexOf(FIELD[a.fieldId]) - FIELDS.indexOf(FIELD[b.fieldId]))
-    .forEach(r => rows.push([br(r.date), FIELD[r.fieldId].name, String(FIELD[r.fieldId].ha ?? '').replace('.', ','), String(r.mm).replace('.', ','), r.user]));
+    .forEach(r => rows.push([br(r.date), FIELD[r.fieldId].name, String(r.mm).replace('.', ','), r.user]));
   return new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' });
 }
 const fileStamp = p => { const r = range(p); return `${r.from}_a_${r.to}`; };
@@ -498,7 +433,6 @@ const actions = {
   day: el => openLaunch(el.dataset.id),
   field: el => openField(el.dataset.id),
   share: openShare,
-  mapreset: () => mapReset(),
   'share-period': el => sheets.at(-1).setPeriod(el.dataset.id),
   ldate: el => { L.date = el.dataset.id; drawLaunch(); },
   pick: el => pick(el.dataset.id),
@@ -559,7 +493,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeSheet();
 });
 $('#file').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) restore(await f.text()); });
-let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => ui.tab === 'map' && !sheets.length && render(), 200); });
 
 render();
 if (!db.settings.user) askUser();
