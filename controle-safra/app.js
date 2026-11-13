@@ -318,7 +318,8 @@ function viewCargas() {
   return `<div class="pagehead"><h1>Viagens</h1><span>${at.length} viagens · ${n1(soma(at, 'sacas'))} sc</span></div>
   <div class="card"><div class="field" style="margin:0"><label>Dia ${fechado ? '<i class="badge">fechado</i>' : ''}</label><input type="date" id="dDia" value="${S.dia}"></div>
   ${ger && !fechado && at.length ? '<button class="btn yel" style="margin-top:12px" data-act="fecharDia">Fechar o dia e enviar resumo</button>' : ''}
-  ${fechado ? '<button class="btn sec" style="margin-top:12px" data-act="zapDia">Reenviar resumo do dia (WhatsApp)</button>' : ''}</div>
+  ${fechado ? '<button class="btn sec" style="margin-top:12px" data-act="zapDia">Reenviar resumo do dia (WhatsApp)</button>' : ''}
+  ${fechado && ger ? '<button class="btn red" style="margin-top:10px" data-act="reabrirDia">Reabrir o dia</button>' : ''}</div>
   <div class="card list">${lista.map(itemCarga).join('') || '<div class="empty">Nenhuma viagem neste dia.</div>'}</div>`;
 }
 function resumoDia(dia) {
@@ -346,7 +347,7 @@ async function compartilhaViagem(id) {
 function abrirCarga(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
   setTimeout(() => fotoLe(c.client_id).then(b => { const v = document.getElementById('vFoto'); if (b && v) v.innerHTML = `<img class="fotoprev" src="${URL.createObjectURL(b)}" alt="foto da balança" style="margin:0 0 12px">`; }), 0);
-  const pode = S.perfil.papel === 'gerente' || (c.data >= diasAtras(1));
+  const fechadoDia = diaFechado(c.data), pode = !fechadoDia && (S.perfil.papel === 'gerente' || (c.data >= diasAtras(1)));
   sheet(`<div class="vhero"><div class="vn"><small>Viagem</small>${c.viagem ?? '·'}</div>
     <div class="vt">${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''}</div>
     <div class="vp">${n0(c.liquido)} <small>kg líquidos</small></div>
@@ -358,6 +359,7 @@ function abrirCarga(id) {
   <div class="kv"><span>Peso líquido</span><b>${n0(c.liquido)} kg</b></div><div class="kv"><span>Sacas</span><b>${n1(c.sacas)}</b></div>
   <div class="kv"><span>Umidade</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'}</b></div>
   ${c.status === 'cancelada' ? `<div class="msg" style="margin-top:12px">Cancelada: ${esc(c.motivo_cancelamento)}</div>${c.viagem && !ativas().some(x => x.viagem === c.viagem) ? `<button class="btn yel" style="margin-bottom:10px" data-act="reusarNumero" data-n="${c.viagem}">Reutilizar número ${c.viagem}</button>` : ''}` : ''}
+  ${fechadoDia && c.status === 'ativa' ? '<div class="msg" style="margin-top:12px">Este dia está fechado: a viagem não pode ser cancelada. O gerente pode reabrir o dia na aba Viagens.</div>' : ''}
   ${c._pend ? '<div class="hint" style="margin:10px 0">Salva no aparelho, aguardando internet para enviar.</div>' : ''}
   ${c.status === 'ativa' && pode ? (c._pend ? `<button class="btn red" style="margin-top:14px" data-act="descartar" data-id="${c.client_id}">Descartar carga</button>` : `<div class="field" style="margin-top:14px"><label>Motivo do cancelamento</label><input id="cMotivo" placeholder="ex.: pesagem digitada errado"></div><button class="btn red" data-act="cancelar" data-id="${c.id}">Cancelar carga</button>`) : ''}
   <button class="btn sec" style="margin-top:10px" data-act="fechar">Fechar</button>`);
@@ -596,6 +598,13 @@ document.addEventListener('click', async e => {
     else if (a === 'csvResumo') exportarResumoCSV();
     else if (a === 'zapCarga') compartilhaViagem(el.dataset.id);
     else if (a === 'reusarNumero') { S.viagemForcada = parseInt(el.dataset.n, 10); fechar(); S.tab = 'lancar'; render(); toast('A próxima viagem será a ' + S.viagemForcada); }
+    else if (a === 'reabrirDia') {
+      if (!confirm(`Reabrir ${brData(S.dia)}? Depois disso será possível lançar e cancelar viagens deste dia de novo.`)) return;
+      const { data: rem, error } = await sb.from('cs_fechamentos').delete().eq('safra_id', S.safra.id).eq('data', S.dia).select('data');
+      if (error) return toast(traduz(error), true);
+      if (!rem || !rem.length) return toast('Não foi possível reabrir o dia (sem permissão).', true);
+      S.fech = S.fech.filter(d => d !== S.dia); await carregar(); render(); toast('Dia reaberto');
+    }
     else if (a === 'zapDia') window.open('https://wa.me/?text=' + encodeURIComponent(textoDia(resumoDia(S.dia))), '_blank');
     else if (a === 'fecharDia') {
       const r = resumoDia(S.dia);
@@ -617,8 +626,9 @@ document.addEventListener('click', async e => {
     else if (a === 'descartar') { S.fila = S.fila.filter(x => x.client_id !== el.dataset.id); salvaFila(); fechar(); render(); toast('Carga descartada'); }
     else if (a === 'cancelar') {
       const motivo = ($('#cMotivo').value || '').trim(); if (!motivo) return toast('Informe o motivo.', true);
-      const { error } = await sb.from('cs_cargas').update({ status: 'cancelada', motivo_cancelamento: motivo }).eq('id', el.dataset.id);
+      const { data: alt, error } = await sb.from('cs_cargas').update({ status: 'cancelada', motivo_cancelamento: motivo }).eq('id', el.dataset.id).select('id');
       if (error) return toast(traduz(error), true);
+      if (!alt || !alt.length) return toast('Não foi possível cancelar: o dia está fechado ou você não tem permissão. O gerente pode reabrir o dia na aba Viagens.', true);
       fechar(); await carregar(); render(); toast('Carga cancelada');
     }
   }
