@@ -178,7 +178,7 @@ function telaSemAcesso() {
 
 /* ---------- Lançar viagem ---------- */
 const TIPOS = [['intacta', 'Intacta'], ['rr', 'RR'], ['convencional', 'Convencional']];
-function snapshotForm() { const f = $('#fCarga'); if (!f) return null; return Object.fromEntries([...f.elements].filter(e => e.id && !['cTipo', 'cVar'].includes(e.id)).map(e => [e.id, e.value])); }
+function snapshotForm() { const f = $('#fCarga'); if (!f) return null; return Object.fromEntries([...f.elements].filter(e => e.id && e.type !== 'file' && !['cTipo', 'cVar'].includes(e.id)).map(e => [e.id, e.value])); }
 function restoreForm(v) { for (const [k, val] of Object.entries(v)) { const e = document.getElementById(k); if (e) e.value = val; } }
 const veiculoDe = placa => S.veiculos.find(v => v.placa === placa) || null;
 const ultimoPorPlaca = placa => { const v = veiculoDe(placa); if (v && v.tara_padrao) return v.tara_padrao; const c = todasCargas().find(x => x.placa === placa); return c ? c.tara : null; };
@@ -211,6 +211,10 @@ function viewLancar() {
     <div class="field"><label>Variedade</label><select id="cVar" required><option value="">Selecione a variedade…</option>${varOpts(tipo)}</select></div>
     <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="16" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist><div class="hint" id="hVei"></div></div>
     <div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" placeholder="ex.: 14.000" required><div class="hint" id="hTara"></div></div></div>
+    <div class="field"><label>Foto da balança (peso bruto)</label>
+      <label class="btn sec" for="cFoto" style="cursor:pointer">${S.fotoUrl ? 'Trocar a foto' : 'Tirar foto da balança'}</label>
+      <input id="cFoto" type="file" accept="image/*" capture="environment" hidden>
+      <div id="fotoBox">${S.fotoUrl ? `<img class="fotoprev" src="${S.fotoUrl}" alt="foto da balança">` : '<div class="hint">A foto lê o peso sozinha. Se preferir, digite o peso abaixo.</div>'}</div></div>
     <div class="row2"><div class="field"><label>Peso bruto (kg)</label><input id="cBruto" inputmode="numeric" placeholder="ex.: 40.940" required></div>
     <div class="field"><label>Umidade %</label><input id="cUmid" inputmode="decimal" placeholder="ex.: 13,5"></div></div>
     <div class="preview" id="prev"></div>
@@ -251,6 +255,20 @@ function bindLancar() {
     if (t) { g('hTara').textContent = (v && v.tara_padrao ? 'Tara padrão: ' : 'Última tara: ') + n0(t) + ' kg (toque para usar)'; g('hTara').dataset.t = t; } else { g('hTara').textContent = ''; delete g('hTara').dataset.t; }
     calc();
   });
+  g('cFoto').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const box = g('fotoBox'), msg = t => { const m = g('fotoMsg'); if (m) m.innerHTML = t; };
+    try { S.foto = await comprimeFoto(f); } catch { S.foto = f; }
+    if (S.fotoUrl) URL.revokeObjectURL(S.fotoUrl); S.fotoUrl = URL.createObjectURL(S.foto);
+    box.innerHTML = `<img class="fotoprev" src="${S.fotoUrl}" alt="foto da balança"><div class="hint" id="fotoMsg">Lendo o peso da foto…</div>`;
+    try {
+      const r = await lerPesoFoto(f);
+      if (!r.valor) return msg('Não consegui ler o número. Digite o peso bruto.');
+      g('cBruto').value = maskMilhar(r.valor); calc();
+      msg(`Peso lido: <b>${n0(r.valor)} kg</b>. Confira antes de salvar.` + (r.candidatos.length > 1 ? `<div class="cands">Outros números na foto: ${r.candidatos.slice(1).map(n => `<button type="button" data-peso="${n}">${n0(n)}</button>`).join('')}</div>` : ''));
+    } catch { msg('Sem internet para ler a foto agora. Digite o peso bruto; a foto fica guardada.'); }
+  });
+  g('fotoBox').addEventListener('click', e => { const b = e.target.closest('[data-peso]'); if (b) { g('cBruto').value = maskMilhar(b.dataset.peso); calc(); } });
   g('hTara').addEventListener('click', () => { if (g('hTara').dataset.t) { g('cTara').value = maskMilhar(g('hTara').dataset.t); calc(); g('cBruto').focus(); } });
   ['cTara', 'cBruto'].forEach(id => g(id).addEventListener('input', e => { e.target.value = maskMilhar(e.target.value); }));
   g('cUmid').addEventListener('input', e => { e.target.value = maskDec(e.target.value); });
@@ -268,6 +286,7 @@ function bindLancar() {
     const al = alertasViagem(d);
     if (al.length && !confirm(al.join('\n') + '\n\nSalvar mesmo assim?')) return;
     const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid };
+    if (S.foto) { fotoSalva(r.client_id, S.foto); URL.revokeObjectURL(S.fotoUrl); S.foto = null; S.fotoUrl = null; }
     S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id }; ls.set('cs_ult', S.lt);
     toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara) / 60) + ' sacas');
     S.tab = 'lancar'; S.limpar = true; render();
@@ -308,13 +327,25 @@ function textoViagem(c) {
   const u = c.umidade != null ? n1(c.umidade) + '%' : '—';
   return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\nUmidade: ${u}\n*Sacas: ${n1(c.sacas)}*`;
 }
+async function compartilhaViagem(id) {
+  const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
+  const txt = textoViagem(c), b = await fotoLe(c.client_id);
+  if (b && navigator.canShare) {
+    const f = new File([b], `viagem-${c.viagem ?? ''}.jpg`, { type: 'image/jpeg' });
+    if (navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], text: txt }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  if (b) toast('Este aparelho não envia a foto direto. Enviei só o texto.', true);
+}
 function abrirCarga(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
+  setTimeout(() => fotoLe(c.client_id).then(b => { const v = document.getElementById('vFoto'); if (b && v) v.innerHTML = `<img class="fotoprev" src="${URL.createObjectURL(b)}" alt="foto da balança" style="margin:0 0 12px">`; }), 0);
   const pode = S.perfil.papel === 'gerente' || (c.data >= diasAtras(1));
   sheet(`<div class="vhero"><div class="vn"><small>Viagem</small>${c.viagem ?? '·'}</div>
     <div class="vt">${esc(nomeTal(c.talhao_id))}${nomeVar(c) ? ' · ' + esc(nomeVar(c)) : ''}</div>
     <div class="vp">${n0(c.liquido)} <small>kg líquidos</small></div>
     <div class="vs">${esc(fmtPlaca(c.placa))} · ${n1(c.sacas)} sc</div></div>
+  <div id="vFoto"></div>
   <button class="btn zap" data-act="zapCarga" data-id="${c.id}">Enviar no WhatsApp</button>
   <div class="kv" style="margin-top:12px"><span>Data e hora</span><b>${brData(c.data)} ${(c.hora || '').slice(0, 5)}</b></div>
   <div class="kv"><span>Tara</span><b>${n0(c.tara)} kg</b></div><div class="kv"><span>Peso bruto</span><b>${n0(c.bruto)} kg</b></div>
@@ -553,7 +584,7 @@ document.addEventListener('click', async e => {
     }
     else if (a === 'csv') exportarCSV();
     else if (a === 'csvResumo') exportarResumoCSV();
-    else if (a === 'zapCarga') { const c = todasCargas().find(x => String(x.id) === el.dataset.id); if (c) window.open('https://wa.me/?text=' + encodeURIComponent(textoViagem(c)), '_blank'); }
+    else if (a === 'zapCarga') compartilhaViagem(el.dataset.id);
     else if (a === 'zapDia') window.open('https://wa.me/?text=' + encodeURIComponent(textoDia(resumoDia(S.dia))), '_blank');
     else if (a === 'fecharDia') {
       const r = resumoDia(S.dia);
