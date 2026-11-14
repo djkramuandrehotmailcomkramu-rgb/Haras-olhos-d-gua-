@@ -22,7 +22,7 @@ const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xx
 const ls = { get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
 
 const S = {
-  user: null, perfil: null, safra: null, talhoes: [], variedades: [], params: null, veiculos: [], fech: [], areas: [], atualizadoEm: 0, lt: ls.get('cs_ult', {}), cargas: [], fila: ls.get('cs_fila', []),
+  user: null, perfil: null, safra: null, talhoes: [], variedades: [], params: null, veiculos: [], fech: [], areas: [], destinos: [], atualizadoEm: 0, lt: ls.get('cs_ult', {}), cargas: [], fila: ls.get('cs_fila', []),
   tab: (t => (t === 'painel' || t === 'resumo') ? 'safra' : t)(ls.get('cs_tab', 'lancar')), online: navigator.onLine, periodo: '7d', fTalhao: '', dia: hoje(), sync: false, erroLogin: '', entrando: false, usuarios: []
 };
 
@@ -72,12 +72,13 @@ async function carregar() {
       const { data: ve } = await sb.from('cs_veiculos').select('*').order('placa'); if (ve) S.veiculos = ve;
       const { data: fe } = await sb.from('cs_fechamentos').select('data').eq('safra_id', S.safra.id); if (fe) S.fech = fe.map(x => x.data);
       const { data: ar } = await sb.from('cs_colheita_areas').select('*').eq('safra_id', S.safra.id); if (ar) S.areas = ar;
+      const { data: ds } = await sb.from('cs_destinos').select('*').order('ordem').order('nome'); if (ds) S.destinos = ds;
     }
-    ls.set('cs_cache', { safra: S.safra, talhoes: S.talhoes, cargas: S.cargas, variedades: S.variedades, params: S.params, veiculos: S.veiculos, fech: S.fech, areas: S.areas });
+    ls.set('cs_cache', { safra: S.safra, talhoes: S.talhoes, cargas: S.cargas, variedades: S.variedades, params: S.params, veiculos: S.veiculos, fech: S.fech, areas: S.areas, destinos: S.destinos });
     S.online = true; S.atualizadoEm = Date.now();
   } catch (e) {
     const c = ls.get('cs_cache', null);
-    if (c && !S.safra) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; S.params = c.params || null; S.veiculos = c.veiculos || []; S.fech = c.fech || []; S.areas = c.areas || []; }
+    if (c && !S.safra) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; S.params = c.params || null; S.veiculos = c.veiculos || []; S.fech = c.fech || []; S.areas = c.areas || []; S.destinos = c.destinos || []; }
     if (/fetch|Network|Load failed/i.test(String(e.message))) S.online = false; else toast(traduz(e), true);
   }
 }
@@ -234,17 +235,22 @@ const ultimoPorPlaca = placa => { const v = veiculoDe(placa); if (v && v.tara_pa
 function proxViagem() { return S.viagemForcada || ativas().reduce((m, c) => Math.max(m, c.viagem || 0), 0) + 1; }
 const varOpts = tipo => S.variedades.filter(v => v.ativo && v.tipo === tipo).map(v => `<option value="${v.id}" ${S.lt.vari === v.id ? 'selected' : ''}>${esc(v.nome)}</option>`).join('');
 function alertasViagem(d) {
-  const a = [], liq = d.bruto - d.tara;
-  if (liq > 80000) a.push('Peso líquido acima de 80.000 kg.');
+  const a = [], liq = d.bruto - d.tara, hist = ativas();
+  if (liq > 55000) a.push(`Peso líquido muito alto (${n0(liq)} kg). Confira o peso bruto e a tara.`);
   if (liq > 0 && liq < 5000) a.push(`Peso líquido muito baixo (${n0(liq)} kg). Confira o peso bruto e a tara.`);
-  const mesmas = ativas().filter(c => c.placa === d.placa);
-  if (mesmas.length >= 3) {
-    const m = mesmas.reduce((s, c) => s + Number(c.liquido), 0) / mesmas.length;
-    if (liq > 0 && Math.abs(liq - m) / m > 0.25) a.push(`Peso líquido (${n0(liq)} kg) muito diferente da média desta placa (${n0(m)} kg).`);
+  const mesmas = hist.filter(c => c.placa === d.placa && Number(c.liquido) > 0);
+  if (liq > 0 && mesmas.length >= 2) {
+    const m = mesmas.reduce((x, c) => x + Number(c.liquido), 0) / mesmas.length, dif = (liq - m) / m;
+    if (Math.abs(dif) > 0.20) a.push(`Peso líquido (${n0(liq)} kg) ${dif > 0 ? 'acima' : 'abaixo'} da média desta placa (${n0(m)} kg), ${n0(Math.abs(dif) * 100)}% de diferença.`);
+  } else if (liq > 0 && hist.length >= 5) {                                   // placa sem histórico: compara com a frota toda
+    const ls = hist.map(c => Number(c.liquido)).filter(v => v > 0).sort((x, y) => x - y), med = ls[Math.floor(ls.length / 2)];
+    if (med && Math.abs(liq - med) / med > 0.40) a.push(`Peso líquido (${n0(liq)} kg) fora do padrão das outras viagens (típico: ${n0(med)} kg).`);
   }
   const t0 = ultimoPorPlaca(d.placa);
   if (t0 && d.tara && Math.abs(d.tara - t0) > 300) a.push(`Tara (${n0(d.tara)} kg) difere da última desta placa (${n0(t0)} kg).`);
-  if (ativas().some(c => c.viagem === d.viagem && c.placa === d.placa && c.data === hoje())) a.push(`Já existe a viagem ${d.viagem} desta placa hoje.`);
+  const igual = hist.find(c => c.placa === d.placa && c.data === hoje() && Number(c.tara) === d.tara && Number(c.bruto) === d.bruto);
+  if (igual) a.push(`Parece repetida: mesma placa, tara e peso bruto da viagem ${igual.viagem ?? ''} de hoje.`);
+  if (hist.some(c => c.viagem === d.viagem && c.placa === d.placa && c.data === hoje())) a.push(`Já existe a viagem ${d.viagem} desta placa hoje.`);
   if (d.umid != null && d.umid > 18) a.push(`Umidade alta (${n1(d.umid)}%).`);
   if (d.umid != null && d.umid < 8) a.push(`Umidade muito baixa (${n1(d.umid)}%). Confira.`);
   return a;
@@ -254,6 +260,7 @@ function viewLancar() {
   const tal = S.talhoes.filter(t => t.ativo);
   if (!tal.length) return `<div class="card empty">Nenhum talhão cadastrado nesta safra ainda.<br>O gerente precisa cadastrar os talhões primeiro.</div>`;
   const tipo = S.lt.tipo || 'intacta';
+  const destinosAtivos = S.destinos.filter(d => d.ativo); if (destinosAtivos.length && !destinosAtivos.some(d => d.id === S.lt.dest)) S.lt.dest = destinosAtivos[0].id;
   const hojeL = ativas().filter(c => c.data === hoje());
   return `<div class="pagehead"><h1>Lançar viagem</h1><span>${brData(hoje())} · ${agoraHora()}</span></div>
   <div class="tiles mini rise"><div class="tile"><span>Hoje</span><b data-fit>${hojeL.length}</b><em>viagens</em></div>
@@ -264,6 +271,7 @@ function viewLancar() {
     <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${S.lt.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${variedadeDe(t) ? ' · ' + esc(variedadeDe(t).nome) : ''}</option>`).join('')}</select></div>
     <div class="field"><label>Tipo de soja</label><div class="tipos" id="cTipos">${TIPOS.map(([k, n]) => `<button type="button" data-tipo="${k}" class="${tipo === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>
     <div class="field"><label>Variedade</label><select id="cVar" required><option value="">Selecione a variedade…</option>${varOpts(tipo)}</select></div>
+    ${destinosAtivos.length ? `<div class="field"><label>Destino</label><div class="tipos dest" id="cDests">${destinosAtivos.map(d => `<button type="button" data-dest="${d.id}" class="${S.lt.dest === d.id ? 'on' : ''}">${esc(d.nome)}</button>`).join('')}</div></div>` : ''}
     <div class="row2"><div class="field"><label>Placa / equipamento</label><input id="cPlaca" class="up" list="dlPlacas" required maxlength="16" autocapitalize="characters"><datalist id="dlPlacas">${placas.map(p => `<option value="${esc(p)}">`).join('')}</datalist><div class="hint" id="hVei"></div></div>
     <div class="field"><label>Tara (kg)</label><input id="cTara" inputmode="numeric" placeholder="ex.: 14.000" required><div class="hint" id="hTara"></div></div></div>
     <div class="field"><label>Foto da balança (peso bruto)</label>
@@ -298,6 +306,7 @@ function bindLancar() {
   };
   g('cTipos').addEventListener('click', e => { const b = e.target.closest('[data-tipo]'); if (!b) return; S.lt.tipo = b.dataset.tipo; S.lt.vari = null; pinta(); });
   g('cVar').addEventListener('change', e => { S.lt.vari = e.target.value || null; });
+  const cd = g('cDests'); if (cd) cd.addEventListener('click', e => { const b = e.target.closest('[data-dest]'); if (!b) return; S.lt.dest = b.dataset.dest; ls.set('cs_ult', S.lt); cd.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
   g('cTal').addEventListener('change', e => {
     S.lt.tal = e.target.value || null;
     const t = S.talhoes.find(x => x.id === S.lt.tal), v = t && variedadeDe(t);
@@ -335,6 +344,7 @@ function bindLancar() {
     const d = dados();
     if (!g('cTal').value) return toast('Escolha o talhão.', true);
     if (!g('cVar').value) return toast('Escolha a variedade.', true);
+    if (S.destinos.some(d => d.ativo) && !S.lt.dest) return toast('Escolha o destino.', true);
     if (d.placa.length < 3) return toast('Informe a placa.', true);
     if (!d.viagem) return toast('Informe o nº da viagem.', true);
     if (!d.tara || !d.bruto) return toast('Informe tara e peso bruto.', true);
@@ -342,10 +352,10 @@ function bindLancar() {
     if (d.umid !== null && !(d.umid >= 0 && d.umid <= 60)) return toast('Umidade inválida.', true);
     const al = alertasViagem(d);
     if (al.length && !confirm(al.join('\n') + '\n\nSalvar mesmo assim?')) return;
-    const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid };
+    const r = { client_id: uuid(), safra_id: S.safra.id, talhao_id: g('cTal').value, variedade_id: g('cVar').value, destino_id: S.lt.dest || null, data: hoje(), hora: agoraHora(), viagem: d.viagem, placa: d.placa, tara: d.tara, bruto: d.bruto, umidade: d.umid };
     if (S.foto) { fotoSalva(r.client_id, S.foto); URL.revokeObjectURL(S.fotoUrl); S.foto = null; S.fotoUrl = null; }
     S.viagemForcada = null; S.viagemEditada = false;
-    S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id }; ls.set('cs_ult', S.lt);
+    S.fila.push(r); salvaFila(); S.lt = { tal: r.talhao_id, tipo: S.lt.tipo, vari: r.variedade_id, dest: r.destino_id }; ls.set('cs_ult', S.lt);
     toast('Viagem ' + d.viagem + ' salva — ' + n1((d.bruto - d.tara) / 60) + ' sacas');
     S.tab = 'lancar'; S.limpar = true; render();
     g('cPlaca') && document.getElementById('cPlaca').focus();
@@ -375,6 +385,7 @@ function viewCargas() {
     fechado && ger ? acao('reabrirDia', 'abrir', 'Reabrir o dia', 'permite alterar', 'verm') : ''
   ].filter(Boolean);
   return `<div class="pagehead"><h1>Viagens</h1><span>${brData(S.dia)}</span></div>
+  ${avisoBackup()}
   <div class="hero2 rise"><div class="hl"><span>Sacas do dia</span><b data-fit data-count="${sc}" data-dec="1">${n1(sc)}</b><em>sc</em>
     <div class="hsub">${at.length} viagens · ${n1(kg / 1000)} t${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}${canc ? ' · ' + canc + ' cancelada' + (canc > 1 ? 's' : '') : ''}</div></div>
     <div class="hr"><span class="selo ${fechado ? 'fech' : 'aberto'}">${fechado ? 'Dia fechado' : 'Dia aberto'}</span></div></div>
@@ -392,7 +403,7 @@ function textoDia(r) {
 }
 function textoViagem(c) {
   const u = c.umidade != null ? n1(c.umidade) + '%' : '—';
-  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\nPlaca: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\n*Sacas: ${n1(c.sacas)}*\nUmidade: ${u}`;
+  return `*Viagem ${c.viagem ?? ''} — Lagoa Formosa*\nSafra ${S.safra ? S.safra.nome : ''} · ${brData(c.data)} ${(c.hora || '').slice(0, 5)}\n\nTalhão: ${nomeTal(c.talhao_id)}\nVariedade: ${nomeVar(c) || '—'}\n${nomeDest(c) ? 'Destino: ' + nomeDest(c) + '\n' : ''}Placa: ${fmtPlaca(c.placa)}\n\nPeso líquido: ${n0(c.liquido)} kg\n*Sacas: ${n1(c.sacas)}*\nUmidade: ${u}`;
 }
 async function compartilhaViagem(id) {
   const c = todasCargas().find(x => String(x.id) === id); if (!c) return;
@@ -415,6 +426,7 @@ function abrirCarga(id) {
   <div id="vFoto"></div>
   <button class="btn zap" data-act="zapCarga" data-id="${c.id}">Enviar no WhatsApp</button>
   <div class="kv" style="margin-top:12px"><span>Data e hora</span><b>${brData(c.data)} ${(c.hora || '').slice(0, 5)}</b></div>
+  ${nomeDest(c) ? `<div class="kv"><span>Destino</span><b>${esc(nomeDest(c))}</b></div>` : ''}
   <div class="kv"><span>Tara</span><b>${n0(c.tara)} kg</b></div><div class="kv"><span>Peso bruto</span><b>${n0(c.bruto)} kg</b></div>
   <div class="kv"><span>Peso líquido</span><b>${n0(c.liquido)} kg</b></div><div class="kv"><span>Sacas</span><b>${n1(c.sacas)}</b></div>
   <div class="kv"><span>Umidade</span><b>${c.umidade != null ? n1(c.umidade) + '%' : '—'}</b></div>
@@ -428,6 +440,7 @@ function abrirCarga(id) {
 /* ---------- Dashboard ---------- */
 /* ---------- Safra: média geral, por tipo, por talhão e por variedade ---------- */
 const soma = (l, k) => l.reduce((a, c) => a + Number(c[k] || 0), 0);
+const nomeDest = c => (S.destinos.find(d => d.id === c.destino_id) || {}).nome || '';
 const tipoNome = k => (TIPOS.find(z => z[0] === k) || [0, k || ''])[1];
 const areaTalhao = tid => S.areas.filter(a => a.talhao_id === tid);
 const haTotalTalhao = tid => areaTalhao(tid).reduce((a, x) => a + Number(x.area_ha || 0), 0);
@@ -447,7 +460,9 @@ function dadosSafra() {
   const tipos = TIPOS.map(([k, nome]) => ({ k, nome, ...agrega(pares.filter(p => (vInfo(p.vid) || {}).tipo === k)) }));
   const vids = [...new Set(pares.map(p => p.vid))];
   const variedades = vids.map(vid => ({ nome: (vInfo(vid) || { nome: 'Sem variedade' }).nome, tipo: tipoNome((vInfo(vid) || {}).tipo), ...agrega(pares.filter(p => p.vid === vid)) })).sort((a, b) => b.sc - a.sc);
-  return { l, talhoes, tipos, variedades, geral: agrega(pares) };
+  const dm = new Map(); l.forEach(c => { const k = c.destino_id || ''; const o = dm.get(k) || { nome: (S.destinos.find(d => d.id === k) || {}).nome || 'Sem destino', n: 0, kg: 0, sc: 0 }; o.n++; o.kg += Number(c.liquido); o.sc += Number(c.sacas); dm.set(k, o); });
+  const destinos = [...dm.values()].filter(x => x.n).sort((a, b) => b.sc - a.sc);
+  return { l, talhoes, tipos, variedades, destinos, geral: agrega(pares) };
 }
 function txtAtual() { const s = Math.floor((Date.now() - (S.atualizadoEm || Date.now())) / 1000); return s < 6 ? 'atualizado agora' : s < 60 ? 'atualizado há ' + s + ' s' : 'atualizado há ' + Math.floor(s / 60) + ' min'; }
 function viewSafra() {
@@ -465,6 +480,7 @@ function viewSafra() {
   const cab4 = '<div class="trow cab"><span>Talhão</span><span class="c">Há</span><span class="c">Ton</span><span class="c">Sacas</span><span class="c">Média</span></div>';
   const blocoT = x => `<div class="tbloco" ${ger ? `data-hec="${x.t.id}"` : ''}><div class="trow"><div class="tn"><b>${esc(x.t.nome)}</b><small>${x.ps.length > 1 ? x.ps.length + ' variedades' : esc(x.vars.join(' / '))}${x.tipos.length && x.ps.length < 2 ? ' · ' + esc(x.tipos.join(' / ')) : ''}</small></div>${cols(x.ha, x.kg, x.sc, x.med, ger && !x.med)}</div>${x.ps.length > 1 ? x.ps.slice().sort((a, b) => b.sc - a.sc).map(p => { const v = S.variedades.find(y => y.id === p.vid); return `<div class="trow sub"><div class="tn"><b>↳ ${esc(v ? v.nome : 'Sem variedade')}</b><small>${esc(v ? tipoNome(v.tipo) : '')}</small></div>${cols(p.ha, p.kg, p.sc, p.ha > 0 && p.sc > 0 ? p.sc / p.ha : 0, ger && !(p.ha > 0))}</div>`; }).join('') : ''}</div>`;
   return `<div class="pagehead"><h1>Safra</h1><span id="atual">${txtAtual()}</span></div>
+  ${avisoBackup()}
   <div class="hero2 rise"><div class="hl"><span>Média geral da safra</span><b data-fit ${G.med ? `data-count="${G.med}" data-dec="1"` : ''}>${G.med ? n1(G.med) : '—'}</b><em>sc/ha</em>
     <div class="hsub">${G.ha ? n1(G.ha) + ' ha colhidos' : 'informe os hectares para calcular'}${umid == null ? '' : ' · umid. ' + n1(umid) + '%'}</div></div>
     <div class="hr sc"><span>Sacas</span><b data-fit data-count="${G.sc}">${n0(G.sc)}</b><small>${n0(l.length)} viagens · ${n1(G.kg / 1000)} t</small></div></div>
@@ -472,12 +488,53 @@ function viewSafra() {
   <div class="tipos3 rise">${D.tipos.map(t => `<div class="tcard3 t-${t.k}"><span>${esc(t.nome)}</span><b data-fit>${t.med ? n1(t.med) : '—'}</b><em>sc/ha</em><small>${t.sc ? n0(t.sc) + ' sc · ' + n1(t.kg / 1000) + ' t' + (t.ha ? ' · ' + n1(t.ha) + ' ha' : '') : 'sem viagens'}</small></div>`).join('')}</div>
   <div class="card rise"><h2>Por talhão<small>hectares, toneladas, sacas e média sc/ha · ${ger ? 'toque no talhão para informar os hectares' : 'do mais colhido para o menos'}</small></h2><div class="trows">${D.talhoes.length ? cab4 + D.talhoes.map(blocoT).join('') + `<div class="trow tot"><div class="tn"><b>Total da safra</b><small>média geral</small></div>${cols(G.ha, G.kg, G.sc, G.med, false)}</div>` : '<div class="empty">Nenhuma viagem lançada ainda.</div>'}</div></div>
   <div class="card rise"><h2>Por variedade<small>hectares, toneladas, sacas e média sc/ha</small></h2><div class="trows">${D.variedades.length ? cab4.replace('Talhão', 'Variedade') + D.variedades.map(v => `<div class="trow"><div class="tn"><b>${esc(v.nome)}</b><small>${esc(v.tipo)}</small></div>${cols(v.ha, v.kg, v.sc, v.med, false)}</div>`).join('') : '<div class="empty">—</div>'}</div></div>
+  ${D.destinos.length ? `<div class="card rise"><h2>Por destino<small>viagens, toneladas e sacas</small></h2>${D.destinos.map(d => `<div class="kv"><span>${esc(d.nome)}</span><b>${d.n} viag. · ${n1(d.kg / 1000)} t · ${n0(d.sc)} sc</b></div>`).join('')}</div>` : ''}
   <div class="card chart rise"><h2>Produção por dia<small>barras = sacas do dia · linha = acumulado</small></h2>${ks.length ? graficoProducao(ks.map(k => k.slice(8) + '/' + k.slice(5, 7)), ks.map(k => dias[k]), 'Produção por dia') : '<div class="empty">Sem viagens.</div>'}</div>
   <details class="mais card"><summary>Ver mais</summary>
     <h3>Umidade das viagens</h3>${comU.length ? fu.map(([k, v]) => `<div class="bar"><div class="lb">${k}</div><div class="tr"><i style="width:${v / Math.max(1, comU.length) * 100}%"></i></div><div class="vl">${v}</div></div>`).join('') : '<div class="empty">Nenhuma umidade informada.</div>'}
-    <h3>Por veículo</h3>${veic.length ? `<div class="tscroll"><table class="rs"><tr><th>Placa</th><th>Viagens</th><th>Sacas</th><th>Média</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(fmtPlaca(p))}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table></div>` : '<div class="empty">Sem dados.</div>'}</details>
-  <div class="acoes noprint">${acao('csvSafra', 'baixar', 'Baixar planilha', 'arquivo CSV')}${acao('zap', 'zap', 'Enviar resumo', 'pelo WhatsApp', 'wa')}${acao('imprimir', 'imprimir', 'Imprimir', 'ou salvar em PDF', 'am')}</div>`;
+    <h3>Por veículo</h3>${veic.length ? `<div class="tscroll"><table class="rs"><tr><th>Placa</th><th>Viagens</th><th>Sacas</th><th>Média</th></tr>${veic.map(([p, v]) => `<tr><td>${esc(fmtPlaca(p))}</td><td>${v.n}</td><td>${n0(v.sc)}</td><td>${n1(v.sc / v.n)} sc</td></tr>`).join('')}</table></div>` : '<div class="empty">Sem dados.</div>'}<div class="acoes um" style="margin-top:12px">${acao('csvSafra', 'baixar', 'Baixar CSV', 'arquivo simples')}</div></details>
+  <div class="acoes noprint">${acao('xlsxSafra', 'baixar', 'Baixar Excel', 'planilha .xlsx')}${acao('zap', 'zap', 'Enviar resumo', 'pelo WhatsApp', 'wa')}${acao('imprimir', 'imprimir', 'Imprimir', 'ou salvar em PDF', 'am')}</div>`;
 }
+/* ---------- Excel e backup ---------- */
+function planilhasSafra(completo) {
+  const D = dadosSafra(), G = D.geral, ordem = (a, b) => a.t.nome.localeCompare(b.t.nome, 'pt-BR');
+  const linhasR = []; D.talhoes.slice().sort(ordem).forEach(x => x.ps.slice().sort((a, b) => b.sc - a.sc).forEach(p => { const v = S.variedades.find(y => y.id === p.vid); linhasR.push([x.t.nome, v ? v.nome : 'Sem variedade', p.ha || null, Math.round(p.kg), p.sc, p.ha > 0 && p.sc > 0 ? p.sc / p.ha : null, v ? tipoNome(v.tipo) : '']); }));
+  linhasR.push(['TOTAL / MÉDIA GERAL', '', G.ha || null, Math.round(G.kg), G.sc, G.med || null, '']);
+  const nomeSafra = S.safra ? S.safra.nome : '';
+  const P = [
+    { nome: 'Resumo Geral', titulo: `CONTROLE SAFRA ${nomeSafra} — Fazenda Lagoa Formosa`, colunas: [{ t: 'Talhão', w: 24 }, { t: 'Variedade', w: 20 }, { t: 'Há', w: 10, tipo: 'n1' }, { t: 'Peso líquido (kg)', w: 17, tipo: 'n0' }, { t: 'Sacas', w: 12, tipo: 'n1' }, { t: 'Média (sc/ha)', w: 13, tipo: 'n2' }, { t: 'Qualidade', w: 15 }], linhas: linhasR, total: true },
+    { nome: 'Por tipo', colunas: [{ t: 'Tipo de soja', w: 18 }, { t: 'Há', w: 10, tipo: 'n1' }, { t: 'Peso líquido (kg)', w: 17, tipo: 'n0' }, { t: 'Sacas', w: 12, tipo: 'n1' }, { t: 'Média (sc/ha)', w: 13, tipo: 'n2' }], linhas: D.tipos.map(t => [t.nome, t.ha || null, Math.round(t.kg), t.sc, t.med || null]) },
+    { nome: 'Por destino', colunas: [{ t: 'Destino', w: 24 }, { t: 'Viagens', w: 10, tipo: 'n0' }, { t: 'Peso líquido (kg)', w: 17, tipo: 'n0' }, { t: 'Sacas', w: 12, tipo: 'n1' }], linhas: D.destinos.map(d => [d.nome, d.n, Math.round(d.kg), d.sc]) },
+  ];
+  const cv = (lista) => lista.slice().sort((a, b) => (a.data + (a.hora || '')).localeCompare(b.data + (b.hora || ''))).map(c => { const v = S.variedades.find(y => y.id === c.variedade_id); return [c.data, (c.hora || '').slice(0, 5), c.viagem, fmtPlaca(c.placa), nomeTal(c.talhao_id), v ? v.nome : '', v ? tipoNome(v.tipo) : '', nomeDest(c), Number(c.tara), Number(c.bruto), Number(c.liquido), Number(c.sacas), c.umidade != null ? Number(c.umidade) : null, c.status === 'ativa' ? 'Ativa' : 'Cancelada', c.motivo_cancelamento || '']; });
+  const colV = [{ t: 'Data', tipo: 'data', w: 12 }, { t: 'Hora', w: 8 }, { t: 'Viagem', tipo: 'n0', w: 9 }, { t: 'Placa', w: 11 }, { t: 'Talhão', w: 22 }, { t: 'Variedade', w: 18 }, { t: 'Tipo', w: 14 }, { t: 'Destino', w: 18 }, { t: 'Tara (kg)', tipo: 'n0', w: 11 }, { t: 'Peso bruto (kg)', tipo: 'n0', w: 14 }, { t: 'Peso líquido (kg)', tipo: 'n0', w: 16 }, { t: 'Sacas', tipo: 'n1', w: 10 }, { t: 'Umidade %', tipo: 'n1', w: 11 }, { t: 'Situação', w: 11 }, { t: 'Motivo do cancelamento', w: 28 }];
+  if (!completo) { P.push({ nome: 'Viagens', colunas: colV.slice(0, 13), linhas: cv(ativas()).map(r => r.slice(0, 13)) }); return P; }
+  P.push({ nome: 'Viagens (todas)', colunas: colV, linhas: cv(todasCargas()) });
+  P.push({ nome: 'Talhões', colunas: [{ t: 'Talhão', w: 24 }, { t: 'Área total (ha)', tipo: 'n2', w: 15 }, { t: 'Variedade padrão', w: 20 }, { t: 'Situação', w: 10 }], linhas: S.talhoes.map(t => [t.nome, Number(t.area_ha || 0), (variedadeDe(t) || {}).nome || '', t.ativo ? 'Ativo' : 'Inativo']) });
+  P.push({ nome: 'Hectares colhidos', colunas: [{ t: 'Talhão', w: 24 }, { t: 'Variedade', w: 20 }, { t: 'Hectares colhidos', tipo: 'n2', w: 17 }], linhas: S.areas.map(a => [nomeTal(a.talhao_id), (S.variedades.find(v => v.id === a.variedade_id) || {}).nome || '', Number(a.area_ha || 0)]) });
+  P.push({ nome: 'Veículos', colunas: [{ t: 'Placa', w: 12 }, { t: 'Tara padrão (kg)', tipo: 'n0', w: 16 }, { t: 'Transportadora', w: 20 }, { t: 'Motorista', w: 20 }, { t: 'Situação', w: 10 }], linhas: S.veiculos.map(v => [fmtPlaca(v.placa), v.tara_padrao ? Number(v.tara_padrao) : null, v.transportadora || '', v.motorista || '', v.ativo ? 'Ativo' : 'Inativo']) });
+  P.push({ nome: 'Destinos', colunas: [{ t: 'Destino', w: 24 }, { t: 'Situação', w: 10 }], linhas: S.destinos.map(d => [d.nome, d.ativo ? 'Ativo' : 'Inativo']) });
+  return P;
+}
+function exportarSafraXlsx() { baixarArquivo(xlsxBlob(planilhasSafra(false)), `safra-${S.safra.nome.replace('/', '-')}-${hoje()}.xlsx`); toast('Planilha Excel gerada'); }
+function baixarBackup() {
+  const nome = `backup-safra-${S.safra.nome.replace('/', '-')}-${hoje()}`;
+  baixarArquivo(xlsxBlob(planilhasSafra(true)), nome + '.xlsx');
+  const dados = { gerado_em: new Date().toISOString(), app: 'Controle de Safra - Fazenda Lagoa Formosa', safra: S.safra, talhoes: S.talhoes, variedades: S.variedades, cargas: todasCargas().map(({ _pend, ...c }) => c), areas_colhidas: S.areas, veiculos: S.veiculos, destinos: S.destinos };
+  setTimeout(() => baixarArquivo(new Blob([JSON.stringify(dados, null, 1)], { type: 'application/json' }), nome + '.json'), 600);
+  ls.set('cs_backup', { ts: Date.now(), n: ativas().length }); toast('Backup gerado: Excel e arquivo de segurança'); render();
+}
+function avisoBackup() {
+  if (!S.perfil || S.perfil.papel !== 'gerente' || !ativas().length) return '';
+  const b = ls.get('cs_backup', null), h = b ? (Date.now() - b.ts) / 3600000 : Infinity;
+  return h < 24 ? '' : `<div class="alerta noprint">${b ? 'O último backup foi há ' + (h < 48 ? Math.floor(h) + ' horas' : Math.floor(h / 24) + ' dias') + '.' : 'Ainda não foi feito backup.'} Faça o backup de hoje para não perder dados. <button type="button" class="link-sm2" data-act="backup">Baixar agora</button></div>`;
+}
+function cardBackup(ger) {
+  if (!ger) return '';
+  const b = ls.get('cs_backup', null);
+  return `<div class="card rise"><h2>Backup<small>${b ? 'último: ' + new Date(b.ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + ' · ' + b.n + ' viagens' : 'ainda não feito neste aparelho'}</small></h2><div class="hint" style="margin:0 0 10px">Baixa um Excel com tudo (viagens, talhões, hectares, veículos e destinos) e um arquivo de segurança. Guarde no computador ou no Google Drive.</div><div class="acoes um">${acao('backup', 'baixar', 'Baixar backup completo', 'Excel + arquivo de segurança', 'vd')}</div></div>`;
+}
+
 function exportarSafraCSV() {
   const D = dadosSafra(), f2 = v => Number(v).toFixed(2).replace('.', ',');
   const cab = ['Talhão', 'Variedade', 'Tipo', 'Há colhidos', 'Peso líquido kg', 'Sacas', 'Média sc/ha'];
@@ -592,6 +649,17 @@ function abrirDesconto() {
 function cardVeiculos(ger) {
   return `<div class="card"><h2>Veículos</h2><div class="list">${S.veiculos.map(v => `<button class="item" ${ger ? `data-act="editVei" data-id="${esc(v.placa)}"` : ''}><div class="n" style="font-size:11px">${esc(v.placa.slice(0, 4))}</div><div class="m"><b>${esc(v.placa)}${v.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${[v.transportadora, v.motorista].filter(Boolean).map(esc).join(' · ') || 'sem transportadora'}</small></div><div class="v">${v.tara_padrao ? n0(v.tara_padrao) + ' kg' : '—'}<small>tara padrão</small></div></button>`).join('') || '<div class="empty">Nenhum veículo cadastrado.</div>'}</div><button class="btn sec" style="margin-top:12px" data-act="novoVei">Novo veículo</button></div>`;
 }
+function cardDestinos(ger) {
+  return `<div class="card"><h2>Destinos</h2><div class="list">${S.destinos.map(d => `<button class="item" ${ger ? `data-act="editDest" data-id="${d.id}"` : ''}><div class="n" style="font-size:12px">${esc(d.nome.slice(0, 2))}</div><div class="m"><b>${esc(d.nome)}${d.ativo ? '' : '<i class="badge">inativo</i>'}</b><small>${nDestino(d.id)} viagens</small></div></button>`).join('') || '<div class="empty">Nenhum destino cadastrado.</div>'}</div>${ger ? '<button class="btn sec" style="margin-top:12px" data-act="novoDest">Novo destino</button>' : ''}</div>`;
+}
+const nDestino = id => ativas().filter(c => c.destino_id === id).length;
+function abrirDestino(id) {
+  const d = id ? S.destinos.find(x => x.id === id) : {};
+  sheet(`<h2>${id ? 'Editar destino' : 'Novo destino'}</h2><form id="fDest" data-id="${id || ''}" autocomplete="off">
+  <div class="field"><label>Nome</label><input id="dNome" required maxlength="60" value="${esc(d.nome || '')}" placeholder="ex.: Silo bolsa 2"></div>
+  ${id ? `<div class="field"><label>Situação</label><select id="dAtivo"><option value="1" ${d.ativo ? 'selected' : ''}>Ativo</option><option value="0" ${!d.ativo ? 'selected' : ''}>Inativo (some da lista de lançamento)</option></select></div>` : ''}
+  <button class="btn" type="submit">Salvar</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
+}
 function abrirVeiculo(placa) {
   const v = placa ? S.veiculos.find(x => x.placa === placa) : {};
   sheet(`<h2>${placa ? 'Editar veículo' : 'Novo veículo'}</h2><form id="fVei" data-placa="${esc(placa)}" autocomplete="off">
@@ -606,14 +674,16 @@ function viewMais() {
   const ger = S.perfil.papel === 'gerente';
   const usuarios = ger ? `<div class="card"><h2>Usuários</h2><div class="list">${S.usuarios.map(u => `<div class="item"><div class="n">${esc((u.nome || '?').slice(0, 1))}</div><div class="m"><b>${esc(u.nome)}${u.ativo ? '' : '<i class="badge">desativado</i>'}</b><small>${u.papel === 'gerente' ? 'Gerente / Patrão' : 'Balanceiro'}</small></div><div style="display:flex;gap:6px"><button class="btn sec sm" data-act="redefinir" data-id="${u.id}">Senha</button>${u.id === S.user.id ? '' : `<button class="btn sec sm" data-act="ativar" data-id="${u.id}">${u.ativo ? 'Desativar' : 'Reativar'}</button>`}</div></div>`).join('') || '<div class="empty">Carregando…</div>'}</div><button class="btn" style="margin-top:12px" data-act="novoUsuario">Novo acesso</button></div>` : '';
   const nome = S.perfil.nome || 'Usuário';
-  const botoes = [acao('trocarSenha', 'chave', 'Trocar senha', 'da sua conta'), acao('sync', 'sync', 'Sincronizar', 'enviar agora'), acao('csv', 'baixar', 'Baixar planilha', 'arquivo CSV'), instalar ? acao('instalar', 'baixar', 'Instalar app', 'na tela inicial', 'am') : ''].filter(Boolean).join('');
+  const botoes = [acao('trocarSenha', 'chave', 'Trocar senha', 'da sua conta'), acao('sync', 'sync', 'Sincronizar', 'enviar agora'), acao('xlsxSafra', 'baixar', 'Baixar Excel', 'resumo e viagens'), instalar ? acao('instalar', 'baixar', 'Instalar app', 'na tela inicial', 'am') : ''].filter(Boolean).join('');
   return `<div class="pagehead"><h1>Mais</h1></div>
   <div class="hero2 rise"><div class="avatar">${esc(nome.slice(0, 1))}</div><div class="hl"><span>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</span><b data-fit style="font-size:26px">${esc(nome)}</b><div class="hsub">${esc(S.user.email)}</div></div></div>
   <div class="tiles rise"><div class="tile"><span>A enviar</span><b data-fit>${S.fila.length}</b><em>viagens</em></div>
     <div class="tile"><span>Conexão</span><b data-fit style="font-size:20px">${S.online ? 'Online' : 'Offline'}</b><em>${S.online ? 'sincronizado' : 'salvando local'}</em></div>
     <div class="tile"><span>Safra</span><b data-fit style="font-size:20px">${S.safra ? esc(S.safra.nome) : '—'}</b><em>aberta</em></div></div>
-  <div class="acoes">${botoes}</div>
+  ${cardBackup(ger)}
+  ${avisoBackup() ? '' : ''}<div class="acoes">${botoes}</div>
   ${usuarios}
+  ${cardDestinos(ger)}
   ${cardVeiculos(ger)}
   <div class="acoes um">${acao('sair', 'sair', 'Sair da conta', 'encerrar a sessão neste aparelho', 'verm')}</div>`;
 }
@@ -648,6 +718,8 @@ document.addEventListener('click', async e => {
     }
     else if (a === 'csv') exportarCSV();
     else if (a === 'csvSafra') exportarSafraCSV();
+    else if (a === 'xlsxSafra') exportarSafraXlsx();
+    else if (a === 'backup') baixarBackup();
     else if (a === 'zapCarga') compartilhaViagem(el.dataset.id);
     else if (a === 'reusarNumero') { S.viagemForcada = parseInt(el.dataset.n, 10); fechar(); S.tab = 'lancar'; render(); toast('A próxima viagem será a ' + S.viagemForcada); }
     else if (a === 'reabrirDia') {
@@ -668,6 +740,8 @@ document.addEventListener('click', async e => {
       window.open('https://wa.me/?text=' + encodeURIComponent(textoDia(r)), '_blank');
     }
     else if (a === 'descontoCfg') abrirDesconto();
+    else if (a === 'novoDest') abrirDestino('');
+    else if (a === 'editDest') abrirDestino(el.dataset.id);
     else if (a === 'novoVei') abrirVeiculo('');
     else if (a === 'editVei') abrirVeiculo(el.dataset.id);
     else if (a === 'imprimir') window.print();
@@ -729,6 +803,14 @@ document.addEventListener('submit', async e => {
     if (error) return toast(traduz(error), true);
     S.params = row; fechar(); render(); toast('Parâmetros salvos');
   }
+  if (e.target.id === 'fDest') {
+    e.preventDefault(); const id = e.target.dataset.id, nome = $('#dNome').value.trim();
+    if (nome.length < 2) return toast('Informe o nome do destino.', true);
+    const row = { nome }; if (id) row.ativo = $('#dAtivo').value === '1'; else row.ordem = (S.destinos.reduce((a, d) => Math.max(a, d.ordem || 0), 0) || 0) + 1;
+    const { error } = id ? await sb.from('cs_destinos').update(row).eq('id', id) : await sb.from('cs_destinos').insert(row);
+    if (error) return toast(error.code === '23505' ? 'Já existe um destino com esse nome.' : traduz(error), true);
+    fechar(); await carregar(); render(); toast('Destino salvo');
+  }
   if (e.target.id === 'fVei') {
     e.preventDefault(); const nova = !e.target.dataset.placa, placa = normPlaca($('#vPlaca').value), tara = parseInt($('#vTara').value.replace(/\D/g, ''), 10);
     if (placa.length < 3) return toast('Informe a placa.', true);
@@ -779,12 +861,12 @@ async function iniciar() {
     const novo = session ? session.user : null;
     if (novo && (!S.user || S.user.id !== novo.id)) { S.user = novo; await carregarPerfil(); await carregar(); render(); enviarFila(); }
     else if (!novo && S.user) {
-      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.variedades = []; S.usuarios = []; S.params = null; S.veiculos = []; S.fech = []; S.areas = []; S.safra = null;
+      S.user = null; S.perfil = null; S.cargas = []; S.talhoes = []; S.variedades = []; S.usuarios = []; S.params = null; S.veiculos = []; S.fech = []; S.areas = []; S.destinos = []; S.safra = null;
       try { localStorage.removeItem('cs_cache'); localStorage.removeItem('cs_perfil'); } catch { } /* aparelho compartilhado: não deixa dados da conta */
       render();
     }
   });
-  if (S.user) { S.perfil = ls.get('cs_perfil', null); const c = ls.get('cs_cache', null); if (c) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; S.params = c.params || null; S.veiculos = c.veiculos || []; S.areas = c.areas || []; } render(); await carregarPerfil(); await carregar(); render(); enviarFila(); }
+  if (S.user) { S.perfil = ls.get('cs_perfil', null); const c = ls.get('cs_cache', null); if (c) { S.safra = c.safra; S.talhoes = c.talhoes; S.cargas = c.cargas; S.variedades = c.variedades || []; S.params = c.params || null; S.veiculos = c.veiculos || []; S.areas = c.areas || []; S.destinos = c.destinos || []; } render(); await carregarPerfil(); await carregar(); render(); enviarFila(); }
   else render();
 }
 iniciar();
