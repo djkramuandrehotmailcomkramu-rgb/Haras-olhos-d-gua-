@@ -290,3 +290,25 @@ button.trow:hover{background:rgba(70,105,125,.06)}button.trow:active{transform:s
 .pend{display:inline-block;font-size:10px;font-weight:800;color:#8a5a00;background:#FFF3C7;border:1px solid #F1D77A;border-radius:99px;padding:4px 8px;line-height:1.1}
 .traco{color:var(--tx2);font-weight:800}
 @media (max-width:350px){.tcard3 b{font-size:21px}.trow{grid-template-columns:minmax(0,1fr) auto 64px;gap:6px}}
+
+/* lista por talhão/variedade em colunas: Há | Ton | Sacas | Média */
+.trow{grid-template-columns:minmax(0,1fr) 38px 40px 50px 54px;gap:4px;padding:10px 4px;align-items:center}
+.trow .c{text-align:right;font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap}
+.trow .c.sc{font-weight:800;font-size:14px;color:var(--verde-esc)}.trow .c.m{text-align:right}
+.trow.cab{padding:2px 4px 8px;border-bottom:2px solid var(--azul-esc)}.trow.cab span{font-size:9.5px;font-weight:800;letter-spacing:.05em;color:var(--tx2);text-transform:uppercase}
+.trow.cab+.tbloco .trow{border-top:0}
+.tbloco{display:block;width:100%;border-top:1px solid var(--line);border-radius:12px;transition:background .15s}
+.tbloco:first-of-type{border-top:0}
+.tbloco[data-hec]{cursor:pointer}.tbloco[data-hec]:hover{background:rgba(70,105,125,.05)}.tbloco[data-hec]:active{background:rgba(70,105,125,.1)}
+.tbloco .trow{border-top:0}
+.trow.sub{padding:7px 4px 7px 14px;background:rgba(70,105,125,.05)}.trow.sub .tn b{font-size:12.5px;font-weight:700}.trow.sub .c{font-weight:600}.trow.sub .c.sc{font-size:12.5px}
+.trow.sub+.trow.sub{border-top:1px dashed var(--line)}
+.trow.tot{border-top:2px solid var(--azul-esc);background:var(--azul-bg);border-radius:12px;margin-top:6px}
+.trow .tn b{font-size:14px}
+.trow .chip{font-size:12px;padding:2px 7px}
+.trow .pend{font-size:9px;padding:3px 5px}
+@media (max-width:350px){.trow{grid-template-columns:minmax(0,1fr) 34px 36px 44px 48px}.trow .c{font-size:11px}}
+.trow .tn b,.trow .tn small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15;word-break:break-word}
+.trow .tn b{font-size:13px}.trow.sub .tn b{font-size:12px}
+.trow .tn small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}
+.trow .tn b{word-break:normal;overflow-wrap:anywhere}
