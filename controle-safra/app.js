@@ -259,6 +259,7 @@ function viewLancar() {
   <div class="tiles mini rise"><div class="tile"><span>Hoje</span><b data-fit>${hojeL.length}</b><em>viagens</em></div>
     <div class="tile"><span>Sacas hoje</span><b data-fit>${n0(soma(hojeL, 'sacas'))}</b><em>sc</em></div>
     <div class="tile"><span>Próxima</span><b data-fit>${proxViagem()}</b><em>nº da viagem</em></div></div>
+  ${balCardHtml()}
   <form id="fCarga" class="card rise" autocomplete="off">
     <div class="viagem"><label>Viagem nº</label><input id="cViagem" inputmode="numeric" pattern="[0-9]*" value="${proxViagem()}" required></div>
     <div class="field"><label>Talhão</label><select id="cTal" required><option value="">Selecione o talhão…</option>${tal.map(t => `<option value="${t.id}" ${S.lt.tal === t.id ? 'selected' : ''}>${esc(t.nome)}${variedadeDe(t) ? ' · ' + esc(variedadeDe(t).nome) : ''}</option>`).join('')}</select></div>
@@ -351,6 +352,7 @@ function bindLancar() {
     g('cPlaca') && document.getElementById('cPlaca').focus();
     enviarFila();
   });
+  balBind();
   calc();
 }
 
@@ -788,3 +790,4 @@ async function iniciar() {
   else render();
 }
 iniciar();
+balAuto();

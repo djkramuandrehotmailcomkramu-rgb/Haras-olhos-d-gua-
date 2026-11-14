@@ -312,3 +312,22 @@ button.trow:hover{background:rgba(70,105,125,.06)}button.trow:active{transform:s
 .trow .tn b{font-size:13px}.trow.sub .tn b{font-size:12px}
 .trow .tn small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}
 .trow .tn b{word-break:normal;overflow-wrap:anywhere}
+
+/* ===== balança ao vivo ===== */
+.card.bal{background:linear-gradient(135deg,#2F4A3A,var(--verde-esc));color:#fff;border:0;padding:16px 16px 12px;box-shadow:var(--sombra)}
+.bal-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.bal-t span{display:block;font-size:11px;font-weight:800;letter-spacing:.05em;opacity:.9}
+.bal-t b{display:inline-block;font-size:50px;line-height:1.05;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.bal-t em{font-style:normal;font-size:14px;font-weight:700;color:var(--amarelo);margin-left:6px}
+.bal-selo{flex:none;padding:7px 11px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap;background:rgba(255,255,255,.2)}
+.bal-selo.ok{background:#7CFC9A;color:#06361a}.bal-selo.pesa{background:var(--amarelo);color:var(--tx)}.bal-selo.vazio{background:rgba(255,255,255,.28)}.bal-selo.desc{background:rgba(0,0,0,.25)}
+.bal-msg{font-size:12px;font-weight:700;color:#FFE08A;margin:4px 0 0;min-height:0}.bal-msg:empty{display:none}
+.card.bal .acoes{margin:12px 0 8px}
+.card.bal .btn-acao:disabled{opacity:.45;filter:grayscale(.4)}
+.card.bal .btn-acao.pronto{box-shadow:0 0 0 3px rgba(124,252,154,.7)}
+.bal-rod{display:flex;justify-content:space-between;gap:10px}
+.link-sm{color:#fff;opacity:.9;font-size:12px;font-weight:700;text-decoration:underline;padding:4px 2px}
+.bal-dica{font-size:13px;color:var(--tx2);text-align:center}
+input.da-balanca{border-color:#1FB855!important;box-shadow:0 0 0 3px rgba(31,184,85,.35)!important;transition:box-shadow .3s}
+pre.bal-raw{background:#1f2d25;color:#B6F0C8;border-radius:12px;padding:10px;font-size:11px;line-height:1.5;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;text-transform:none}
+@media (max-width:350px){.bal-t b{font-size:40px}}
