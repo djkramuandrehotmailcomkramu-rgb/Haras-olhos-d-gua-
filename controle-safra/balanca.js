@@ -58,6 +58,7 @@ async function balConectar(pedir) {
     if (pedir) port = await navigator.serial.requestPort();
     else { const ps = await navigator.serial.getPorts(); port = ps[0]; }
     if (!port) return;
+    try { const i = port.getInfo ? port.getInfo() : {}; BAL.info = i.usbVendorId ? 'USB fabricante ' + i.usbVendorId.toString(16).padStart(4, '0') + ' · produto ' + (i.usbProductId || 0).toString(16).padStart(4, '0') : 'porta sem identificação USB'; } catch { }
     const cfg = balCfg(), lista = [cfg.baud, ...BAL_VELOCIDADES].filter((v, k, a) => a.indexOf(v) === k);
     BAL.port = port; BAL.ativo = true; BAL.parar = false;
     for (const baud of lista) {
@@ -179,6 +180,7 @@ function balAjustes() {
     <h3 style="margin:18px 0 6px">O que a balança está enviando</h3>
     <div class="hint" style="margin:0 0 6px">Se o peso não aparecer, copie estas linhas e envie para o suporte.</div>
     <pre class="bal-raw" id="balRaw">${BAL.raw.length ? BAL.raw.map(q => esc(q.replace(/[\x00-\x1f]/g, '·')) + '   [' + hex(q) + ']').join('\n') : 'Nada recebido ainda. Conecte a balança e coloque peso.'}</pre>
+    <div class="hint">Porta: ${esc(BAL.info || 'ainda não conectada')}</div>
     <div class="hint">Erros de leitura: ${BAL.errosSerial || 0}${BAL.ultimoErro ? ' · último: ' + esc(BAL.ultimoErro) : ''}</div>
     <button class="btn sec" style="margin-top:10px" type="button" id="balCopia">Copiar amostra</button>
     <button class="btn sec" style="margin-top:10px" data-act="fechar" type="button">Fechar</button>`);
