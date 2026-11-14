@@ -63,6 +63,7 @@ async function balConectar(pedir) {
     for (const baud of lista) {
       if (BAL.parar) break;
       BAL.tentando = baud; balAtualiza(true);
+      if (port.readable) { try { await port.close(); } catch { } }
       try { await port.open({ baudRate: Number(baud), dataBits: Number(cfg.dados), stopBits: Number(cfg.stop), parity: cfg.paridade }); }
       catch (e) {
         if (/in use|busy|already|access denied|failed to open/i.test(String(e && e.message))) throw e;
@@ -80,7 +81,8 @@ async function balConectar(pedir) {
   } catch (e) {
     BAL.ativo = false; BAL.tentando = 0;
     if (e && e.name === 'NotFoundError') { BAL.conectando = false; balAtualiza(true); return; }   // fechou a janela de escolha
-    BAL.erro = /in use|busy|already|access denied|failed to open/i.test(String(e && e.message)) ? 'A porta está em uso por outro programa. Feche o outro sistema que lê a balança.' : 'Não foi possível abrir a porta: ' + (e && e.message ? e.message : e);
+    BAL.ultimoErro = (e && e.name ? e.name : 'Erro') + ': ' + (e && e.message ? e.message : e);
+    BAL.erro = /in use|busy|already|access denied|failed to open/i.test(String(e && e.message)) ? 'Não consegui abrir a porta: ela já está aberta em outro lugar. Feche outras abas ou janelas do app e qualquer programa de balança, tire e recoloque o cabo USB e tente de novo.' : 'Não foi possível abrir a porta: ' + (e && e.message ? e.message : e);
   }
   BAL.conectando = false; balAtualiza(true);
 }
@@ -191,3 +193,4 @@ function balAjustes() {
 }
 if (typeof document !== 'undefined') setInterval(() => { if (document.getElementById('balPeso')) balAtualiza(); }, 1000);
 if (typeof module !== 'undefined') module.exports = { balParse };
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { BAL.parar = true; BAL.ativo = false; try { if (BAL.reader) BAL.reader.cancel(); } catch { } try { if (BAL.port) BAL.port.close(); } catch { } });
