@@ -48,44 +48,63 @@ function balProcessa(texto) {
     for (const f of quadros) { const p = balParse(f); if (p !== null) balLeitura(p); }
   }
 }
+const BAL_VELOCIDADES = [9600, 19200, 4800, 2400, 38400, 1200, 57600, 115200];
+const balEspera = ms => new Promise(r => setTimeout(r, ms));
 async function balConectar(pedir) {
-  if (!balSuportada()) return;
-  const cfg = balCfg(); BAL.erro = '';
+  if (!balSuportada() || BAL.conectando) return;
+  BAL.conectando = true; BAL.erro = ''; BAL.errosSerial = 0; BAL.ultimoErro = '';
   try {
     let port;
     if (pedir) port = await navigator.serial.requestPort();
     else { const ps = await navigator.serial.getPorts(); port = ps[0]; }
     if (!port) return;
-    await port.open({ baudRate: Number(cfg.baud), dataBits: Number(cfg.dados), stopBits: Number(cfg.stop), parity: cfg.paridade });
-    BAL.port = port; BAL.ativo = true; BAL.janela = []; BAL.peso = null; BAL.estavel = false; BAL.buf = '';
-    balAtualiza(true);
-    balLoop(port);
+    const cfg = balCfg(), lista = [cfg.baud, ...BAL_VELOCIDADES].filter((v, k, a) => a.indexOf(v) === k);
+    BAL.port = port; BAL.ativo = true; BAL.parar = false;
+    for (const baud of lista) {
+      if (BAL.parar) break;
+      BAL.tentando = baud; balAtualiza(true);
+      try { await port.open({ baudRate: Number(baud), dataBits: Number(cfg.dados), stopBits: Number(cfg.stop), parity: cfg.paridade }); }
+      catch (e) {
+        if (/in use|busy|already|access denied|failed to open/i.test(String(e && e.message))) throw e;
+        continue;
+      }
+      BAL.janela = []; BAL.peso = null; BAL.estavel = false; BAL.buf = ''; BAL.errosSerial = 0;
+      BAL.loop = balLoop(port);
+      const t0 = Date.now();
+      while (!BAL.parar && BAL.peso === null && Date.now() - t0 < 3500 && BAL.errosSerial < 40) await balEspera(100);
+      if (BAL.peso !== null) { BAL.tentando = 0; balSalvaCfg({ ...cfg, baud }); balAtualiza(true); BAL.conectando = false; return; }   // achou: segue lendo
+      BAL.parar = true; try { if (BAL.reader) await BAL.reader.cancel(); } catch { } await BAL.loop; BAL.parar = false;
+    }
+    BAL.tentando = 0;
+    if (BAL.ativo && BAL.peso === null) { BAL.ativo = false; BAL.erro = 'Não chegou nenhum peso. Confira se o visor está enviando o peso (saída contínua) e veja "Ajustes e diagnóstico".'; }
   } catch (e) {
-    BAL.ativo = false;
-    if (e && e.name === 'NotFoundError') return;                                // usuário fechou a janela de escolha
+    BAL.ativo = false; BAL.tentando = 0;
+    if (e && e.name === 'NotFoundError') { BAL.conectando = false; balAtualiza(true); return; }   // fechou a janela de escolha
     BAL.erro = /in use|busy|already|access denied|failed to open/i.test(String(e && e.message)) ? 'A porta está em uso por outro programa. Feche o outro sistema que lê a balança.' : 'Não foi possível abrir a porta: ' + (e && e.message ? e.message : e);
-    balAtualiza(true);
   }
+  BAL.conectando = false; balAtualiza(true);
 }
 async function balLoop(port) {
   const dec = new TextDecoder('latin1');
-  try {
-    while (port.readable && BAL.ativo) {
-      BAL.reader = port.readable.getReader();
-      try {
-        for (;;) { const { value, done } = await BAL.reader.read(); if (done) break; if (value) balProcessa(dec.decode(value, { stream: true })); }
-      } finally { BAL.reader.releaseLock(); }
-    }
-  } catch (e) { if (BAL.ativo) BAL.erro = 'Conexão com a balança interrompida.'; }
-  BAL.ativo = false; BAL.estavel = false;
+  while (port.readable && BAL.ativo && !BAL.parar) {
+    BAL.reader = port.readable.getReader();
+    try {
+      for (;;) { const { value, done } = await BAL.reader.read(); if (done) break; if (value) balProcessa(dec.decode(value, { stream: true })); }
+    } catch (e) {                                                                // erro de leitura (ex.: velocidade errada): segue tentando
+      BAL.errosSerial = (BAL.errosSerial || 0) + 1; BAL.ultimoErro = (e && e.name ? e.name : 'Erro') + ': ' + (e && e.message ? e.message : '');
+      await balEspera(30);
+    } finally { try { BAL.reader.releaseLock(); } catch { } }
+    if (BAL.errosSerial > 400 && BAL.peso === null) break;
+  }
+  const caiu = BAL.ativo && !BAL.parar && BAL.peso !== null;
   try { await port.close(); } catch { }
-  balAtualiza(true);
+  if (!BAL.parar) { BAL.ativo = false; BAL.estavel = false; if (caiu) BAL.erro = 'A conexão com a balança foi interrompida. Toque em Conectar balança de novo.'; balAtualiza(true); }
 }
 async function balDesconectar() {
-  BAL.ativo = false;
+  BAL.parar = true; BAL.ativo = false;
   try { if (BAL.reader) await BAL.reader.cancel(); } catch { }
-  try { if (BAL.port) await BAL.port.close(); } catch { }
-  BAL.peso = null; BAL.estavel = false; balAtualiza(true);
+  try { if (BAL.loop) await BAL.loop; } catch { }
+  BAL.parar = false; BAL.peso = null; BAL.estavel = false; BAL.tentando = 0; balAtualiza(true);
 }
 async function balAuto() {                                                       // reconecta sozinho na porta já autorizada
   if (!balSuportada()) return;
@@ -124,7 +143,7 @@ function balAtualiza(tudo) {
   document.getElementById('balBruto').disabled = !ok; document.getElementById('balTara').disabled = !ok;
   document.getElementById('balBruto').classList.toggle('pronto', cl === 'ok');
   const con = document.getElementById('balCon'); con.textContent = BAL.ativo ? 'Desconectar' : 'Conectar balança';
-  document.getElementById('balMsg').textContent = BAL.erro || '';
+  document.getElementById('balMsg').textContent = BAL.erro || (BAL.tentando ? 'Procurando a velocidade da balança (' + BAL.tentando + ')…' : '');
   document.getElementById('balCard').classList.toggle('ligada', BAL.ativo);
   if (tudo) { const c = document.getElementById('balCard'); c.dataset.t = Date.now(); }
 }
@@ -158,6 +177,7 @@ function balAjustes() {
     <h3 style="margin:18px 0 6px">O que a balança está enviando</h3>
     <div class="hint" style="margin:0 0 6px">Se o peso não aparecer, copie estas linhas e envie para o suporte.</div>
     <pre class="bal-raw" id="balRaw">${BAL.raw.length ? BAL.raw.map(q => esc(q.replace(/[\x00-\x1f]/g, '·')) + '   [' + hex(q) + ']').join('\n') : 'Nada recebido ainda. Conecte a balança e coloque peso.'}</pre>
+    <div class="hint">Erros de leitura: ${BAL.errosSerial || 0}${BAL.ultimoErro ? ' · último: ' + esc(BAL.ultimoErro) : ''}</div>
     <button class="btn sec" style="margin-top:10px" type="button" id="balCopia">Copiar amostra</button>
     <button class="btn sec" style="margin-top:10px" data-act="fechar" type="button">Fechar</button>`);
   const f = document.getElementById('fBal');
