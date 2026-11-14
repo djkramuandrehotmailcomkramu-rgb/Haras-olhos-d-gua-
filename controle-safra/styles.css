@@ -312,3 +312,7 @@ button.trow:hover{background:rgba(70,105,125,.06)}button.trow:active{transform:s
 .trow .tn b{font-size:13px}.trow.sub .tn b{font-size:12px}
 .trow .tn small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}
 .trow .tn b{word-break:normal;overflow-wrap:anywhere}
+
+.tipos.dest{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+
+.link-sm2{color:#6B4E00;font-weight:800;text-decoration:underline;font-size:13px;padding:2px 4px;margin-left:4px}
