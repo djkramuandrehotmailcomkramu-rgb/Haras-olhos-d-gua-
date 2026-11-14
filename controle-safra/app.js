@@ -623,7 +623,7 @@ function abrirUsuario() {
   <div class="field"><label>Nome</label><input id="uNome" required></div>
   <div class="field"><label>E-mail (usado para entrar)</label><input id="uEmail" type="email" inputmode="email" autocapitalize="off" required></div>
   <div class="field"><label>Senha inicial</label><input id="uSenha" type="text" minlength="6" required><div class="hint">Mínimo 6 caracteres. Passe para a pessoa; ela pode trocar depois em Mais.</div></div>
-  <div class="field"><label>Função</label><select id="uPapel"><option value="balanceiro">Balanceiro (lança cargas)</option><option value="gerente">Gerente / Patrão (tudo)</option></select></div>
+  <div class="field"><label>Função</label><select id="uPapel"><option value="balanceiro">Balanceiro (lança cargas)</option><option value="gerente">Administrador (tudo)</option></select></div>
   <button class="btn" type="submit">Criar acesso</button></form><button class="btn sec" style="margin-top:10px" data-act="fechar">Cancelar</button>`);
 }
 function abrirRedef(id) {
@@ -672,11 +672,11 @@ function abrirVeiculo(placa) {
 }
 function viewMais() {
   const ger = S.perfil.papel === 'gerente';
-  const usuarios = ger ? `<div class="card"><h2>Usuários</h2><div class="list">${S.usuarios.map(u => `<div class="item"><div class="n">${esc((u.nome || '?').slice(0, 1))}</div><div class="m"><b>${esc(u.nome)}${u.ativo ? '' : '<i class="badge">desativado</i>'}</b><small>${u.papel === 'gerente' ? 'Gerente / Patrão' : 'Balanceiro'}</small></div><div style="display:flex;gap:6px"><button class="btn sec sm" data-act="redefinir" data-id="${u.id}">Senha</button>${u.id === S.user.id ? '' : `<button class="btn sec sm" data-act="ativar" data-id="${u.id}">${u.ativo ? 'Desativar' : 'Reativar'}</button>`}</div></div>`).join('') || '<div class="empty">Carregando…</div>'}</div><button class="btn" style="margin-top:12px" data-act="novoUsuario">Novo acesso</button></div>` : '';
+  const usuarios = ger ? `<div class="card"><h2>Usuários</h2><div class="list">${S.usuarios.map(u => `<div class="item"><div class="n">${esc((u.nome || '?').slice(0, 1))}</div><div class="m"><b>${esc(u.nome)}${u.ativo ? '' : '<i class="badge">desativado</i>'}</b><small>${u.papel === 'gerente' ? 'Administrador' : 'Balanceiro'}</small></div><div style="display:flex;gap:6px"><button class="btn sec sm" data-act="redefinir" data-id="${u.id}">Senha</button>${u.id === S.user.id ? '' : `<button class="btn sec sm" data-act="ativar" data-id="${u.id}">${u.ativo ? 'Desativar' : 'Reativar'}</button>`}</div></div>`).join('') || '<div class="empty">Carregando…</div>'}</div><button class="btn" style="margin-top:12px" data-act="novoUsuario">Novo acesso</button></div>` : '';
   const nome = S.perfil.nome || 'Usuário';
   const botoes = [acao('trocarSenha', 'chave', 'Trocar senha', 'da sua conta'), acao('sync', 'sync', 'Sincronizar', 'enviar agora'), acao('xlsxSafra', 'baixar', 'Baixar Excel', 'resumo e viagens'), instalar ? acao('instalar', 'baixar', 'Instalar app', 'na tela inicial', 'am') : ''].filter(Boolean).join('');
   return `<div class="pagehead"><h1>Mais</h1></div>
-  <div class="hero2 rise"><div class="avatar">${esc(nome.slice(0, 1))}</div><div class="hl"><span>${ger ? 'Gerente / Patrão' : 'Balanceiro'}</span><b data-fit style="font-size:26px">${esc(nome)}</b><div class="hsub">${esc(S.user.email)}</div></div></div>
+  <div class="hero2 rise"><div class="avatar">${esc(nome.slice(0, 1))}</div><div class="hl"><span>${ger ? 'Administrador' : 'Balanceiro'}</span><b data-fit style="font-size:26px">${esc(nome)}</b><div class="hsub">${esc(S.user.email)}</div></div></div>
   <div class="tiles rise"><div class="tile"><span>A enviar</span><b data-fit>${S.fila.length}</b><em>viagens</em></div>
     <div class="tile"><span>Conexão</span><b data-fit style="font-size:20px">${S.online ? 'Online' : 'Offline'}</b><em>${S.online ? 'sincronizado' : 'salvando local'}</em></div>
     <div class="tile"><span>Safra</span><b data-fit style="font-size:20px">${S.safra ? esc(S.safra.nome) : '—'}</b><em>aberta</em></div></div>
