@@ -7,7 +7,8 @@ Método: gerei massas de teste (1.200, 1.500 e 3.000 viagens, com dados aleatór
 | 1 | Peso líquido = bruto − tara (todas as linhas) | OK |
 | 2 | Sacas = líquido ÷ 60 | OK |
 | 3 | Acumulado linha a linha | OK |
-| 4 | Data digitada em 8 dígitos, 6 dígitos ou data normal vira a data correta | OK |
+| 4 | Data digitada em 8 dígitos, 6 dígitos ou data normal vira a data correta; data inexistente é sinalizada | OK |
+| 4b | Limites do Excel: validações ≤ 255 caracteres, textos em fórmula ≤ 255, parênteses balanceados em todas as fórmulas | OK (corrigido) |
 | 5 | Motorista automático pela placa (com/sem traço, ponto, espaço, maiúscula/minúscula) | OK |
 | 6 | Coluna CONFERIR: tara vazia, bruto < tara, placa vazia, viagem repetida, talhão vazio, placa não cadastrada, talhão fora do RESUMO, tara diferente da padrão, peso fora de 5–55 t, umidade > 18 e < 8 | OK (ordem de prioridade conferida) |
 | 7 | KPIs do topo da ENTRADA (viagens, t, sacas, média geral) | OK |
@@ -24,6 +25,8 @@ Método: gerei massas de teste (1.200, 1.500 e 3.000 viagens, com dados aleatór
 | 18 | Proteção: só células de digitação liberadas; fórmulas travadas (sem senha) | OK |
 
 ## Correções feitas nesta revisão
+- **Erro ao abrir no Excel ("Registros removidos: Fórmula de parte de sheet1.xml")**: a regra de validação da coluna DATA tinha 277 caracteres e o Excel aceita no máximo 255. Regra reescrita (196 caracteres). Conferi também que nenhuma fórmula, validação ou texto passa dos limites do Excel e que todos os parênteses estão balanceados.
+- Data inexistente (ex.: 31/02) agora é sinalizada em CONFERIR ("Informe a data (ou data inválida)") e a linha vazia de data também.
 - Mensagens com `TEXT(...,"#,##0")` (erradas no Excel em português) → `FIXED`.
 - Data de 4 dígitos (`1411`) removida: usava o ano atual e mudava sozinha ao abrir a planilha em outro ano.
 - `MINIFS/MAXIFS` removidos (davam #NOME? em Excel antigo); DIAS agora conta os dias realmente trabalhados.
