@@ -2,7 +2,7 @@
   "expo": {
     "name": "GPSThomas",
     "slug": "gpsthomas",
-    "version": "1.0.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -30,7 +30,7 @@
       "name": "GPSThomas",
       "shortName": "GPSThomas",
       "themeColor": "#1F7A3E",
-      "backgroundColor": "#F1F4EF"
+      "backgroundColor": "#0F4A27"
     },
     "scheme": "gpsthomas",
     "plugins": [

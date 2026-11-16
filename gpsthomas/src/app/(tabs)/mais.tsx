@@ -7,6 +7,7 @@ import { Cartao } from '../../components/Cartao';
 import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
+import { useToast } from '../../store/toast';
 import { ROTULO_AREA, type UnidadeArea } from '../../geo/unidades';
 import { lerArquivo, paraCSV, paraGeoJSON, paraGPX, paraKML } from '../../io/formatos';
 import { entregarArquivo, escolherArquivo } from '../../io/arquivos';
@@ -24,14 +25,21 @@ export default function MaisTela() {
   const { unidadeArea, definirUnidadeArea } = usePrefs();
   const { talhoes, medicoes, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
   const [msg, setMsg] = useState<string | null>(null);
+  const [importando, setImportando] = useState(false);
+  const mostrar = useToast((s) => s.mostrar);
 
   const importar = async () => {
+    setImportando(true);
     const f = await escolherArquivo();
+    setImportando(false);
     if (!f) return;
     const r = lerArquivo(f.texto);
     r.poligonos.forEach((p) => adicionarTalhao({ nome: p.nome, fazenda: 'Importado', cultura: 'Soja', safra: '2026/27', contorno: p.pontos }));
     r.linhas.forEach((l) => adicionarMedicao({ tipo: 'linha', nome: l.nome, pontos: l.pontos, origem: 'importado' }));
-    setMsg(r.poligonos.length + r.linhas.length === 0 ? 'Nenhuma área ou linha encontrada. Use GeoJSON, KML ou GPX.' : `Importado de ${f.nome}: ${r.poligonos.length} talhões e ${r.linhas.length} linhas.`);
+    const vazio0 = r.poligonos.length + r.linhas.length === 0;
+    const m = vazio0 ? 'Nenhuma área ou linha encontrada. Use GeoJSON, KML ou GPX.' : `Importado: ${r.poligonos.length} talhões e ${r.linhas.length} linhas`;
+    setMsg(m);
+    mostrar(m, vazio0 ? 'erro' : 'ok');
   };
 
   const exportar = (ext: 'geojson' | 'kml' | 'gpx' | 'csv') => {
@@ -40,6 +48,7 @@ export default function MaisTela() {
     if (ext === 'kml') entregarArquivo(nome, paraKML(talhoes, medicoes), 'application/vnd.google-earth.kml+xml');
     if (ext === 'gpx') entregarArquivo(nome, paraGPX(talhoes, medicoes), 'application/gpx+xml');
     if (ext === 'csv') entregarArquivo(nome, paraCSV(talhoes), 'text/csv');
+    mostrar('Arquivo exportado', 'ok');
   };
 
   const vazio = talhoes.length + medicoes.length === 0;
@@ -49,14 +58,13 @@ export default function MaisTela() {
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>ARQUIVOS</Text>
       <Cartao style={{ gap: 12 }}>
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Traga áreas do Google Earth, QGIS ou do monitor da máquina e leve suas medições para eles.</Text>
-        <Botao titulo="Importar KML / GeoJSON / GPX" variante="suave" icone={<Ionicons name="download-outline" size={19} color={t.primaria} />} onPress={importar} />
+        <Botao titulo="Importar KML / GeoJSON / GPX" variante="suave" carregando={importando} icone={<Ionicons name="download-outline" size={19} color={t.primaria} />} onPress={importar} />
         <Text style={[tipo.legenda, { color: t.textoSuave }]}>EXPORTAR TUDO ({talhoes.length} talhões · {medicoes.length} medições)</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {(['kml', 'geojson', 'gpx', 'csv'] as const).map((e) => (
             <Botao key={e} titulo={e.toUpperCase()} variante="suave" desabilitado={vazio} onPress={() => exportar(e)} />
           ))}
         </View>
-        {msg && <Text style={[tipo.corpo, { color: t.primaria }]}>{msg}</Text>}
       </Cartao>
 
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>UNIDADE DE ÁREA</Text>
@@ -81,7 +89,8 @@ export default function MaisTela() {
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Tudo fica salvo neste aparelho. Exporte um arquivo para fazer backup.</Text>
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
-      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center', marginTop: 4 }]}>GPSThomas · versão 0.2</Text>
+      <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa © colaboradores do OpenStreetMap</Text>
+      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.3</Text>
     </Tela>
   );
 }

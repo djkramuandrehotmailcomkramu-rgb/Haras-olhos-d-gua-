@@ -32,6 +32,8 @@ function centro(pts: Coord[]): Coord {
   return [pts.reduce((s, c) => s + c[0], 0) / n, pts.reduce((s, c) => s + c[1], 0) / n];
 }
 
+const CSS = '.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
   const P = useRef(props);
@@ -42,6 +44,9 @@ export function MapaInterativo(props: PropsMapa) {
 
   useEffect(() => {
     if (!el.current) return;
+    const st = document.createElement('style');
+    st.textContent = CSS;
+    document.head.appendChild(st);
     const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true } as L.MapOptions).setView([-15.78, -47.93], 4);
     m.attributionControl.setPrefix(false);
     grupos.current = {
@@ -56,6 +61,7 @@ export function MapaInterativo(props: PropsMapa) {
     ro.observe(el.current);
     return () => {
       ro.disconnect();
+      st.remove();
       m.remove();
       mapa.current = null;
     };

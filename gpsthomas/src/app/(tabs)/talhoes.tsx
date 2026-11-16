@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Tela } from '../../components/Tela';
 import { Cartao } from '../../components/Cartao';
+import { Ilustracao } from '../../components/Ilustracao';
 import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
 import { areaM2 } from '../../geo/medidas';
@@ -42,7 +43,7 @@ export default function TalhoesTela() {
 
       {talhoes.length === 0 && (
         <Cartao style={{ alignItems: 'center', gap: 10, paddingVertical: 36 }}>
-          <Ionicons name="leaf-outline" size={44} color={t.primaria} />
+          <Ilustracao tamanho={150} />
           <Text style={[tipo.subtitulo, { color: t.texto }]}>Nenhum talhão ainda</Text>
           <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>Meça uma área no mapa e salve como talhão, ou importe um arquivo KML/GeoJSON em Mais.</Text>
           <View style={{ marginTop: 8 }}><Botao titulo="Medir no mapa" onPress={() => router.navigate('/')} /></View>

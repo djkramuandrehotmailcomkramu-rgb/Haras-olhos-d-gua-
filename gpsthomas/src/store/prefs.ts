@@ -7,6 +7,8 @@ export type Camada = 'satelite' | 'mapa';
 type Prefs = {
   unidadeArea: UnidadeArea;
   camada: Camada;
+  onboardingVisto: boolean;
+  concluirOnboarding: () => void;
   definirUnidadeArea: (u: UnidadeArea) => void;
   definirCamada: (c: Camada) => void;
 };
@@ -16,6 +18,8 @@ export const usePrefs = create<Prefs>()(
     (set) => ({
       unidadeArea: 'ha',
       camada: 'satelite',
+      onboardingVisto: false,
+      concluirOnboarding: () => set({ onboardingVisto: true }),
       definirUnidadeArea: (unidadeArea) => set({ unidadeArea }),
       definirCamada: (camada) => set({ camada }),
     }),

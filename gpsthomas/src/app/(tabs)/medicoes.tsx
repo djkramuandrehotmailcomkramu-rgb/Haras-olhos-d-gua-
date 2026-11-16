@@ -5,6 +5,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Tela } from '../../components/Tela';
 import { Cartao } from '../../components/Cartao';
+import { Ilustracao } from '../../components/Ilustracao';
 import { Botao } from '../../components/Botao';
 import { FolhaSalvar, type DadosTalhao } from '../../components/FolhaSalvar';
 import { useDados, useUi, type Medicao } from '../../store/dados';
@@ -13,6 +14,7 @@ import { formatarArea, formatarDistancia } from '../../geo/unidades';
 import { paraGeoJSON, paraKML, paraGPX } from '../../io/formatos';
 import { entregarArquivo } from '../../io/arquivos';
 import { usePrefs } from '../../store/prefs';
+import { useToast } from '../../store/toast';
 import { fonte, tipo, useTema } from '../../theme';
 
 const quando = (ms: number) => new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -22,6 +24,8 @@ export default function MedicoesTela() {
   const unidade = usePrefs((s) => s.unidadeArea);
   const { medicoes, talhoes, removerMedicao, adicionarTalhao } = useDados();
   const enviar = useUi((s) => s.enviar);
+  const mostrar = useToast((s) => s.mostrar);
+  const baixar = (n: string, c: string, m: string) => { entregarArquivo(n, c, m); mostrar('Arquivo exportado', 'ok'); };
   const [aberta, setAberta] = useState<string | null>(null);
   const [converter, setConverter] = useState<Medicao | null>(null);
 
@@ -32,7 +36,7 @@ export default function MedicoesTela() {
     <Tela titulo="Medições" subtitulo={medicoes.length ? `${medicoes.length} salvas neste aparelho` : 'Histórico de áreas e distâncias'}>
       {medicoes.length === 0 && (
         <Cartao style={{ alignItems: 'center', gap: 10, paddingVertical: 36 }}>
-          <Ionicons name="analytics-outline" size={44} color={t.primaria} />
+          <Ilustracao tamanho={150} />
           <Text style={[tipo.subtitulo, { color: t.texto }]}>Nenhuma medição ainda</Text>
           <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>Caminhe o perímetro, marque pontos ou meça uma distância no mapa e toque em Salvar.</Text>
           <View style={{ marginTop: 8 }}><Botao titulo="Nova medição" icone={<Ionicons name="add" size={20} color={t.sobrePrimaria} />} onPress={() => router.navigate('/')} /></View>
@@ -64,9 +68,9 @@ export default function MedicoesTela() {
                       {m.tipo === 'area' && <Botao titulo="Virar talhão" variante="suave" onPress={() => setConverter(m)} />}
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                      <Botao titulo="KML" variante="fantasma" onPress={() => entregarArquivo(`${m.nome}.kml`, paraKML([], [m]), 'application/vnd.google-earth.kml+xml')} />
-                      <Botao titulo="GeoJSON" variante="fantasma" onPress={() => entregarArquivo(`${m.nome}.geojson`, paraGeoJSON([], [m]), 'application/geo+json')} />
-                      <Botao titulo="GPX" variante="fantasma" onPress={() => entregarArquivo(`${m.nome}.gpx`, paraGPX([], [m]), 'application/gpx+xml')} />
+                      <Botao titulo="KML" variante="fantasma" onPress={() => baixar(`${m.nome}.kml`, paraKML([], [m]), 'application/vnd.google-earth.kml+xml')} />
+                      <Botao titulo="GeoJSON" variante="fantasma" onPress={() => baixar(`${m.nome}.geojson`, paraGeoJSON([], [m]), 'application/geo+json')} />
+                      <Botao titulo="GPX" variante="fantasma" onPress={() => baixar(`${m.nome}.gpx`, paraGPX([], [m]), 'application/gpx+xml')} />
                       <Botao titulo="Excluir" variante="fantasma" onPress={() => removerMedicao(m.id)} />
                     </View>
                   </View>

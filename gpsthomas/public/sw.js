@@ -1,4 +1,4 @@
-const V = 'gpsthomas-v2';
+const V = 'gpsthomas-v3';
 const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
 self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

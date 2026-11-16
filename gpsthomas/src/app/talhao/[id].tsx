@@ -15,6 +15,7 @@ import { areaM2, perimetroM } from '../../geo/medidas';
 import { formatarArea, formatarDistancia, ROTULO_AREA, converterArea, type UnidadeArea } from '../../geo/unidades';
 import { paraGeoJSON, paraKML, paraGPX } from '../../io/formatos';
 import { entregarArquivo } from '../../io/arquivos';
+import { useToast } from '../../store/toast';
 import { fonte, tipo, useTema } from '../../theme';
 
 const OUTRAS: UnidadeArea[] = ['alqPaulista', 'alqMineiro', 'alqGoiano', 'alqBaiano', 'm2'];
@@ -27,6 +28,8 @@ export default function TalhaoDetalhe() {
   const x = useDados((s) => s.talhoes.find((z) => z.id === id));
   const { atualizarTalhao, removerTalhao } = useDados();
   const enviar = useUi((s) => s.enviar);
+  const mostrar = useToast((s) => s.mostrar);
+  const baixar = (n: string, c: string, m: string) => { entregarArquivo(n, c, m); mostrar('Arquivo exportado', 'ok'); };
   const [f, setF] = useState({ nome: '', fazenda: '', cultura: 'Soja', safra: '', obs: '' });
   const [salvo, setSalvo] = useState(false);
 
@@ -81,7 +84,7 @@ export default function TalhaoDetalhe() {
           <Fichas opcoes={CULTURAS} valor={f.cultura} onChange={(v) => { setF({ ...f, cultura: v }); setSalvo(false); }} />
           <Campo rotulo="Safra" value={f.safra} onChangeText={(v) => { setF({ ...f, safra: v }); setSalvo(false); }} />
           <Campo rotulo="Observações" value={f.obs} onChangeText={(v) => { setF({ ...f, obs: v }); setSalvo(false); }} multiline placeholder="Solo, variedade, histórico…" />
-          <Botao titulo={salvo ? 'Salvo ✓' : 'Salvar alterações'} onPress={() => { atualizarTalhao(x.id, { ...f, nome: f.nome.trim() || x.nome }); setSalvo(true); }} />
+          <Botao titulo={salvo ? 'Salvo ✓' : 'Salvar alterações'} onPress={() => { atualizarTalhao(x.id, { ...f, nome: f.nome.trim() || x.nome }); setSalvo(true); mostrar('Alterações salvas', 'ok'); }} />
         </Cartao>
 
         <Cartao style={{ gap: 8 }}>
@@ -100,9 +103,9 @@ export default function TalhaoDetalhe() {
         <Cartao style={{ gap: 10 }}>
           <Text style={[tipo.legenda, { color: t.textoSuave }]}>EXPORTAR ESTE TALHÃO</Text>
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Botao titulo="KML" variante="suave" onPress={() => entregarArquivo(`${x.nome}.kml`, paraKML([x]), 'application/vnd.google-earth.kml+xml')} />
-            <Botao titulo="GeoJSON" variante="suave" onPress={() => entregarArquivo(`${x.nome}.geojson`, paraGeoJSON([x]), 'application/geo+json')} />
-            <Botao titulo="GPX" variante="suave" onPress={() => entregarArquivo(`${x.nome}.gpx`, paraGPX([x]), 'application/gpx+xml')} />
+            <Botao titulo="KML" variante="suave" onPress={() => baixar(`${x.nome}.kml`, paraKML([x]), 'application/vnd.google-earth.kml+xml')} />
+            <Botao titulo="GeoJSON" variante="suave" onPress={() => baixar(`${x.nome}.geojson`, paraGeoJSON([x]), 'application/geo+json')} />
+            <Botao titulo="GPX" variante="suave" onPress={() => baixar(`${x.nome}.gpx`, paraGPX([x]), 'application/gpx+xml')} />
           </View>
         </Cartao>
 

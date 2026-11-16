@@ -4,6 +4,7 @@ export type Paleta = {
   fundo: string; cartao: string; cartaoSuave: string; texto: string; textoSuave: string; linha: string;
   primaria: string; primariaSuave: string; sobrePrimaria: string; destaque: string; perigo: string;
   vidro: 'light' | 'dark'; vidroCor: string;
+  gps: string; terra: string; ok: string; atencao: string;
 };
 
 export const paletas: Record<'claro' | 'escuro', Paleta> = {
@@ -20,7 +21,8 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     destaque: '#D99A00',
     perigo: '#D64545',
     vidro: 'light',
-    vidroCor: 'rgba(255,255,255,0.72)',
+    vidroCor: 'rgba(255,255,255,0.82)',
+    gps: '#2F7DF6', terra: '#8B5E34', ok: '#1F9D55', atencao: '#D99A00',
   },
   escuro: {
     fundo: '#0A110D',
@@ -35,7 +37,8 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     destaque: '#F2B73D',
     perigo: '#F07070',
     vidro: 'dark',
-    vidroCor: 'rgba(21,31,25,0.72)',
+    vidroCor: 'rgba(16,25,20,0.80)',
+    gps: '#5B9BFF', terra: '#C28A55', ok: '#3FB063', atencao: '#F2B73D',
   },
 };
 
@@ -60,5 +63,5 @@ export const tipo = {
   subtitulo: { fontFamily: fonte.semi, fontSize: 17, letterSpacing: -0.2 },
   corpo: { fontFamily: fonte.regular, fontSize: 15 },
   legenda: { fontFamily: fonte.media, fontSize: 12.5, letterSpacing: 0.2 },
-  numeroGrande: { fontFamily: fonte.negrito, fontSize: 40, letterSpacing: -1 },
+  numeroGrande: { fontFamily: fonte.negrito, fontSize: 40, letterSpacing: -1, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
 };
