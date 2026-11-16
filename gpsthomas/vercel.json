@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npx expo export --platform web",
+  "outputDirectory": "dist",
+  "installCommand": "npm install --legacy-peer-deps",
+  "rewrites": [{ "source": "/((?!_expo|assets|sw\\.js|manifest\\.webmanifest|icon-.*).*)", "destination": "/index.html" }],
+  "headers": [{ "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }]
+}

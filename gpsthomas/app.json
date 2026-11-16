@@ -24,7 +24,13 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "GPSThomas",
+      "shortName": "GPSThomas",
+      "themeColor": "#1F7A3E",
+      "backgroundColor": "#F1F4EF"
     },
     "scheme": "gpsthomas",
     "plugins": [
