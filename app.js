@@ -11,6 +11,23 @@ const FIELDS = [['armazem', 'Armazém'],
     .map(n => [(n === 8 || n >= 22 ? 'th' : 'it') + String(n).padStart(2, '0'), 'TH ' + String(n).padStart(2, '0')])]
   .map(([id, name]) => ({ id, name }));
 const FIELD = Object.fromEntries(FIELDS.map(f => [f.id, f]));
+// Pluviômetros numerados: cada um vale para os talhões da sua cobertura (ordem da mensagem de coleta). As leituras continuam guardadas por talhão.
+const GROUPS = [['TH 20', 'Retiro 01', 'Retiro 02', 'Retiro 03'], ['TH 19', 'Condomínio 02'], ['Condomínio 03'], ['Condomínio 01'],
+  ['TH 18', 'TH 17'], ['TH 16'], ['TH 11', 'TH 12'], ['TH 26'], ['TH 25', 'TH 24'], ['TH 23', 'TH 22', 'Armazém'], ['TH 10', 'TH 09'],
+  ['TH 14', 'TH 13'], ['TH 15'], ['TH 27'], ['TH 28'], ['TH 29'], ['TH 30'], ['TH 06'], ['TH 07', 'TH 08'], ['TH 05'], ['TH 04', 'TH 21']];
+const coverText = names => { // ex.: "TH 20, Retiro 01, 02, 03"
+  const out = []; let last = null;
+  for (const n of names.map(x => x.replace('Condomínio', 'Cond.'))) {
+    const m = n.match(/^(.*?)\s*(\d+)$/);
+    if (!m) { out.push(n); last = null; } else if (last === m[1]) out.push(m[2]); else { out.push(`${m[1]} ${m[2]}`); last = m[1]; }
+  }
+  return out.join(', ');
+};
+const BYNAME = Object.fromEntries(FIELDS.map(f => [f.name, f]));
+const GAUGES = GROUPS.map((names, i) => ({ id: 'p' + String(i + 1).padStart(2, '0'), num: String(i + 1).padStart(2, '0'), members: names.map(n => BYNAME[n].id), cover: coverText(names) }));
+const GAUGE = Object.fromEntries(GAUGES.map(g => [g.id, g]));
+const GAUGE_OF = Object.fromEntries(GAUGES.flatMap(g => g.members.map(id => [id, g])));
+if (FIELDS.some(f => !GAUGE_OF[f.id])) throw new Error('Talhão sem pluviômetro'); // garante que nenhum talhão fica de fora
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -87,6 +104,11 @@ function farmDays(idx) { // média simples dos pontos lidos em cada dia (nem tod
   for (const f of FIELDS) for (const [d, mm] of Object.entries(idx[f.id] || {})) { const a = acc[d] ??= [0, 0]; a[0] += mm; a[1] += 1; }
   return Object.fromEntries(Object.entries(acc).map(([d, a]) => [d, a[0] / a[1]]));
 }
+function gaugeDays(g, idx) { // chuva diária do pluviômetro = média dos talhões que ele cobre
+  const acc = {};
+  for (const id of g.members) for (const [d, mm] of Object.entries(idx[id] || {})) { const a = acc[d] ??= [0, 0]; a[0] += mm; a[1] += 1; }
+  return Object.fromEntries(Object.entries(acc).map(([d, a]) => [d, a[0] / a[1]]));
+}
 const sumRange = (days, from, to) => { let s = 0; for (const d in days) if (d >= from && d <= to) s += days[d]; return s; };
 function stats(p = ui.period) {
   const { from, to } = range(p), idx = index(), farm = farmDays(idx);
@@ -96,7 +118,11 @@ function stats(p = ui.period) {
   });
   const ranked = [...rows].sort((a, b) => b.mm - a.mm || a.f.name.localeCompare(b.f.name));
   const withData = rows.filter(r => r.n);
-  return { from, to, idx, farm, rows, ranked, mean: sumRange(farm, from, to), max: ranked[0].mm,
+  const byId = Object.fromEntries(rows.map(r => [r.f.id, r]));
+  const grows = GAUGES.map(g => { const rs = g.members.map(id => byId[id]), ok = rs.filter(r => r.n); return { g, n: Math.max(...rs.map(r => r.n)), mm: ok.length ? ok.reduce((a, r) => a + r.mm, 0) / ok.length : 0 }; });
+  const granked = [...grows].sort((a, b) => b.mm - a.mm || a.g.num.localeCompare(b.g.num));
+  const gdata = grows.filter(r => r.n);
+  return { from, to, idx, farm, rows, ranked, grows, granked, gmax: granked[0].mm, glow: gdata.length ? gdata.reduce((m, r) => r.mm < m.mm ? r : m) : null, mean: sumRange(farm, from, to), max: ranked[0].mm,
     rained: rows.filter(r => r.mm > 0).length, read: withData.length,
     low: withData.length ? withData.reduce((m, r) => r.mm < m.mm ? r : m) : null,
     rainDays: Object.keys(farm).filter(d => d >= from && d <= to && farm[d] > 0).length };
@@ -157,7 +183,7 @@ function closeSheet() { if (layers.at(-1)?.type !== 'tab') closeTop(); }
 const nav = (title, sub = '', left = '') => `<div class="nav">${left || '<span></span>'}<b>${title}${sub ? `<small>${sub}</small>` : ''}</b><button class="ibtn" data-act="close" aria-label="Fechar">${I.close}</button></div>`;
 
 /* ---------- atualização do app ---------- */
-const APP_VERSION = '2.6.0'; // mantenha igual ao VERSION de sw.js
+const APP_VERSION = '2.7.0'; // mantenha igual ao VERSION de sw.js
 const remoteVersion = async () => { // versão publicada no servidor (null = sem internet)
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 7000);
   try { const r = await fetch('sw.js?v=' + Date.now(), { cache: 'no-store', signal: ctl.signal }); if (!r.ok) return null; return (await r.text()).match(/VERSION\s*=\s*'pluvio-([^']+)'/)?.[1] ?? null; }
@@ -236,14 +262,14 @@ function seriesFor(days, p) {
 /* ---------- painel ---------- */
 function viewHome() {
   const s = stats(), t = today();
-  const doneToday = FIELDS.filter(f => getReading(f.id, t)).length;
-  const cta = `<button class="pill" data-act="launch">${I.plus}Lançar chuva${doneToday ? ` <small>· hoje ${doneToday} de ${FIELDS.length}</small>` : ' de hoje'}</button>`;
-  if (!readings().length) return head('Painel') + `<div class="empty"><h3>Nenhuma chuva lançada</h3><p>Toque no botão, escolha o talhão e digite quantos milímetros choveu.</p></div>${cta}`;
-  const top = s.ranked[0], list = ui.allRank ? s.ranked : s.ranked.slice(0, 5);
+  const doneToday = GAUGES.filter(g => gReading(g, t)).length;
+  const cta = `<button class="pill" data-act="launch">${I.plus}Lançar chuva${doneToday ? ` <small>· hoje ${doneToday} de ${GAUGES.length}</small>` : ' de hoje'}</button>`;
+  if (!readings().length) return head('Painel') + `<div class="empty"><h3>Nenhuma chuva lançada</h3><p>Toque no botão, escolha o pluviômetro e digite quantos milímetros choveu.</p></div>${cta}`;
+  const top = s.granked[0], list = ui.allRank ? s.granked : s.granked.slice(0, 5);
   const rank = list.map((r, i) => `
-    <button class="row" data-act="field" data-id="${r.f.id}">
-      <span class="pos">${i + 1}</span>
-      <div class="grow"><div class="t">${esc(r.f.name)}</div><div class="bar"><i style="width:${s.max ? r.mm / s.max * 100 : 0}%;--i:${i}"></i></div></div>
+    <button class="row" data-act="field" data-id="${r.g.id}">
+      <span class="gnum sm">${r.g.num}</span>
+      <div class="grow"><div class="t tw">${esc(r.g.cover)}</div><div class="bar"><i style="width:${s.gmax ? r.mm / s.gmax * 100 : 0}%;--i:${i}"></i></div></div>
       <div class="mm"><b>${r.n ? fmt(r.mm) : '–'}<small>mm</small></b>${r.n ? delta(r.mm, s.mean) : '<span>sem leitura</span>'}</div>
     </button>`).join('');
   return head('Painel', shareBtn) + chips(ui.period) + `
@@ -253,41 +279,43 @@ function viewHome() {
     <div class="kpis">
       <div class="kpi"><span>Talhões com chuva</span><b data-count="${Math.round(s.rained / FIELDS.length * 100)}" data-int="1">${Math.round(s.rained / FIELDS.length * 100)}<small>%</small></b><em>${s.rained} de ${FIELDS.length} talhões</em></div>
       <div class="kpi"><span>Dias com chuva</span><b data-count="${s.rainDays}" data-int="1">${s.rainDays}<small>${s.rainDays === 1 ? 'dia' : 'dias'}</small></b><em>${periodLabel(ui.period)}</em></div>
-      <div class="kpi"><span>Mais choveu</span><b${top.mm > 0 ? ` data-count="${top.mm}"` : ''}>${top.mm > 0 ? fmt(top.mm) : '–'}<small>mm</small></b><em>${top.mm > 0 ? esc(top.f.name) : 'Sem chuva no período'}</em></div>
-      <div class="kpi"><span>Menos choveu</span><b${s.low ? ` data-count="${s.low.mm}"` : ''}>${s.low ? fmt(s.low.mm) : '–'}<small>mm</small></b><em>${s.low ? esc(s.low.f.name) : 'Sem leituras'}</em></div>
+      <div class="kpi"><span>Mais choveu</span><b${top.mm > 0 ? ` data-count="${top.mm}"` : ''}>${top.mm > 0 ? fmt(top.mm) : '–'}<small>mm</small></b><em>${top.mm > 0 ? `${top.g.num} · ${esc(top.g.cover)}` : 'Sem chuva no período'}</em></div>
+      <div class="kpi"><span>Menos choveu</span><b${s.glow ? ` data-count="${s.glow.mm}"` : ''}>${s.glow ? fmt(s.glow.mm) : '–'}<small>mm</small></b><em>${s.glow ? `${s.glow.g.num} · ${esc(s.glow.g.cover)}` : 'Sem leituras'}</em></div>
     </div>
     <div class="sect"><h2>Chuva por dia</h2><span>${ui.period === 'd1' ? 'últimos 7 dias' : ui.period === 'safra' && diffDays(s.from, s.to) > 30 ? 'por mês' : 'mm'}</span></div>
     ${barChart(seriesFor(s.farm, ui.period))}
-    <div class="sect"><h2>Onde mais choveu</h2><button data-act="allrank">${ui.allRank ? 'Mostrar menos' : `Ver os ${FIELDS.length}`}</button></div>
+    <div class="sect"><h2>Onde mais choveu</h2><button data-act="allrank">${ui.allRank ? 'Mostrar menos' : `Ver os ${GAUGES.length}`}</button></div>
     <div class="panel">${rank}</div>`;
 }
 
-/* ---------- detalhe do talhão ---------- */
-function openField(id) {
-  const f = FIELD[id], days = index()[id] || {}, t = today();
+/* ---------- detalhe do pluviômetro ---------- */
+function openGauge(id) {
+  const g = GAUGE[id], days = gaugeDays(g, index()), t = today();
   buzz();
   const tot = PERIODS.map(([p, l]) => { const r = range(p); return `<div><b>${fmt(sumRange(days, r.from, r.to))}</b><span>${l}</span></div>`; }).join('');
   const rainDays = Object.keys(days).filter(d => days[d] > 0).sort(), last = rainDays.at(-1), sr = range('safra');
   const season = Object.entries(days).filter(([d]) => d >= sr.from && d <= sr.to);
   const best = season.reduce((m, e) => e[1] > m[1] ? e : m, ['', 0]);
-  const s = stats('safra'), pos = s.ranked.findIndex(r => r.f.id === id) + 1;
-  openSheet(nav(esc(f.name), 'Pluviômetro') + `<div class="body">
+  const s = stats('safra'), pos = s.granked.findIndex(r => r.g.id === id) + 1;
+  openSheet(nav(`Pluviômetro ${g.num}`, esc(g.cover)) + `<div class="body">
     <div class="panel"><div class="grid4">${tot}</div></div>
     <div class="sect"><h2>Últimos 30 dias</h2><span>mm por dia</span></div>
     ${barChart(seriesFor(days, 'd30'))}
     <div class="sect"><h2>Na safra</h2><span>desde ${brShort(sr.from)}</span></div>
     <div class="panel">
-      <div class="row"><div class="grow t">Posição entre os talhões</div><div class="v">${pos}º de ${FIELDS.length}</div></div>
+      <div class="row"><div class="grow t">Posição entre os pluviômetros</div><div class="v">${pos}º de ${GAUGES.length}</div></div>
       <div class="row"><div class="grow t">Dias com chuva</div><div class="v">${season.filter(e => e[1] > 0).length}</div></div>
       <div class="row"><div class="grow t">Maior chuva em um dia</div><div class="v">${best[1] ? `${fmt(best[1])} mm · ${brShort(best[0])}` : '–'}</div></div>
       <div class="row"><div class="grow t">Última chuva</div><div class="v">${last ? `${dayName(last)}${diffDays(last, t) > 1 ? ` · há ${diffDays(last, t)} dias` : ''}` : '–'}</div></div>
     </div>
-    <div class="stack"><button class="pill orange" data-act="launch-field" data-id="${id}">${I.plus}Lançar chuva neste talhão</button></div>
+    <div class="stack"><button class="pill orange" data-act="launch-field" data-id="${id}">${I.plus}Lançar chuva neste pluviômetro</button></div>
   </div>`);
 }
 
 /* ---------- lançar chuva ---------- */
 const L = { date: today(), sel: null, buf: '', fresh: true };
+const gReading = (g, date) => { for (const id of g.members) { const r = getReading(id, date); if (r) return r; } return null; }; // leitura do pluviômetro no dia
+const putGauge = (g, date, mm) => g.members.forEach(id => putReading(id, date, mm));
 function openLaunch(date = today(), fid = null) {
   if (!db.settings.user) return askUser(() => openLaunch(date, fid));
   Object.assign(L, { date, sel: null });
@@ -299,40 +327,40 @@ function drawLaunch() {
   const el = $('#launch'); if (!el) return;
   if (L.sel) return drawPad(el);
   const t = today(), y = addDays(t, -1), other = L.date !== t && L.date !== y;
-  const done = FIELDS.filter(f => getReading(f.id, L.date)).length;
+  const done = GAUGES.filter(g => gReading(g, L.date)).length;
   el.innerHTML = nav('Lançar chuva', esc(db.settings.user)) + `<div class="body">
     <div class="chips" style="margin-bottom:18px">
       <button data-act="ldate" data-id="${t}" class="${L.date === t ? 'on' : ''}">Hoje</button>
       <button data-act="ldate" data-id="${y}" class="${L.date === y ? 'on' : ''}">Ontem</button>
       <label class="${other ? 'on' : ''}">${other ? br(L.date) : 'Outra data'}<input type="date" id="ldate" max="${t}" value="${L.date}" style="position:absolute;opacity:0;width:1px;height:1px" aria-label="Escolher outra data"></label>
     </div>
-    <p class="hint">Toque no talhão e digite quantos milímetros choveu.</p>
-    <div class="tiles">${FIELDS.map(f => { const r = getReading(f.id, L.date); return `<button class="tile ${r ? 'ok' : ''}" data-act="pick" data-id="${f.id}" aria-label="${esc(f.name)}${r ? `, ${fmt(r.mm)} milímetros` : ', sem leitura'}"><span>${esc(tileName(f.name))}</span><b>${r ? fmt(r.mm) : '–'}</b></button>`; }).join('')}</div>
-    <div class="prog"><span>${done} de ${FIELDS.length} lançados</span><i><u style="width:${done / FIELDS.length * 100}%"></u></i></div>
+    <p class="hint">Toque no pluviômetro e digite quantos milímetros choveu.</p>
+    <div class="panel">${GAUGES.map(g => { const r = gReading(g, L.date); return `<button class="row gauge ${r ? 'ok' : ''}" data-act="pick" data-id="${g.id}" aria-label="Pluviômetro ${g.num}, ${esc(g.cover)}${r ? `, ${fmt(r.mm)} milímetros` : ', sem leitura'}"><span class="gnum">${g.num}</span><div class="grow"><div class="t tw">${esc(g.cover)}</div></div><b class="gval">${r ? fmt(r.mm) : '–'}<small>mm</small></b></button>`; }).join('')}</div>
+    <div class="prog"><span>${done} de ${GAUGES.length} lançados</span><i><u style="width:${done / GAUGES.length * 100}%"></u></i></div>
     <div class="stack" style="margin-top:0">
-      ${done < FIELDS.length ? `<button class="pill ghost" data-act="zero-rest">Marcar 0 mm nos ${FIELDS.length - done} restantes</button>` : ''}
+      ${done < GAUGES.length ? `<button class="pill ghost" data-act="zero-rest">Marcar 0 mm nos ${GAUGES.length - done} restantes</button>` : ''}
       <button class="pill" data-act="close">Concluir</button>
     </div></div>`;
   $('#ldate', el).addEventListener('change', e => { if (e.target.value && e.target.value <= today()) { L.date = e.target.value; drawLaunch(); } });
   $('label', el).addEventListener('click', () => $('#ldate', el).showPicker?.());
 }
-function pick(fid) {
-  const r = getReading(fid, L.date); Object.assign(L, { sel: fid, buf: r ? String(r.mm).replace('.', ',') : '', fresh: true });
+function pick(gid) {
+  const r = gReading(GAUGE[gid], L.date); Object.assign(L, { sel: gid, buf: r ? String(r.mm).replace('.', ',') : '', fresh: true });
   if (layers.at(-1)?.type !== 'pad') pushLayer('pad', () => { L.sel = null; drawLaunch(); });
   drawLaunch();
 }
 function drawPad(el) {
-  const f = FIELD[L.sel], r = getReading(f.id, L.date);
-  el.innerHTML = `<div class="nav"><button class="ibtn" data-act="pad-back" aria-label="Voltar aos talhões">${I.back}</button>
-      <b>${esc(f.name)}<small>${dayName(L.date)} · ${br(L.date)}</small></b>
-      <button class="ibtn" data-act="pad-next" aria-label="Próximo talhão">${I.fwd}</button></div>
+  const g = GAUGE[L.sel], r = gReading(g, L.date);
+  el.innerHTML = `<div class="nav"><button class="ibtn" data-act="pad-back" aria-label="Voltar à lista de pluviômetros">${I.back}</button>
+      <b>${esc(g.cover)}<small>Pluviômetro ${g.num} · ${dayName(L.date)} · ${br(L.date)}</small></b>
+      <button class="ibtn" data-act="pad-next" aria-label="Próximo pluviômetro">${I.fwd}</button></div>
     <div class="pad">
       <div class="disp"><div class="was">${r ? `Lançado: ${fmt(r.mm)} mm · ${esc(r.user || '')}` : 'Sem leitura neste dia'}</div>
         <div class="n ${L.buf ? '' : 'dim'}" id="disp" aria-live="polite">${L.buf || '0'}<small>mm</small></div></div>
       <div class="keys">${['7', '8', '9', '4', '5', '6', '1', '2', '3', ',', '0'].map(k => `<button data-act="key" data-id="${k}">${k}</button>`).join('')}
         <button class="l" data-act="key" data-id="del" aria-label="Apagar dígito">${I.del}</button></div>
       <button class="pill orange" data-act="pad-save">Salvar e ir ao próximo</button>
-      ${r ? '<button class="skip" data-act="pad-clear">Apagar esta leitura</button>' : '<button class="skip" data-act="pad-next">Pular este talhão</button>'}
+      ${r ? '<button class="skip" data-act="pad-clear">Apagar esta leitura</button>' : '<button class="skip" data-act="pad-next">Pular este pluviômetro</button>'}
     </div>`;
 }
 function key(k) {
@@ -355,21 +383,21 @@ function putReading(fid, date, mm) {
   i >= 0 ? db.readings[i] = r : db.readings.push(r);
 }
 function nextField(onlyEmpty) {
-  const i = FIELDS.findIndex(f => f.id === L.sel);
-  for (let k = 1; k <= FIELDS.length; k++) {
-    const f = FIELDS[(i + k) % FIELDS.length];
-    if (!onlyEmpty) return f.id;
-    if (!getReading(f.id, L.date)) return f.id;
+  const i = GAUGES.findIndex(g => g.id === L.sel);
+  for (let k = 1; k <= GAUGES.length; k++) {
+    const g = GAUGES[(i + k) % GAUGES.length];
+    if (!onlyEmpty) return g.id;
+    if (!gReading(g, L.date)) return g.id;
   }
   return null;
 }
 function padSave() {
   if (!L.buf) return toast('Digite os milímetros ou toque em Pular');
   const mm = parseFloat(L.buf.replace(',', '.'));
-  putReading(L.sel, L.date, mm); save(); buzz();
+  putGauge(GAUGE[L.sel], L.date, mm); save(); buzz();
   const nx = nextField(true);
-  if (nx) { toast(`${FIELD[L.sel].name}: ${fmt(mm)} mm`); pick(nx); }
-  else { closePad(); toast('Todos os talhões lançados'); }
+  if (nx) { toast(`Pluviômetro ${GAUGE[L.sel].num}: ${fmt(mm)} mm`); pick(nx); }
+  else { closePad(); toast('Todos os pluviômetros lançados'); }
 }
 
 /* ---------- histórico ---------- */
@@ -381,11 +409,12 @@ function viewHistory() {
   if (!dates.length) return h + `<div class="empty"><h3>Sem lançamentos</h3><p>Os dias lançados aparecem aqui. Toque em um dia para conferir ou corrigir.</p></div><button class="pill" data-act="launch">${I.plus}Lançar chuva</button>`;
   return h + `<div class="panel">${dates.slice(0, 400).map(d => {
     const rs = by[d], mean = rs.reduce((a, r) => a + r.mm, 0) / rs.length;
-    const top = rs.reduce((m, r) => r.mm > m.mm ? r : m);
+    const gs = GAUGES.map(g => { const v = g.members.map(id => rs.find(r => r.fieldId === id)?.mm).filter(x => x != null); return { g, mm: v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }; }).filter(x => x.mm != null);
+    const top = gs.reduce((m, x) => x.mm > m.mm ? x : m);
     return `<button class="row" data-act="day" data-id="${d}"><div class="grow"><div class="t">${dayName(d)} · ${brShort(d)}</div>
-      <div class="s">${rs.length} ${rs.length === 1 ? 'talhão' : 'talhões'}${top.mm > 0 ? ` · maior: ${esc(FIELD[top.fieldId].name)}, ${fmt(top.mm)} mm` : ' · sem chuva'}</div></div>
+      <div class="s">${gs.length} ${gs.length === 1 ? 'pluviômetro' : 'pluviômetros'}${top.mm > 0 ? ` · maior: ${top.g.num}, ${fmt(top.mm)} mm` : ' · sem chuva'}</div></div>
       <div class="mm"><b>${fmt(mean)}<small>mm</small></b></div>${I.chev}</button>`;
-  }).join('')}</div><p class="note">Média da fazenda em cada dia. Toque em um dia para ver e corrigir os talhões.</p>`;
+  }).join('')}</div><p class="note">Média da fazenda em cada dia. Toque em um dia para ver e corrigir os pluviômetros.</p>`;
 }
 
 /* ---------- mais ---------- */
@@ -398,7 +427,7 @@ function viewMore() {
       <button class="row" data-act="backup"><div class="grow"><div class="t">Fazer backup</div><div class="s">${s.lastBackup ? 'Último: ' + new Date(s.lastBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Salva todas as leituras em um arquivo'}</div></div>${I.chev}</button>
       <button class="row" data-act="restore"><div class="grow"><div class="t">Importar backup</div><div class="s">Junta as leituras de outro celular, sem duplicar</div></div>${I.chev}</button>
     </div>
-    <div class="sect"><h2>Fazenda</h2><span>${FIELDS.length} pluviômetros</span></div>
+    <div class="sect"><h2>Fazenda</h2><span>${GAUGES.length} pluviômetros · ${FIELDS.length} talhões</span></div>
     <div class="panel">
       <div class="row"><label class="t" for="sfarm">Nome</label><input id="sfarm" data-set="farm" value="${esc(s.farm)}" maxlength="40" placeholder="Nome da fazenda"></div>
       <div class="row"><label class="t" for="suser">Quem lança</label><input id="suser" data-set="user" value="${esc(s.user)}" maxlength="24" placeholder="Seu nome"></div>
@@ -432,10 +461,10 @@ const sharePeriod = () => sheets.at(-1)?.period?.() || ui.period;
 function waText(p) {
   const s = stats(p);
   const L = [`🌧️ *Chuva · ${db.settings.farm}*`, `${periodLabel(p)}: ${periodText(p)}`, '',
-    `*Média da fazenda:* ${fmt(s.mean)} mm`, `*Talhões com chuva:* ${s.rained} de ${FIELDS.length} (${Math.round(s.rained / FIELDS.length * 100)}%)`, '', '*Chuva por talhão*'];
-  s.ranked.filter(r => r.n).forEach((r, i) => L.push(`${i + 1}. ${r.f.name}: ${fmt(r.mm)} mm`));
-  const none = s.rows.filter(r => !r.n);
-  if (none.length) L.push('', `Sem leitura: ${none.map(r => r.f.name).join(', ')}`);
+    `*Média da fazenda:* ${fmt(s.mean)} mm`, `*Talhões com chuva:* ${s.rained} de ${FIELDS.length} (${Math.round(s.rained / FIELDS.length * 100)}%)`, '', '*Chuva por pluviômetro*'];
+  s.grows.filter(r => r.n).forEach(r => L.push(`${r.g.num} - ${r.g.cover}: ${fmt(r.mm)} mm`));
+  const none = s.grows.filter(r => !r.n);
+  if (none.length) L.push('', `Sem leitura: ${none.map(r => r.g.num).join(', ')}`);
   if (db.settings.user) L.push('', `_Enviado por ${db.settings.user}_`);
   return L.join('\n');
 }
@@ -469,9 +498,9 @@ async function makePdf(p) {
     return doc.lastAutoTable.finalY;
   };
   const num = { halign: 'right' };
-  let y = table(64, 'Chuva por talhão', ['#', 'Pluviômetro', 'Chuva (mm)', 'Comparado à média', 'Dias lidos'],
-    s.ranked.map((r, i) => [i + 1, r.f.name, r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
-    { 0: { cellWidth: 10 }, 2: { ...num, fontStyle: 'bold' }, 3: num, 4: num });
+  let y = table(64, 'Chuva por talhão', ['Pluv.', 'Talhão', 'Chuva (mm)', 'Comparado à média', 'Dias lidos'],
+    s.ranked.map(r => [GAUGE_OF[r.f.id].num, r.f.name, r.n ? fmt(r.mm) : '-', r.n && s.mean > 0 ? `${r.mm >= s.mean ? '+' : ''}${Math.round((r.mm / s.mean - 1) * 100)}%` : '-', r.n]),
+    { 0: { cellWidth: 16 }, 2: { ...num, fontStyle: 'bold' }, 3: num, 4: num });
   const dates = [...new Set(readings().filter(r => r.date >= s.from && r.date <= s.to).map(r => r.date))].sort().reverse();
   if (dates.length && dates.length <= 40) {
     doc.addPage('a4', 'landscape');
@@ -572,7 +601,7 @@ const actions = {
   launch: () => openLaunch(),
   'launch-field': el => { closeSheet(); openLaunch(today(), el.dataset.id); },
   day: el => openLaunch(el.dataset.id),
-  field: el => openField(el.dataset.id),
+  field: el => openGauge(el.dataset.id),
   share: openShare,
   'share-period': el => sheets.at(-1).setPeriod(el.dataset.id),
   ldate: el => { L.date = el.dataset.id; drawLaunch(); },
@@ -582,13 +611,14 @@ const actions = {
   'pad-next': () => pick(nextField(false)),
   'pad-save': padSave,
   'pad-clear': () => {
-    const r = getReading(L.sel, L.date); if (!r || !confirm(`Apagar a leitura de ${FIELD[L.sel].name} em ${br(L.date)}?`)) return;
-    r.deleted = true; r.updatedAt = Date.now(); save(); closePad(); toast('Leitura apagada');
+    const g = GAUGE[L.sel], rs = g.members.map(id => getReading(id, L.date)).filter(Boolean);
+    if (!rs.length || !confirm(`Apagar a leitura do pluviômetro ${g.num} em ${br(L.date)}?`)) return;
+    rs.forEach(r => { r.deleted = true; r.updatedAt = Date.now(); }); save(); closePad(); toast('Leitura apagada');
   },
   'zero-rest': () => {
-    const rest = FIELDS.filter(f => !getReading(f.id, L.date));
-    if (!confirm(`Registrar 0 mm (sem chuva) em ${rest.length} ${rest.length === 1 ? 'talhão' : 'talhões'} em ${br(L.date)}?`)) return;
-    rest.forEach(f => putReading(f.id, L.date, 0)); save(); drawLaunch(); toast('Restantes marcados com 0 mm');
+    const rest = GAUGES.filter(g => !gReading(g, L.date));
+    if (!confirm(`Registrar 0 mm (sem chuva) em ${rest.length} ${rest.length === 1 ? 'pluviômetro' : 'pluviômetros'} em ${br(L.date)}?`)) return;
+    rest.forEach(g => putGauge(g, L.date, 0)); save(); drawLaunch(); toast('Restantes marcados com 0 mm');
   },
   'save-user': (el, w) => {
     const n = $('#uname', w).value.trim(); if (!n) return toast('Informe seu nome');
