@@ -28,6 +28,7 @@ export default function TalhaoDetalhe() {
   const x = useDados((s) => s.talhoes.find((z) => z.id === id));
   const { atualizarTalhao, removerTalhao } = useDados();
   const enviar = useUi((s) => s.enviar);
+  const irPara = useUi((s) => s.irPara);
   const mostrar = useToast((s) => s.mostrar);
   const baixar = (n: string, c: string, m: string) => { entregarArquivo(n, c, m); mostrar('Arquivo exportado', 'ok'); };
   const [f, setF] = useState({ nome: '', fazenda: '', cultura: 'Soja', safra: '', obs: '' });
@@ -75,6 +76,8 @@ export default function TalhaoDetalhe() {
         </View>
 
         <Botao titulo="Ver no mapa de satélite" tamanho="g" icone={<Ionicons name="map" size={20} color={t.sobrePrimaria} />} onPress={() => { enviar({ tipo: 'ajustar', pontos: x.contorno }); router.navigate('/'); }} />
+
+        <Botao titulo="Traçar rota até o talhão" tamanho="g" variante="suave" icone={<Ionicons name="navigate" size={20} color={t.primaria} />} onPress={() => { const n = x.contorno.length || 1; irPara([x.contorno.reduce((a, c) => a + c[0], 0) / n, x.contorno.reduce((a, c) => a + c[1], 0) / n], x.nome); router.navigate('/rotas'); }} />
 
         <Cartao style={{ gap: 12 }}>
           <Text style={[tipo.subtitulo, { color: t.texto }]}>Dados do talhão</Text>

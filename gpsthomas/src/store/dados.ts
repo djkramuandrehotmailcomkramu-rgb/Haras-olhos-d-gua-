@@ -78,7 +78,9 @@ export type Comando =
 
 /** Estado de interface compartilhado entre telas (não persiste). */
 type SemN<T> = T extends unknown ? Omit<T, 'n'> : never;
-export const useUi = create<{ comando: Comando | null; enviar: (c: SemN<Comando>) => void }>((set) => ({
+export const useUi = create<{ comando: Comando | null; enviar: (c: SemN<Comando>) => void; destino: { coord: Coord; nome: string; n: number } | null; irPara: (coord: Coord, nome: string) => void }>((set) => ({
   comando: null,
+  destino: null,
+  irPara: (coord, nome) => set({ destino: { coord, nome, n: Date.now() } }),
   enviar: (c) => set({ comando: { ...c, n: Date.now() } as Comando }),
 }));

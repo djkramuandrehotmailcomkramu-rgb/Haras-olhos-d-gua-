@@ -13,6 +13,7 @@ type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tab
 
 const ICONES: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
   index: ['map-outline', 'map'],
+  rotas: ['navigate-circle-outline', 'navigate-circle'],
   talhoes: ['leaf-outline', 'leaf'],
   medicoes: ['analytics-outline', 'analytics'],
   mais: ['ellipsis-horizontal-circle-outline', 'ellipsis-horizontal-circle'],

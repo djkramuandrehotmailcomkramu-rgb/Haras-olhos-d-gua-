@@ -15,4 +15,11 @@ export type PropsMapa = {
   onAdicionar: (c: Coord) => void;
   onMover: (indice: number, c: Coord) => void;
   onTalhao: (id: string) => void;
+  /** Rotas calculadas (a ativa é desenhada por cima, em azul). */
+  rotas?: Coord[][];
+  rotaAtiva?: number;
+  destino?: Coord | null;
+  /** Quando definido, a câmera acompanha esta posição (modo navegação). */
+  seguir?: Coord | null;
+  onRota?: (indice: number) => void;
 };

@@ -39,7 +39,7 @@ export function MapaInterativo(props: PropsMapa) {
   const P = useRef(props);
   P.current = props;
   const mapa = useRef<L.Map | null>(null);
-  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
+  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
   const primeiraVez = useRef(true);
 
   useEffect(() => {
@@ -52,6 +52,7 @@ export function MapaInterativo(props: PropsMapa) {
     grupos.current = {
       base: L.layerGroup().addTo(m),
       talhoes: L.layerGroup().addTo(m),
+      rotas: L.layerGroup().addTo(m),
       rascunho: L.layerGroup().addTo(m),
       pos: L.layerGroup().addTo(m),
     };
@@ -141,13 +142,41 @@ export function MapaInterativo(props: PropsMapa) {
     L.circleMarker(paraLL(p.coord), { radius: 8, color: '#fff', weight: 3, fillColor: '#3B82F6', fillOpacity: 1, interactive: false }).addTo(g.pos);
   }, [props.posicao]);
 
+  // rotas e destino
+  useEffect(() => {
+    const g = grupos.current;
+    if (!g) return;
+    g.rotas.clearLayers();
+    const rotas = props.rotas ?? [];
+    const ordem = rotas.map((_, i) => i).sort((a, b) => (a === props.rotaAtiva ? 1 : 0) - (b === props.rotaAtiva ? 1 : 0));
+    for (const i of ordem) {
+      const ativa = i === (props.rotaAtiva ?? 0);
+      const ll = rotas[i].map(paraLL);
+      L.polyline(ll, { color: '#fff', weight: ativa ? 11 : 9, opacity: 0.95, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
+      const linha = L.polyline(ll, { color: ativa ? '#2F7DF6' : '#8A97A6', weight: ativa ? 7 : 6, lineCap: 'round', lineJoin: 'round', interactive: !ativa }).addTo(g.rotas);
+      if (!ativa) linha.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onRota?.(i); });
+    }
+    if (props.destino) {
+      const el2 = document.createElement('div');
+      el2.style.cssText = 'width:30px;height:30px;border-radius:50% 50% 50% 0;background:#E5484D;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.5);box-sizing:border-box;';
+      L.marker(paraLL(props.destino), { icon: L.divIcon({ html: el2, className: '', iconSize: [30, 30], iconAnchor: [15, 30] }), interactive: false }).addTo(g.rotas);
+    }
+  }, [props.rotas, props.rotaAtiva, props.destino]);
+
+  // câmera acompanha a posição
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m || !props.seguir) return;
+    m.setView(paraLL(props.seguir), Math.max(m.getZoom(), 17), { animate: true, duration: 0.6 } as L.ZoomPanOptions);
+  }, [props.seguir]);
+
   // comandos (voar para, ajustar)
   useEffect(() => {
     const c = props.comando;
     const m = mapa.current;
     if (!c || !m) return;
     if (c.tipo === 'voar') m.flyTo(paraLL(c.coord), c.zoom ?? 18, { duration: 0.8 });
-    else if (c.pontos.length) m.fitBounds(L.latLngBounds(c.pontos.map(paraLL)), { padding: [70, 70], maxZoom: 18 });
+    else if (c.pontos.length) m.fitBounds(L.latLngBounds(c.pontos.map(paraLL)), { paddingTopLeft: [50, 150], paddingBottomRight: [50, 330], maxZoom: 18 });
   }, [props.comando]);
 
   return (
