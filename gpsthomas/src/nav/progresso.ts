@@ -76,3 +76,8 @@ export function fraseFalada(distM: number, texto: string): string {
   const r = distM >= 200 ? Math.round(distM / 100) * 100 : Math.round(distM / 50) * 50;
   return `Em ${r} metros, ${minus}`;
 }
+
+/** Limite de velocidade (km/h) do trecho em que o veículo está, se a via tiver essa informação. */
+export function limiteNoTrecho(p: RotaPreparada, idx: number): number | null {
+  return p.rota.limites?.[idx] ?? null;
+}

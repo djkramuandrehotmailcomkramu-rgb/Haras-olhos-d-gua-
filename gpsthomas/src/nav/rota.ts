@@ -20,6 +20,8 @@ export type Rota = {
   passos: Passo[];
   /** "via BR-163", a via mais longa da rota */
   via: string;
+  /** limite de velocidade (km/h) de cada trecho da geometria, quando conhecido */
+  limites?: (number | null)[];
 };
 
 /** Servidor de rotas. Troque por um próprio ou pago definindo EXPO_PUBLIC_OSRM_URL. */
@@ -99,13 +101,22 @@ export function interpretarOSRM(json: any): Rota[] {
         if (nome && (s.distance ?? 0) > longo.d) { longo.d = s.distance ?? 0; longo.nome = nome; }
       }
     }
-    return { distanciaM: r.distance ?? 0, duracaoS: r.duration ?? 0, geometria, passos, via: longo.nome ? `via ${longo.nome}` : '' };
+    const limites: (number | null)[] = [];
+    for (const leg of r.legs ?? []) {
+      for (const m of leg.annotation?.maxspeed ?? []) limites.push(typeof m?.speed === 'number' && m.speed > 0 ? m.speed : null);
+    }
+    return {
+      distanciaM: r.distance ?? 0, duracaoS: r.duration ?? 0, geometria, passos, via: longo.nome ? `via ${longo.nome}` : '',
+      limites: limites.length ? limites : undefined,
+    };
   });
 }
 
 export async function calcularRotas(origem: Coord, destino: Coord, sinal?: AbortSignal): Promise<Rota[]> {
   const url = `${BASE}/route/v1/driving/${origem[0]},${origem[1]};${destino[0]},${destino[1]}?overview=full&geometries=geojson&steps=true&alternatives=3`;
-  const r = await fetch(url, { signal: sinal });
+  // Tenta com o limite de velocidade das vias; se o servidor não aceitar, refaz sem ele.
+  let r = await fetch(`${url}&annotations=maxspeed`, { signal: sinal });
+  if (r.status === 400) r = await fetch(url, { signal: sinal });
   if (!r.ok) throw new Error(`Servidor de rotas respondeu ${r.status}`);
   const rotas = interpretarOSRM(await r.json());
   if (rotas.length === 0) throw new Error('Nenhuma rota encontrada entre esses pontos');

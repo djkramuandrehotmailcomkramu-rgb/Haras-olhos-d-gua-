@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { UnidadeArea } from '../geo/unidades';
 import type { Coord } from '../geo/medidas';
+import type { Veiculo } from '../components/veiculos';
 
 export type Recente = { nome: string; sub: string; coord: Coord };
 
@@ -13,6 +14,12 @@ type Prefs = {
   onboardingVisto: boolean;
   recentes: Recente[];
   vozLigada: boolean;
+  veiculo: Veiculo;
+  favoritos: Recente[];
+  viagemAtiva: Recente | null;
+  definirVeiculo: (v: Veiculo) => void;
+  alternarFavorito: (r: Recente) => void;
+  definirViagemAtiva: (r: Recente | null) => void;
   lembrarDestino: (r: Recente) => void;
   definirVoz: (v: boolean) => void;
   concluirOnboarding: () => void;
@@ -28,6 +35,12 @@ export const usePrefs = create<Prefs>()(
       onboardingVisto: false,
       recentes: [],
       vozLigada: true,
+      veiculo: 'carro',
+      favoritos: [],
+      viagemAtiva: null,
+      definirVeiculo: (veiculo) => set({ veiculo }),
+      alternarFavorito: (r) => set((s) => ({ favoritos: s.favoritos.some((x) => x.nome === r.nome) ? s.favoritos.filter((x) => x.nome !== r.nome) : [r, ...s.favoritos].slice(0, 12) })),
+      definirViagemAtiva: (viagemAtiva) => set({ viagemAtiva }),
       lembrarDestino: (r) => set((s) => ({ recentes: [r, ...s.recentes.filter((x) => x.nome !== r.nome)].slice(0, 6) })),
       definirVoz: (vozLigada) => set({ vozLigada }),
       concluirOnboarding: () => set({ onboardingVisto: true }),

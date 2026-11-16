@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Animated, { FadeInDown, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,12 +12,15 @@ import { areaM2, type Coord } from '../../geo/medidas';
 import { formatarArea, formatarDistancia } from '../../geo/unidades';
 import { buscarLugar, type Lugar } from '../../nav/geocodificar';
 import { calcularRotas, type Rota } from '../../nav/rota';
-import { estadoNavegacao, formatarDuracao, fraseFalada, prepararRota, projetar } from '../../nav/progresso';
+import { estadoNavegacao, formatarDuracao, fraseFalada, limiteNoTrecho, prepararRota, projetar } from '../../nav/progresso';
+import { rumoEntre, suavizarRumo, velocidadeKmh, formatarKmh, type Amostra } from '../../nav/movimento';
+import { IconeVeiculo } from '../../components/IconeVeiculo';
+import { VEICULOS } from '../../components/veiculos';
 import { falar, manterTelaLigada, pararVoz } from '../../nav/voz';
 import { useDados, useUi, type Comando } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
-import { fonte, raio, tipo, useTema } from '../../theme';
+import { fonte, raio, tipo, useTema, useTemaForcado } from '../../theme';
 
 type Etapa = 'busca' | 'previa' | 'nav';
 
@@ -40,7 +43,9 @@ export default function RotasTela() {
   const ins = useSafeAreaInsets();
   const gps = useLocalizacao();
   const { talhoes } = useDados();
-  const { unidadeArea, camada, recentes, lembrarDestino, vozLigada, definirVoz } = usePrefs();
+  const { unidadeArea, camada, recentes, lembrarDestino, vozLigada, definirVoz, veiculo, definirVeiculo, favoritos, alternarFavorito, viagemAtiva, definirViagemAtiva } = usePrefs();
+  const registrarViagem = useDados((x) => x.registrarViagem);
+  const forcarTema = useTemaForcado((x) => x.definir);
   const mostrar = useToast((s) => s.mostrar);
   const destinoUi = useUi((s) => s.destino);
 
@@ -58,18 +63,72 @@ export default function RotasTela() {
   const [seguir, setSeguir] = useState<Coord | null>(null);
   const [along, setAlong] = useState(0);
   const [recalculando, setRecalculando] = useState(false);
+  const [kmh, setKmh] = useState(0);
+  const [rumo, setRumo] = useState(0);
+  const [semSinal, setSemSinal] = useState(false);
 
   const idxRef = useRef(0);
   const fora = useRef(0);
   const ultimoRecalculo = useRef(0);
   const falados = useRef<Set<string>>(new Set());
   const abortar = useRef<AbortController | null>(null);
+  const hist = useRef<Amostra[]>([]);
+  const ultimoPos = useRef(0);
+  const aviso = useRef({ excesso: 0, sinal: 0 });
+  const viagem = useRef({ inicio: 0, vmax: 0, soma: 0, n: 0 });
+  const autoIniciar = useRef(false);
 
   const rota = rotas[ativa] ?? null;
   const prep = useMemo(() => (rota ? prepararRota(rota) : null), [rota]);
   const estado = useMemo(() => (prep ? estadoNavegacao(prep, along) : null), [prep, along]);
 
   useEffect(() => { gps.ligar(); }, []);
+
+  // Velocidade e rumo do veículo, a cada posição do GPS
+  useEffect(() => {
+    const p = gps.pos;
+    if (!p) return;
+    ultimoPos.current = Date.now();
+    setSemSinal(false);
+    hist.current = [...hist.current.slice(-5), { coord: p.coord, tempoMs: p.tempoMs, velMs: p.velocidade }];
+    const v = velocidadeKmh(hist.current);
+    setKmh(v);
+    if (v > 4) {
+      const h = hist.current;
+      const a = h.length > 1 ? h[h.length - 2].coord : null;
+      const novo = p.rumo ?? (a && (a[0] !== p.coord[0] || a[1] !== p.coord[1]) ? rumoEntre(a, p.coord) : null);
+      if (novo != null) setRumo((r) => suavizarRumo(r, novo, 0.6));
+    }
+  }, [gps.pos]);
+
+  // Sem posições novas por alguns segundos: considera parado (evita velocidade "congelada")
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (ultimoPos.current && Date.now() - ultimoPos.current > 6000) { hist.current = []; setKmh(0); }
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Noite: navegação em tema escuro entre 18h e 6h
+  useEffect(() => {
+    const h = new Date().getHours();
+    forcarTema(etapa === 'nav' && (h >= 18 || h < 6) ? 'escuro' : 'auto');
+    return () => forcarTema('auto');
+  }, [etapa]);
+
+  // Sinal de GPS perdido durante a navegação
+  useEffect(() => {
+    if (etapa !== 'nav') return;
+    const id = setInterval(() => {
+      if (Date.now() - ultimoPos.current > 9000 && Date.now() - aviso.current.sinal > 30000) {
+        aviso.current.sinal = Date.now();
+        setSemSinal(true);
+        mostrar('Sinal de GPS fraco ou perdido', 'erro');
+        if (usePrefs.getState().vozLigada) falar('Sinal de GPS fraco.');
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [etapa]);
   useEffect(() => { if (gps.erro) mostrar(gps.erro, 'erro'); }, [gps.erro]);
 
   // Destino vindo de outra tela (ex.: "Traçar rota até o talhão")
@@ -79,6 +138,11 @@ export default function RotasTela() {
     setDestino(l);
     tracar(l);
   }, [destinoUi?.n]);
+
+  // Retomar a viagem depois de fechar o app: recalcula a partir de onde você está e inicia
+  useEffect(() => {
+    if (autoIniciar.current && etapa === 'previa' && rota) { autoIniciar.current = false; iniciar(); }
+  }, [etapa, rota]);
 
   // Assim que o GPS responde, continua o que ficou esperando
   useEffect(() => {
@@ -137,10 +201,20 @@ export default function RotasTela() {
     setEtapa('nav');
     setSeguir(gps.pos?.coord ?? null);
     manterTelaLigada(true);
+    viagem.current = { inicio: Date.now(), vmax: 0, soma: 0, n: 0 };
+    if (destino) definirViagemAtiva({ nome: destino.nome, sub: destino.sub, coord: destino.coord });
     if (vozLigada) falar(`Iniciando a rota. ${rota.passos[0]?.texto ?? ''}. Destino a ${formatarDistancia(rota.distanciaM).replace('.', ',')}.`);
   };
 
-  const encerrar = () => {
+  const encerrar = (concluida = false) => {
+    if (etapa === 'nav' && destino && rota && viagem.current.inicio) {
+      const dur = (Date.now() - viagem.current.inicio) / 1000;
+      const andou = concluida ? rota.distanciaM : along;
+      if (andou > 200) {
+        registrarViagem({ destino: destino.nome, inicioMs: viagem.current.inicio, fimMs: Date.now(), distanciaM: andou, vmedKmh: dur > 0 ? (andou / dur) * 3.6 : 0, vmaxKmh: viagem.current.vmax });
+      }
+    }
+    definirViagemAtiva(null);
     pararVoz();
     manterTelaLigada(false);
     setSeguir(null);
@@ -162,8 +236,18 @@ export default function RotasTela() {
     if (est.chegou) {
       if (vozLigada) falar('Você chegou ao seu destino.');
       mostrar('Você chegou ao destino', 'ok');
-      encerrar();
+      encerrar(true);
       return;
+    }
+
+    // Estatísticas da viagem e alerta de excesso de velocidade
+    const v = velocidadeKmh(hist.current);
+    if (v > 3) { viagem.current.soma += v; viagem.current.n += 1; }
+    viagem.current.vmax = Math.max(viagem.current.vmax, v);
+    const lim = limiteNoTrecho(prep, pr.idx);
+    if (vozLigada && lim && v > lim + 7 && Date.now() - aviso.current.excesso > 30000) {
+      aviso.current.excesso = Date.now();
+      falar(`Atenção, limite de ${lim} quilômetros por hora.`);
     }
 
     // Fora da rota? Recalcula a partir de onde você está
@@ -191,6 +275,17 @@ export default function RotasTela() {
       }
     }
   }, [gps.pos, etapa]);
+
+  const linkMapas = (c: Coord) => `https://www.google.com/maps/dir/?api=1&destination=${c[1]},${c[0]}&travelmode=driving`;
+  const abrirExterno = (url: string) => { Linking.openURL(url).catch(() => mostrar('Não foi possível abrir o aplicativo.', 'erro')); };
+  const compartilhar = async () => {
+    if (!destino || !estado) return;
+    const msg = `Estou a caminho de ${destino.nome}. Chego por volta das ${horaChegada(estado.restanteS)} (faltam ${formatarDistancia(estado.restanteM)}).\n${linkMapas(destino.coord)}`;
+    try {
+      if (Platform.OS === 'web' && (navigator as any).share) await (navigator as any).share({ title: 'Minha viagem', text: msg });
+      else abrirExterno(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+    } catch {}
+  };
 
   const aoTocarNoMapa = (c: Coord) => {
     if (!escolhendo) return;
@@ -229,6 +324,8 @@ export default function RotasTela() {
         rotaAtiva={ativa}
         destino={destino?.coord ?? null}
         seguir={etapa === 'nav' ? seguir : null}
+        veiculo={etapa === 'nav' && gps.pos ? { tipo: veiculo, rumo, coord: gps.pos.coord } : null}
+        progressoIdx={etapa === 'nav' ? idxRef.current : 0}
         onRota={(i) => { setAtiva(i); setComando({ n: Date.now(), tipo: 'ajustar', pontos: rotas[i].geometria }); }}
       />
 
@@ -242,7 +339,8 @@ export default function RotasTela() {
                 <TextInput
                   value={texto}
                   onChangeText={setTexto}
-                  placeholder="Para onde? Cidade, endereço, rodovia…"
+                  editable={kmh < 8}
+                  placeholder={kmh < 8 ? 'Para onde? Cidade, endereço, rodovia…' : 'Pare o veículo para buscar um destino'}
                   placeholderTextColor={t.textoSuave}
                   returnKeyType="search"
                   accessibilityLabel="Buscar destino"
@@ -256,6 +354,20 @@ export default function RotasTela() {
             </Vidro>
           </Animated.View>
 
+          {viagemAtiva && texto.trim().length < 3 && (
+            <Animated.View entering={FadeInDown.duration(250)}>
+              <Vidro>
+                <View style={{ padding: 14, gap: 10 }}>
+                  <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.texto }}>Você tem uma viagem em andamento para {viagemAtiva.nome}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Botao titulo="Retomar" icone={<Ionicons name="play" size={18} color={t.sobrePrimaria} />} onPress={() => { autoIniciar.current = true; tracar({ nome: viagemAtiva.nome, sub: viagemAtiva.sub, coord: viagemAtiva.coord }); }} />
+                    <Botao titulo="Descartar" variante="suave" onPress={() => definirViagemAtiva(null)} />
+                  </View>
+                </View>
+              </Vidro>
+            </Animated.View>
+          )}
+
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable onPress={() => { Haptics.selectionAsync(); setEscolhendo((v) => !v); }}>
               <Vidro raioBorda={raio.pilula}>
@@ -266,6 +378,21 @@ export default function RotasTela() {
               </Vidro>
             </Pressable>
           </View>
+
+          {texto.trim().length < 3 && favoritos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {favoritos.map((f) => (
+                <Pressable key={f.nome} onPress={() => { Haptics.selectionAsync(); tracar(f); }}>
+                  <Vidro raioBorda={raio.pilula}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 38 }}>
+                      <Ionicons name="star" size={15} color={t.atencao} />
+                      <Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.texto }}>{f.nome}</Text>
+                    </View>
+                  </Vidro>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
 
           {(resultados.length > 0 || (texto.trim().length < 3 && recentes.length > 0)) && (
             <Animated.View entering={FadeInDown.duration(250)}>
@@ -305,8 +432,26 @@ export default function RotasTela() {
                   <Text numberOfLines={1} style={[tipo.subtitulo, { color: t.texto }]}>{destino?.nome}</Text>
                   <Text numberOfLines={1} style={[tipo.legenda, { color: t.textoSuave }]}>{destino?.sub}</Text>
                 </View>
-                <Pressable onPress={encerrar} hitSlop={10}><Ionicons name="close-circle" size={26} color={t.textoSuave} /></Pressable>
+                {destino && (
+                  <Pressable onPress={() => alternarFavorito({ nome: destino.nome, sub: destino.sub, coord: destino.coord })} hitSlop={10} accessibilityLabel="Favoritar destino">
+                    <Ionicons name={favoritos.some((f) => f.nome === destino.nome) ? 'star' : 'star-outline'} size={24} color={t.atencao} />
+                  </Pressable>
+                )}
+                <Pressable onPress={() => encerrar()} hitSlop={10}><Ionicons name="close-circle" size={26} color={t.textoSuave} /></Pressable>
               </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {VEICULOS.map((v) => {
+                  const sel = v.id === veiculo;
+                  return (
+                    <Pressable key={v.id} onPress={() => { Haptics.selectionAsync(); definirVeiculo(v.id); }} accessibilityLabel={`Veículo: ${v.rotulo}`}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 14, paddingLeft: 4, height: 46, borderRadius: raio.pilula, backgroundColor: sel ? t.primariaSuave : t.cartaoSuave, borderWidth: 1.5, borderColor: sel ? t.primaria : 'transparent' }}>
+                      <IconeVeiculo tipo={v.id} cor={t.primaria} tamanho={38} />
+                      <Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.texto }}>{v.rotulo}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
               <View style={{ gap: 8 }}>
                 {rotas.map((r, i) => {
@@ -329,6 +474,13 @@ export default function RotasTela() {
               </View>
 
               <Botao titulo="Iniciar navegação" tamanho="g" icone={<Ionicons name="navigate" size={20} color={t.sobrePrimaria} />} onPress={iniciar} />
+              {destino && (
+                <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+                  <Pressable onPress={() => abrirExterno(linkMapas(destino.coord))}><Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.primaria }}>Abrir no Google Maps</Text></Pressable>
+                  <Text style={{ color: t.textoSuave }}>·</Text>
+                  <Pressable onPress={() => abrirExterno(`https://waze.com/ul?ll=${destino.coord[1]},${destino.coord[0]}&navigate=yes`)}><Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.primaria }}>Abrir no Waze</Text></Pressable>
+                </View>
+              )}
             </View>
           </Vidro>
         </Animated.View>
@@ -347,6 +499,32 @@ export default function RotasTela() {
             </View>
           </Animated.View>
 
+          <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, bottom: Math.max(ins.bottom, 12) + 186, zIndex: 10 }}>
+            {(() => {
+              const lim = prep ? limiteNoTrecho(prep, idxRef.current) : null;
+              const excesso = lim != null && kmh > lim + 5;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                  <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: excesso ? t.perigo : t.cartao, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: excesso ? '#fff' : t.linha, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }} accessibilityLabel={`Velocidade ${formatarKmh(kmh)} quilômetros por hora`}>
+                    <Text style={{ fontFamily: fonte.negrito, fontSize: 32, lineHeight: 34, color: excesso ? '#fff' : t.texto, fontVariant: ['tabular-nums'] }}>{formatarKmh(kmh)}</Text>
+                    <Text style={{ fontFamily: fonte.semi, fontSize: 11, color: excesso ? '#fff' : t.textoSuave }}>km/h</Text>
+                  </View>
+                  {lim != null && (
+                    <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: '#fff', borderWidth: 5, borderColor: '#E5484D', alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={`Limite ${lim}`}>
+                      <Text style={{ fontFamily: fonte.negrito, fontSize: 16, color: '#111' }}>{lim}</Text>
+                    </View>
+                  )}
+                  {(semSinal || (gps.pos?.precisaoM ?? 0) > 50) && (
+                    <View style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: t.atencao, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}>
+                      <Ionicons name="warning" size={14} color="#1a1200" />
+                      <Text style={{ fontFamily: fonte.semi, fontSize: 12, color: '#1a1200' }}>GPS fraco</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+          </Animated.View>
+
           <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 10 }}>
             <Vidro>
               <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 }}>
@@ -359,12 +537,17 @@ export default function RotasTela() {
                     <Ionicons name={vozLigada ? 'volume-high' : 'volume-mute'} size={22} color={t.texto} />
                   </View>
                 </Pressable>
+                <Pressable onPress={compartilhar} hitSlop={8} accessibilityLabel="Compartilhar viagem">
+                  <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: t.cartaoSuave, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="share-social" size={22} color={t.texto} />
+                  </View>
+                </Pressable>
                 <Pressable onPress={() => { if (gps.pos) setSeguir([...gps.pos.coord] as Coord); }} hitSlop={8} accessibilityLabel="Recentralizar">
                   <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: t.cartaoSuave, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="locate" size={22} color={t.texto} />
                   </View>
                 </Pressable>
-                <Botao titulo="Sair" variante="perigo" onPress={encerrar} />
+                <Botao titulo="Sair" variante="perigo" onPress={() => encerrar()} />
               </View>
             </Vidro>
           </Animated.View>

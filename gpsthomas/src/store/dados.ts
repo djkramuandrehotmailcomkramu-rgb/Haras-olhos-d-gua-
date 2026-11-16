@@ -22,6 +22,8 @@ export type Medicao = {
   criadoEm: number;
 };
 
+export type Viagem = { id: string; destino: string; inicioMs: number; fimMs: number; distanciaM: number; vmedKmh: number; vmaxKmh: number };
+
 export const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 const memoria: Record<string, string> = {};
@@ -40,6 +42,8 @@ const armazem: StateStorage = {
 type Dados = {
   talhoes: Talhao[];
   medicoes: Medicao[];
+  viagens: Viagem[];
+  registrarViagem: (v: Omit<Viagem, 'id'>) => void;
   adicionarTalhao: (t: Omit<Talhao, 'id' | 'criadoEm'>) => string;
   atualizarTalhao: (id: string, p: Partial<Omit<Talhao, 'id'>>) => void;
   removerTalhao: (id: string) => void;
@@ -53,6 +57,8 @@ export const useDados = create<Dados>()(
     (set) => ({
       talhoes: [],
       medicoes: [],
+      viagens: [],
+      registrarViagem: (v) => set((s) => ({ viagens: [{ ...v, id: novoId() }, ...s.viagens].slice(0, 30) })),
       adicionarTalhao: (t) => {
         const id = novoId();
         set((s) => ({ talhoes: [{ ...t, id, criadoEm: Date.now() }, ...s.talhoes] }));

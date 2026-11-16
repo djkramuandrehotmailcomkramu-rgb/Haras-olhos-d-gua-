@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import type { Coord } from './medidas';
 
-export type Posicao = { coord: Coord; precisaoM: number | null; velocidade: number | null; tempoMs: number };
+export type Posicao = { coord: Coord; precisaoM: number | null; velocidade: number | null; rumo: number | null; tempoMs: number };
 
 /** Liga/desliga o GPS e entrega a última posição. */
 export function useLocalizacao() {
@@ -28,7 +28,8 @@ export function useLocalizacao() {
           setPos({
             coord: [l.coords.longitude, l.coords.latitude],
             precisaoM: l.coords.accuracy ?? null,
-            velocidade: l.coords.speed ?? null,
+            velocidade: l.coords.speed != null && isFinite(l.coords.speed) && l.coords.speed >= 0 ? l.coords.speed : null,
+            rumo: l.coords.heading != null && isFinite(l.coords.heading) && l.coords.heading >= 0 ? l.coords.heading : null,
             tempoMs: l.timestamp,
           });
         },

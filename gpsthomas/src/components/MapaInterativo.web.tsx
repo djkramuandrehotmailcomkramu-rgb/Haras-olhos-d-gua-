@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Coord } from '../geo/medidas';
 import type { PropsMapa } from './MapaInterativo.types';
+import { svgVeiculo, type Veiculo } from './veiculos';
 
 const paraLL = (c: Coord): L.LatLngTuple => [c[1], c[0]];
 const deLL = (p: L.LatLng): Coord => [p.lng, p.lat];
@@ -32,7 +33,7 @@ function centro(pts: Coord[]): Coord {
   return [pts.reduce((s, c) => s + c[0], 0) / n, pts.reduce((s, c) => s + c[1], 0) / n];
 }
 
-const CSS = '.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+const CSS = '.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
 
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
@@ -41,6 +42,7 @@ export function MapaInterativo(props: PropsMapa) {
   const mapa = useRef<L.Map | null>(null);
   const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
   const primeiraVez = useRef(true);
+  const veic = useRef<{ mk: L.Marker; giro: HTMLDivElement; tipo: Veiculo } | null>(null);
 
   useEffect(() => {
     if (!el.current) return;
@@ -137,10 +139,36 @@ export function MapaInterativo(props: PropsMapa) {
     if (!g) return;
     g.pos.clearLayers();
     const p = props.posicao;
-    if (!p) return;
+    if (!p || props.veiculo) return;
     if (p.precisaoM) L.circle(paraLL(p.coord), { radius: p.precisaoM, color: '#3B82F6', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(g.pos);
     L.circleMarker(paraLL(p.coord), { radius: 8, color: '#fff', weight: 3, fillColor: '#3B82F6', fillOpacity: 1, interactive: false }).addTo(g.pos);
-  }, [props.posicao]);
+  }, [props.posicao, !!props.veiculo]);
+
+  // veículo (ícone que gira com o rumo)
+  useEffect(() => {
+    const g = grupos.current;
+    const v = props.veiculo;
+    if (!g || !mapa.current) return;
+    if (!v) {
+      veic.current?.mk.remove();
+      veic.current = null;
+      return;
+    }
+    if (!veic.current || veic.current.tipo !== v.tipo) {
+      veic.current?.mk.remove();
+      const caixa = document.createElement('div');
+      caixa.style.cssText = 'width:64px;height:64px;filter:drop-shadow(0 4px 8px rgba(0,0,0,.5));';
+      const giro = document.createElement('div');
+      giro.className = 'gt-veic-giro';
+      giro.style.cssText = 'width:64px;height:64px;';
+      giro.innerHTML = svgVeiculo(v.tipo, '#1F7A3E', 64);
+      caixa.appendChild(giro);
+      const mk = L.marker(paraLL(v.coord), { icon: L.divIcon({ html: caixa, className: 'gt-veic', iconSize: [64, 64], iconAnchor: [32, 32] }), interactive: false, zIndexOffset: 1000 }).addTo(mapa.current!);
+      veic.current = { mk, giro, tipo: v.tipo };
+    }
+    veic.current.mk.setLatLng(paraLL(v.coord));
+    veic.current.giro.style.transform = `rotate(${v.rumo}deg)`;
+  }, [props.veiculo?.coord, props.veiculo?.rumo, props.veiculo?.tipo]);
 
   // rotas e destino
   useEffect(() => {
@@ -154,6 +182,9 @@ export function MapaInterativo(props: PropsMapa) {
       const ll = rotas[i].map(paraLL);
       L.polyline(ll, { color: '#fff', weight: ativa ? 11 : 9, opacity: 0.95, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
       const linha = L.polyline(ll, { color: ativa ? '#2F7DF6' : '#8A97A6', weight: ativa ? 7 : 6, lineCap: 'round', lineJoin: 'round', interactive: !ativa }).addTo(g.rotas);
+      if (ativa && props.progressoIdx && props.progressoIdx > 0) {
+        L.polyline(rotas[i].slice(0, props.progressoIdx + 1).map(paraLL), { color: '#8A97A6', weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
+      }
       if (!ativa) linha.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onRota?.(i); });
     }
     if (props.destino) {
@@ -161,7 +192,7 @@ export function MapaInterativo(props: PropsMapa) {
       el2.style.cssText = 'width:30px;height:30px;border-radius:50% 50% 50% 0;background:#E5484D;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.5);box-sizing:border-box;';
       L.marker(paraLL(props.destino), { icon: L.divIcon({ html: el2, className: '', iconSize: [30, 30], iconAnchor: [15, 30] }), interactive: false }).addTo(g.rotas);
     }
-  }, [props.rotas, props.rotaAtiva, props.destino]);
+  }, [props.rotas, props.rotaAtiva, props.destino, props.progressoIdx]);
 
   // câmera acompanha a posição
   useEffect(() => {

@@ -8,6 +8,10 @@ import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
+import { IconeVeiculo } from '../../components/IconeVeiculo';
+import { VEICULOS } from '../../components/veiculos';
+import { formatarDistancia } from '../../geo/unidades';
+import { formatarDuracao } from '../../nav/progresso';
 import { ROTULO_AREA, type UnidadeArea } from '../../geo/unidades';
 import { lerArquivo, paraCSV, paraGeoJSON, paraGPX, paraKML } from '../../io/formatos';
 import { entregarArquivo, escolherArquivo } from '../../io/arquivos';
@@ -22,7 +26,8 @@ function confirmar(msg: string, ok: () => void) {
 
 export default function MaisTela() {
   const t = useTema();
-  const { unidadeArea, definirUnidadeArea } = usePrefs();
+  const { unidadeArea, definirUnidadeArea, veiculo, definirVeiculo } = usePrefs();
+  const viagens = useDados((x) => x.viagens);
   const { talhoes, medicoes, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
   const [msg, setMsg] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
@@ -67,6 +72,35 @@ export default function MaisTela() {
         </View>
       </Cartao>
 
+      <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>MEU VEÍCULO</Text>
+      <Cartao style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 10 }}>
+        {VEICULOS.map((v) => {
+          const sel = v.id === veiculo;
+          return (
+            <Pressable key={v.id} onPress={() => { Haptics.selectionAsync(); definirVeiculo(v.id); }} style={{ alignItems: 'center', gap: 2, paddingVertical: 8, paddingHorizontal: 10, borderRadius: raio.md, backgroundColor: sel ? t.primariaSuave : 'transparent' }}>
+              <IconeVeiculo tipo={v.id} cor={t.primaria} tamanho={48} />
+              <Text style={{ fontFamily: sel ? fonte.semi : fonte.regular, fontSize: 12.5, color: t.texto }}>{v.rotulo}</Text>
+            </Pressable>
+          );
+        })}
+      </Cartao>
+
+      {viagens.length > 0 && (
+        <>
+          <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>VIAGENS RECENTES</Text>
+          <Cartao style={{ gap: 12 }}>
+            {viagens.slice(0, 5).map((v) => (
+              <View key={v.id} style={{ gap: 2 }}>
+                <Text numberOfLines={1} style={{ fontFamily: fonte.semi, fontSize: 15, color: t.texto }}>{v.destino}</Text>
+                <Text style={[tipo.legenda, { color: t.textoSuave }]}>
+                  {new Date(v.inicioMs).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} · {formatarDistancia(v.distanciaM)} · {formatarDuracao((v.fimMs - v.inicioMs) / 1000)} · média {Math.round(v.vmedKmh)} km/h · máx. {Math.round(v.vmaxKmh)} km/h
+                </Text>
+              </View>
+            ))}
+          </Cartao>
+        </>
+      )}
+
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>UNIDADE DE ÁREA</Text>
       <Cartao style={{ padding: 6 }}>
         {UNIDADES.map((u, i) => {
@@ -90,7 +124,7 @@ export default function MaisTela() {
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
       <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa, busca e rotas © colaboradores do OpenStreetMap (Nominatim, OSRM)</Text>
-      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.3</Text>
+      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.5</Text>
     </Tela>
   );
 }

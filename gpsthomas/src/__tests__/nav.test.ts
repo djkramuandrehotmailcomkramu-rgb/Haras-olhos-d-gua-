@@ -74,3 +74,46 @@ describe('progresso', () => {
     expect(formatarDuracao(1500)).toBe('25 min');
   });
 });
+
+import { rumoEntre, velocidadeKmh, suavizarRumo, type Amostra } from '../nav/movimento';
+import { limiteNoTrecho } from '../nav/progresso';
+
+describe('movimento', () => {
+  it('rumo entre pontos', () => {
+    expect(Math.round(rumoEntre([0, 0], [0, 1]))).toBe(0); // norte
+    expect(Math.round(rumoEntre([0, 0], [1, 0]))).toBe(90); // leste
+    expect(Math.round(rumoEntre([0, 0], [0, -1]))).toBe(180); // sul
+    expect(Math.round(rumoEntre([0, 0], [-1, 0]))).toBe(270); // oeste
+  });
+  it('velocidade a partir da posição (GPS sem speed)', () => {
+    // 100 m em 5 s = 20 m/s = 72 km/h
+    const g = 100 / 111132;
+    const h: Amostra[] = [0, 1, 2, 3].map((i) => ({ coord: [0, i * g] as [number, number], tempoMs: i * 5000, velMs: null }));
+    expect(Math.round(velocidadeKmh(h))).toBe(72);
+  });
+  it('usa a velocidade do GPS quando existe e zera parado', () => {
+    const a: Amostra[] = [{ coord: [0, 0], tempoMs: 0, velMs: 25 }, { coord: [0, 0], tempoMs: 1000, velMs: 25 }];
+    expect(Math.round(velocidadeKmh(a))).toBe(90);
+    const parado: Amostra[] = [{ coord: [0, 0], tempoMs: 0, velMs: 0.2 }, { coord: [0, 0], tempoMs: 1000, velMs: 0.1 }];
+    expect(velocidadeKmh(parado)).toBe(0);
+    expect(velocidadeKmh([])).toBe(0);
+  });
+  it('gira pelo menor arco', () => {
+    expect(Math.round(suavizarRumo(350, 10, 1))).toBe(10);
+    expect(Math.round(suavizarRumo(350, 10, 0.5))).toBe(0);
+    expect(Math.round(suavizarRumo(10, 350, 0.5))).toBe(0);
+  });
+});
+
+describe('limite de velocidade', () => {
+  it('lê maxspeed do OSRM e ignora desconhecidos', () => {
+    const j = JSON.parse(JSON.stringify(osrm));
+    j.routes[0].legs[0].annotation = { maxspeed: [{ speed: 80, unit: 'km/h' }, { unknown: true }] };
+    const [r] = interpretarOSRM(j);
+    expect(r.limites).toEqual([80, null]);
+    const prep = prepararRota(r);
+    expect(limiteNoTrecho(prep, 0)).toBe(80);
+    expect(limiteNoTrecho(prep, 1)).toBeNull();
+    expect(limiteNoTrecho(prepararRota(interpretarOSRM(osrm)[0]), 0)).toBeNull();
+  });
+});

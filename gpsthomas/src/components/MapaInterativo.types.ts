@@ -1,6 +1,7 @@
 import type { Coord } from '../geo/medidas';
 import type { Comando } from '../store/dados';
 import type { Camada } from '../store/prefs';
+import type { Veiculo } from './veiculos';
 
 export type TalhaoMapa = { id: string; nome: string; rotulo: string; contorno: Coord[] };
 
@@ -22,4 +23,8 @@ export type PropsMapa = {
   /** Quando definido, a câmera acompanha esta posição (modo navegação). */
   seguir?: Coord | null;
   onRota?: (indice: number) => void;
+  /** Veículo desenhado no lugar da bolinha de GPS (modo navegação). */
+  veiculo?: { tipo: Veiculo; rumo: number; coord: Coord } | null;
+  /** Segmento da rota já percorrido (desenhado em cinza). */
+  progressoIdx?: number;
 };

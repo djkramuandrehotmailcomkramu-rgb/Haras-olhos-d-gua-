@@ -1,4 +1,7 @@
 import { useColorScheme } from 'react-native';
+import { create } from 'zustand';
+
+export const useTemaForcado = create<{ modo: 'auto' | 'escuro'; definir: (m: 'auto' | 'escuro') => void }>((set) => ({ modo: 'auto', definir: (modo) => set({ modo }) }));
 
 export type Paleta = {
   fundo: string; cartao: string; cartaoSuave: string; texto: string; textoSuave: string; linha: string;
@@ -44,7 +47,9 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
 
 
 export function useTema(): Paleta {
-  return useColorScheme() === 'dark' ? paletas.escuro : paletas.claro;
+  const forcado = useTemaForcado((s) => s.modo);
+  const sistema = useColorScheme();
+  return forcado === 'escuro' || sistema === 'dark' ? paletas.escuro : paletas.claro;
 }
 
 export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
