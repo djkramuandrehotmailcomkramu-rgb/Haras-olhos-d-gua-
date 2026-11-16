@@ -61,7 +61,7 @@ function importSeed() { // coletas da planilha, embutidas no app; entram uma vez
 }
 importSeed();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch { toast('Sem espaço para salvar no aparelho'); } };
-const ui = { tab: 'home', period: 'd7', allRank: false };
+const ui = { tab: 'home', period: 'd7', allRank: false, update: null, busy: false };
 const readings = () => db.readings.filter(r => !r.deleted && FIELD[r.fieldId]);
 const getReading = (fid, date) => db.readings.find(r => r.id === fid + '|' + date && !r.deleted);
 
@@ -156,6 +156,33 @@ function openSheet(html, { full = false, init } = {}) {
 function closeSheet() { if (layers.at(-1)?.type !== 'tab') closeTop(); }
 const nav = (title, sub = '', left = '') => `<div class="nav">${left || '<span></span>'}<b>${title}${sub ? `<small>${sub}</small>` : ''}</b><button class="ibtn" data-act="close" aria-label="Fechar">${I.close}</button></div>`;
 
+/* ---------- atualização do app ---------- */
+const APP_VERSION = '2.6.0'; // mantenha igual ao VERSION de sw.js
+const remoteVersion = async () => { // versão publicada no servidor (null = sem internet)
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 7000);
+  try { const r = await fetch('sw.js?v=' + Date.now(), { cache: 'no-store', signal: ctl.signal }); if (!r.ok) return null; return (await r.text()).match(/VERSION\s*=\s*'pluvio-([^']+)'/)?.[1] ?? null; }
+  catch { return null; } finally { clearTimeout(t); }
+};
+function setUpdate(v) { const newer = v && v !== APP_VERSION ? v : null; if (newer !== ui.update) { ui.update = newer; render({ still: true }); } }
+async function updateApp() {
+  if (ui.busy) return;
+  ui.busy = true; render({ still: true });
+  const v = await remoteVersion();
+  ui.busy = false;
+  if (v === null) { render({ still: true }); return toast('Sem internet. Conecte e tente de novo.'); }
+  setUpdate(v); render({ still: true });
+  if (v === APP_VERSION) return toast('Você já está na versão mais recente');
+  toast('Atualizando…'); buzz();
+  try { // limpa a cópia guardada no aparelho e baixa tudo de novo; as leituras não são tocadas
+    for (const r of await navigator.serviceWorker?.getRegistrations?.() ?? []) await r.unregister();
+    for (const k of await caches.keys()) if (k.startsWith('pluvio-')) await caches.delete(k);
+    await Promise.all(['./', 'index.html', 'styles.css', 'app.js', 'coletas.js', 'sw.js', 'manifest.webmanifest'].map(f => fetch(f, { cache: 'reload' }).catch(() => {})));
+  } catch {}
+  location.reload();
+}
+let lastCheck = 0;
+const checkUpdate = async () => { if (Date.now() - lastCheck < 3e5 || !navigator.onLine) return; lastCheck = Date.now(); setUpdate(await remoteVersion()); };
+
 /* ---------- efeitos leves ---------- */
 const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TABS = ['home', 'history', 'more'];
@@ -168,7 +195,7 @@ function countUp(el) { // o número "sobe" até o valor
   requestAnimationFrame(step);
 }
 function render({ slide = 0, still = false } = {}) {
-  $$('#tabbar [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  $$('#tabbar [data-tab]').forEach(b => { b.classList.toggle('on', b.dataset.tab === ui.tab); b.classList.toggle('dot', b.dataset.tab === 'more' && !!ui.update); });
   const v = $('#view'), fx = motionOK() && !still;
   v.classList.toggle('still', !fx);
   v.innerHTML = ({ home: viewHome, history: viewHistory, more: viewMore })[ui.tab]();
@@ -366,6 +393,7 @@ function viewMore() {
   const s = db.settings;
   return head('Mais') + `
     <div class="panel">
+      <button class="row" data-act="update"${ui.busy ? ' disabled' : ''}><div class="grow"><div class="t">${ui.update ? 'Atualizar o app' : 'Verificar atualização'}</div><div class="s${ui.update ? ' up' : ''}">${ui.busy ? 'Verificando…' : ui.update ? 'Nova versão disponível. Toque aqui' : `Versão ${APP_VERSION}. Toque para ver se há novidade`}</div></div>${ui.update ? '<span class="badge">Novo</span>' : I.chev}</button>
       <button class="row" data-act="share"><div class="grow"><div class="t">Enviar relatório</div><div class="s">WhatsApp, PDF ou Excel</div></div>${I.chev}</button>
       <button class="row" data-act="backup"><div class="grow"><div class="t">Fazer backup</div><div class="s">${s.lastBackup ? 'Último: ' + new Date(s.lastBackup).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Salva todas as leituras em um arquivo'}</div></div>${I.chev}</button>
       <button class="row" data-act="restore"><div class="grow"><div class="t">Importar backup</div><div class="s">Junta as leituras de outro celular, sem duplicar</div></div>${I.chev}</button>
@@ -379,7 +407,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.5</p>`;
+    <p class="note">Pluviômetro · versão ${APP_VERSION}</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -577,6 +605,7 @@ const actions = {
   csv: () => { const p = sharePeriod(); deliver(makeCsv(p), `chuva-${fileStamp(p)}.csv`, 'Leituras de chuva'); },
   backup,
   restore: () => $('#file').click(),
+  update: updateApp,
   wipe: () => {
     const n = readings().length; if (!n) return toast('Não há leituras');
     if (!confirm(`Apagar as ${n} leituras deste celular? Faça um backup antes. Não dá para desfazer.`)) return;
@@ -616,4 +645,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
 }
 navigator.storage?.persist?.();
+setTimeout(checkUpdate, 4000); // avisa sozinho quando há versão nova
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
 })();

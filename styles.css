@@ -167,3 +167,10 @@ button.row:active{background:var(--s2)}
 .pill:active{transform:scale(.97)}.tile:active{transform:scale(.93)}.keys button:active{transform:scale(.94)}
 .ibtn:active{transform:scale(.92)}.chips button:active{transform:scale(.95)}.tabbar button:active{transform:scale(.93)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}
+
+/* ---------- atualização ---------- */
+.row .s.up{color:var(--orange)}
+.badge{flex:none;font-size:11px;font-weight:600;color:#000;background:var(--orange);border-radius:999px;padding:3px 9px}
+button.row:disabled{opacity:.6}
+.tabbar button{position:relative}
+.tabbar button.dot::after{content:"";position:absolute;top:2px;left:calc(50% + 7px);width:9px;height:9px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 2px #000}
