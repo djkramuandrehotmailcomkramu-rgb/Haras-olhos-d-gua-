@@ -55,3 +55,31 @@ describe('filtro GPS', () => {
     expect(aceitarAmostra(a, { ...a, coord: [grau, 0] })).toBe(true);
   });
 });
+
+import { paraGeoJSON, paraKML, paraGPX, lerArquivo, lerKML } from '../io/formatos';
+import type { Talhao } from '../store/dados';
+
+const talhaoTeste: Talhao = { id: '1', nome: 'T <1> & "A"', fazenda: 'F', cultura: 'Soja', safra: '2026/27', contorno: quadrado, criadoEm: 0 };
+
+describe('arquivos', () => {
+  it('GeoJSON ida e volta', () => {
+    const r = lerArquivo(paraGeoJSON([talhaoTeste]));
+    expect(r.poligonos).toHaveLength(1);
+    expect(r.poligonos[0].pontos).toHaveLength(4);
+    expect(r.poligonos[0].nome).toBe('T <1> & "A"');
+  });
+  it('KML ida e volta', () => {
+    const r = lerKML(paraKML([talhaoTeste]));
+    expect(r.poligonos).toHaveLength(1);
+    expect(r.poligonos[0].nome).toBe('T <1> & "A"');
+    expect(r.poligonos[0].pontos).toHaveLength(4);
+  });
+  it('GPX vira linha', () => {
+    const r = lerArquivo(paraGPX([talhaoTeste]));
+    expect(r.linhas[0].pontos.length).toBe(5);
+  });
+  it('lixo não quebra', () => {
+    expect(lerArquivo('abc').poligonos).toHaveLength(0);
+    expect(lerArquivo('{"type":').poligonos).toHaveLength(0);
+  });
+});

@@ -1,12 +1,25 @@
-const V = 'gpsthomas-v1';
-self.addEventListener('install', (e) => { self.skipWaiting(); });
+const V = 'gpsthomas-v2';
+const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
+self.addEventListener('install', () => { self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => !k.startsWith('gpsthomas-') || (k !== V && k !== 'gpsthomas-tiles')).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  // Mapas: cache primeiro, assim as áreas já vistas abrem sem internet.
+  if (TILES.some((h) => url.hostname.endsWith(h))) {
+    e.respondWith(
+      caches.open('gpsthomas-tiles').then((c) =>
+        c.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok || r.type === 'opaque') c.put(req, r.clone()); return r; }).catch(() => hit)),
+      ),
+    );
+    return;
+  }
+  if (url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then((r) => { const c = r.clone(); caches.open(V).then((k) => k.put(e.request, c)); return r; })
-      .catch(() => caches.match(e.request).then((m) => m || caches.match('/')))
+    fetch(req).then((r) => { const cp = r.clone(); caches.open(V).then((k) => k.put(req, cp)); return r; })
+      .catch(() => caches.match(req).then((m) => m || caches.match('/'))),
   );
 });

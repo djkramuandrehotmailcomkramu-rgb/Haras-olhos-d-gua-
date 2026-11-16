@@ -1,21 +1,27 @@
 # GPSThomas
 
-App GPS para medir área e distância no campo (React Native + Expo, Android).
+App GPS para medir área e distância no campo (React Native + Expo). Roda como PWA no Android/iPhone e, nas próximas fases, como app nativo.
+
+## Funciona hoje
+- Mapa de satélite (Esri) e mapa de ruas, com GPS e precisão em tempo real
+- Medir por **caminhada** (GPS grava o contorno), **pontos no mapa** (arrastáveis) e **distância**
+- Área, perímetro e distância ao vivo; hectare, alqueires (paulista, mineiro, goiano, baiano) e m²
+- Talhões por fazenda, cultura e safra; busca; edição e exclusão
+- Histórico de medições, conversão de medição em talhão
+- Importar KML / GeoJSON / GPX e exportar KML / GeoJSON / GPX / CSV
+- Dados salvos no aparelho; mapas já vistos abrem sem internet
 
 ## Rodar
 ```bash
 cd gpsthomas
 npm install --legacy-peer-deps
-npx expo start
+npx expo start --web
 ```
-Fase 1 roda no Expo Go. Mapa de satélite e GPS em segundo plano (fases 2 e 5) exigem dev build:
-`eas build --profile development --platform android`.
 
 ## Verificar
 ```bash
-npm run typecheck
-npm test
+npm run typecheck && npm test
 ```
 
-## Fases
-1. Base e design system (esta) · 2. Medição · 3. Fazendas e talhões · 4. Importar/exportar · 5. Offline + nuvem · 6. Solo, plantio e colheita.
+## Próximas fases
+Nuvem (Supabase) e backup · análise de solo (pontos de coleta, laudos) · plantio e colheita · relatórios PDF · app nativo com GPS em segundo plano.
