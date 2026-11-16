@@ -151,4 +151,19 @@ button.row:active{background:var(--s2)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 @media (min-height:760px){.keys button{aspect-ratio:1.15}}
 @media (max-height:600px){.disp .n{font-size:60px}.keys{gap:8px}.keys button{aspect-ratio:1.9;font-size:26px}}
-@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+
+/* ---------- efeitos leves ---------- */
+@keyframes grow{from{transform:scaleY(0)}}
+@keyframes fillbar{from{transform:scaleX(0)}}
+@keyframes fadein{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+.chart rect{transform-box:fill-box;transform-origin:50% 100%;animation:grow .6s cubic-bezier(.2,.8,.2,1) both}
+.chart text{animation:fadein .4s .4s both}
+.bar i{transform-origin:left center;animation:fillbar .8s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 45ms)}
+.kpi{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+.kpi:nth-child(2){animation-delay:.06s}.kpi:nth-child(3){animation-delay:.12s}.kpi:nth-child(4){animation-delay:.18s}
+#view.still *{animation:none !important}
+.pill,.tile,.keys button,.ibtn,.chips button,.tabbar button{transition:transform .14s cubic-bezier(.2,.8,.2,1),background .14s,opacity .14s,color .2s}
+.pill:active{transform:scale(.97)}.tile:active{transform:scale(.93)}.keys button:active{transform:scale(.94)}
+.ibtn:active{transform:scale(.92)}.chips button:active{transform:scale(.95)}.tabbar button:active{transform:scale(.93)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition:none !important}}

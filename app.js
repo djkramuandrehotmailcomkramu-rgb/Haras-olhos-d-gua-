@@ -111,35 +111,88 @@ const chips = (cur, act = 'period') => `<div class="chips">${PERIODS.map(([id, l
 const head = (title, right = '') => `<div class="head"><div><div class="cap">${esc(db.settings.farm)}</div><h1>${title}</h1></div>${right}</div>`;
 const shareBtn = `<button class="ibtn" data-act="share" aria-label="Enviar relatório">${I.share}</button>`;
 
+/* ---------- botão voltar ----------
+   Cada janela aberta (ficha, lançamento, teclado, relatório) e cada aba fora do Painel vira uma "camada" no histórico do navegador.
+   Voltar fecha só a camada de cima; no Painel avisa antes de sair, em vez de fechar o app. */
+const layers = [], hq = [];
+let pos = 0, guardOn = false, waiting = false;
+function runHq() { // fila de operações no histórico: uma de cada vez, esperando o navegador responder
+  if (waiting) return;
+  const op = hq.shift(); if (op === undefined) return;
+  if (op === 'back') { waiting = true; history.go(-1); setTimeout(() => { if (waiting) { waiting = false; runHq(); } }, 400); }
+  else { history.pushState({ pluvio: op }, ''); pos = op; runHq(); }
+}
+function ensureGuard() { if (!guardOn) { history.pushState({ pluvio: 0 }, ''); guardOn = true; pos = 0; } }
+function pushLayer(type, close) { ensureGuard(); layers.push({ type, close }); hq.push(layers.length); runHq(); }
+function closeTop() { const l = layers.pop(); if (!l) return; l.close(); hq.push('back'); runHq(); }
+addEventListener('popstate', e => {
+  const d = e.state?.pluvio;
+  if (waiting) { waiting = false; pos = d ?? 0; runHq(); return; }
+  if (d === undefined) { // chegou à primeira entrada: avisa e, se voltar de novo, o sistema fecha o app
+    while (layers.length) layers.pop().close();
+    hq.length = 0; guardOn = false; pos = 0;
+    toast('Aperte voltar de novo para sair');
+    return;
+  }
+  pos = d; guardOn = true;
+  if (d > layers.length) { waiting = true; history.go(layers.length - d); setTimeout(() => { waiting = false; }, 400); return; } // entrada antiga (depois de recarregar)
+  while (layers.length > d) layers.pop().close();
+});
+if (history.state?.pluvio !== undefined) { history.replaceState({ pluvio: 0 }, ''); guardOn = true; } // recarregou dentro de uma tela: esta entrada vira a base
+else if (!history.state?.root) history.replaceState({ root: 1 }, '');
+document.addEventListener('click', ensureGuard, true); // o navegador só mantém entradas criadas após um toque do usuário
+
 const sheets = [];
 function openSheet(html, { full = false, init } = {}) {
   const w = document.createElement('div');
   w.className = 'wrap' + (full ? ' full' : '');
   w.innerHTML = `<div class="back" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
   $('#sheets').append(w); sheets.push(w); w.openedAt = Date.now();
+  pushLayer('sheet', () => { const x = sheets.pop(); if (!x) return; x.classList.remove('in'); setTimeout(() => x.remove(), 300); x.onclose?.(); });
   requestAnimationFrame(() => requestAnimationFrame(() => w.classList.add('in')));
   init?.(w);
   return w;
 }
-function closeSheet() {
-  const w = sheets.pop(); if (!w) return;
-  w.classList.remove('in'); setTimeout(() => w.remove(), 300);
-  if (w.onclose) w.onclose();
-}
+function closeSheet() { if (layers.at(-1)?.type !== 'tab') closeTop(); }
 const nav = (title, sub = '', left = '') => `<div class="nav">${left || '<span></span>'}<b>${title}${sub ? `<small>${sub}</small>` : ''}</b><button class="ibtn" data-act="close" aria-label="Fechar">${I.close}</button></div>`;
 
-function render() {
-  $$('#tabbar [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
-  $('#view').innerHTML = ({ home: viewHome, history: viewHistory, more: viewMore })[ui.tab]();
+/* ---------- efeitos leves ---------- */
+const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TABS = ['home', 'history', 'more'];
+function countUp(el) { // o número "sobe" até o valor
+  const to = parseFloat(el.dataset.count), int = el.dataset.int, node = el.firstChild, t0 = performance.now();
+  if (!isFinite(to) || node?.nodeType !== 3) return;
+  const show = v => int ? String(Math.round(v)) : fmt(v);
+  node.nodeValue = show(0);
+  const step = now => { const k = Math.min(1, (now - t0) / 750); node.nodeValue = show(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); else node.nodeValue = show(to); };
+  requestAnimationFrame(step);
 }
+function render({ slide = 0, still = false } = {}) {
+  $$('#tabbar [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  const v = $('#view'), fx = motionOK() && !still;
+  v.classList.toggle('still', !fx);
+  v.innerHTML = ({ home: viewHome, history: viewHistory, more: viewMore })[ui.tab]();
+  if (fx) {
+    $$('[data-count]', v).forEach(countUp);
+    if (slide) v.animate([{ opacity: 0, transform: `translateX(${slide * 22}px)` }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  }
+}
+function goTab(t) {
+  if (t === ui.tab) return;
+  const slide = TABS.indexOf(t) > TABS.indexOf(ui.tab) ? 1 : -1, hasLayer = layers.some(l => l.type === 'tab');
+  ui.tab = t; render({ slide }); window.scrollTo(0, 0);
+  if (t === 'home') { if (hasLayer) closeTop(); }
+  else if (!hasLayer) pushLayer('tab', () => { if (ui.tab !== 'home') { ui.tab = 'home'; render({ slide: -1 }); window.scrollTo(0, 0); } });
+}
+function closePad() { if (layers.at(-1)?.type === 'pad') closeTop(); else { L.sel = null; drawLaunch(); } }
 
 /* ---------- gráfico de barras ---------- */
 function barChart(items) { // [{label, v, tick}]
   const W = 320, H = 120, n = items.length, bw = W / n, max = Math.max(...items.map(i => i.v), 1), top = 16, base = H - 20;
   const bars = items.map((it, i) => {
     const h = it.v / max * (base - top), w = Math.min(bw * 0.62, 22), x = i * bw + (bw - w) / 2;
-    return (it.v > 0 ? `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, 1.500).toFixed(1)}" rx="${Math.min(w / 2, 3)}"><title>${it.label}: ${fmt(it.v)} mm</title></rect>`
-      : `<rect class="z" x="${(x + w / 2 - 1).toFixed(1)}" y="${base - 2}" width="2" height="2" rx="1"/>`)
+    return (it.v > 0 ? `<rect style="animation-delay:${Math.min(i * 22, 500)}ms" x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(h, 1.500).toFixed(1)}" rx="${Math.min(w / 2, 3)}"><title>${it.label}: ${fmt(it.v)} mm</title></rect>`
+      : `<rect class="z" style="animation-delay:${Math.min(i * 22, 500)}ms" x="${(x + w / 2 - 1).toFixed(1)}" y="${base - 2}" width="2" height="2" rx="1"/>`)
       + (it.tick ? `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle">${it.tick}</text>` : '')
       + (n <= 12 && it.v > 0 ? `<text x="${(i * bw + bw / 2).toFixed(1)}" y="${(base - h - 4).toFixed(1)}" text-anchor="middle">${fmt(it.v)}</text>` : '');
   }).join('');
@@ -163,18 +216,18 @@ function viewHome() {
   const rank = list.map((r, i) => `
     <button class="row" data-act="field" data-id="${r.f.id}">
       <span class="pos">${i + 1}</span>
-      <div class="grow"><div class="t">${esc(r.f.name)}</div><div class="bar"><i style="width:${s.max ? r.mm / s.max * 100 : 0}%"></i></div></div>
+      <div class="grow"><div class="t">${esc(r.f.name)}</div><div class="bar"><i style="width:${s.max ? r.mm / s.max * 100 : 0}%;--i:${i}"></i></div></div>
       <div class="mm"><b>${r.n ? fmt(r.mm) : '–'}<small>mm</small></b>${r.n ? delta(r.mm, s.mean) : '<span>sem leitura</span>'}</div>
     </button>`).join('');
   return head('Painel', shareBtn) + chips(ui.period) + `
     <div class="hero"><div class="k">Chuva acumulada na fazenda</div>
-      <div class="big">${fmt(s.mean)}<small>mm</small></div><div class="sub">${periodLabel(ui.period)} · ${periodText()} · média dos talhões</div></div>
+      <div class="big" data-count="${s.mean}">${fmt(s.mean)}<small>mm</small></div><div class="sub">${periodLabel(ui.period)} · ${periodText()} · média dos talhões</div></div>
     ${cta}
     <div class="kpis">
-      <div class="kpi"><span>Talhões com chuva</span><b>${Math.round(s.rained / FIELDS.length * 100)}<small>%</small></b><em>${s.rained} de ${FIELDS.length} talhões</em></div>
-      <div class="kpi"><span>Dias com chuva</span><b>${s.rainDays}<small>${s.rainDays === 1 ? 'dia' : 'dias'}</small></b><em>${periodLabel(ui.period)}</em></div>
-      <div class="kpi"><span>Mais choveu</span><b>${top.mm > 0 ? fmt(top.mm) : '–'}<small>mm</small></b><em>${top.mm > 0 ? esc(top.f.name) : 'Sem chuva no período'}</em></div>
-      <div class="kpi"><span>Menos choveu</span><b>${s.low ? fmt(s.low.mm) : '–'}<small>mm</small></b><em>${s.low ? esc(s.low.f.name) : 'Sem leituras'}</em></div>
+      <div class="kpi"><span>Talhões com chuva</span><b data-count="${Math.round(s.rained / FIELDS.length * 100)}" data-int="1">${Math.round(s.rained / FIELDS.length * 100)}<small>%</small></b><em>${s.rained} de ${FIELDS.length} talhões</em></div>
+      <div class="kpi"><span>Dias com chuva</span><b data-count="${s.rainDays}" data-int="1">${s.rainDays}<small>${s.rainDays === 1 ? 'dia' : 'dias'}</small></b><em>${periodLabel(ui.period)}</em></div>
+      <div class="kpi"><span>Mais choveu</span><b${top.mm > 0 ? ` data-count="${top.mm}"` : ''}>${top.mm > 0 ? fmt(top.mm) : '–'}<small>mm</small></b><em>${top.mm > 0 ? esc(top.f.name) : 'Sem chuva no período'}</em></div>
+      <div class="kpi"><span>Menos choveu</span><b${s.low ? ` data-count="${s.low.mm}"` : ''}>${s.low ? fmt(s.low.mm) : '–'}<small>mm</small></b><em>${s.low ? esc(s.low.f.name) : 'Sem leituras'}</em></div>
     </div>
     <div class="sect"><h2>Chuva por dia</h2><span>${ui.period === 'd1' ? 'últimos 7 dias' : ui.period === 'safra' && diffDays(s.from, s.to) > 30 ? 'por mês' : 'mm'}</span></div>
     ${barChart(seriesFor(s.farm, ui.period))}
@@ -236,7 +289,11 @@ function drawLaunch() {
   $('#ldate', el).addEventListener('change', e => { if (e.target.value && e.target.value <= today()) { L.date = e.target.value; drawLaunch(); } });
   $('label', el).addEventListener('click', () => $('#ldate', el).showPicker?.());
 }
-function pick(fid) { const r = getReading(fid, L.date); Object.assign(L, { sel: fid, buf: r ? String(r.mm).replace('.', ',') : '', fresh: true }); drawLaunch(); }
+function pick(fid) {
+  const r = getReading(fid, L.date); Object.assign(L, { sel: fid, buf: r ? String(r.mm).replace('.', ',') : '', fresh: true });
+  if (layers.at(-1)?.type !== 'pad') pushLayer('pad', () => { L.sel = null; drawLaunch(); });
+  drawLaunch();
+}
 function drawPad(el) {
   const f = FIELD[L.sel], r = getReading(f.id, L.date);
   el.innerHTML = `<div class="nav"><button class="ibtn" data-act="pad-back" aria-label="Voltar aos talhões">${I.back}</button>
@@ -285,7 +342,7 @@ function padSave() {
   putReading(L.sel, L.date, mm); save(); buzz();
   const nx = nextField(true);
   if (nx) { toast(`${FIELD[L.sel].name}: ${fmt(mm)} mm`); pick(nx); }
-  else { L.sel = null; drawLaunch(); toast('Todos os talhões lançados'); }
+  else { closePad(); toast('Todos os talhões lançados'); }
 }
 
 /* ---------- histórico ---------- */
@@ -322,7 +379,7 @@ function viewMore() {
     <p class="note">As coletas da planilha (safras 2024/25 e 2026/27, até ${window.COLETAS ? brShort(Object.keys(window.COLETAS.days).at(-1)) : ''}) já vêm no app. As novas leituras ficam neste celular. Para juntar com os outros, um faz o backup, envia o arquivo e o outro importa.</p>
     <div class="sect"></div>
     <div class="panel"><button class="row red" data-act="wipe"><div class="grow t">Apagar todas as leituras</div></button></div>
-    <p class="note">Pluviômetro · versão 2.4</p>`;
+    <p class="note">Pluviômetro · versão 2.5</p>`;
 }
 function askUser(then) {
   openSheet(nav('Bem-vindo') + `<div class="body">
@@ -483,7 +540,7 @@ function restore(text) {
 const actions = {
   close: closeSheet,
   period: el => { ui.period = el.dataset.id; render(); },
-  allrank: () => { ui.allRank = !ui.allRank; render(); },
+  allrank: () => { ui.allRank = !ui.allRank; render({ still: true }); },
   launch: () => openLaunch(),
   'launch-field': el => { closeSheet(); openLaunch(today(), el.dataset.id); },
   day: el => openLaunch(el.dataset.id),
@@ -493,12 +550,12 @@ const actions = {
   ldate: el => { L.date = el.dataset.id; drawLaunch(); },
   pick: el => pick(el.dataset.id),
   key: el => key(el.dataset.id),
-  'pad-back': () => { L.sel = null; drawLaunch(); },
+  'pad-back': closePad,
   'pad-next': () => pick(nextField(false)),
   'pad-save': padSave,
   'pad-clear': () => {
     const r = getReading(L.sel, L.date); if (!r || !confirm(`Apagar a leitura de ${FIELD[L.sel].name} em ${br(L.date)}?`)) return;
-    r.deleted = true; r.updatedAt = Date.now(); save(); L.sel = null; drawLaunch(); toast('Leitura apagada');
+    r.deleted = true; r.updatedAt = Date.now(); save(); closePad(); toast('Leitura apagada');
   },
   'zero-rest': () => {
     const rest = FIELDS.filter(f => !getReading(f.id, L.date));
@@ -528,7 +585,7 @@ const actions = {
 };
 document.addEventListener('click', e => {
   const tab = e.target.closest('[data-tab]');
-  if (tab) { ui.tab = tab.dataset.tab; render(); window.scrollTo(0, 0); return; }
+  if (tab) { goTab(tab.dataset.tab); return; }
   const el = e.target.closest('[data-act]'); if (!el) return;
   if (el.classList.contains('back') && Date.now() - (el.parentNode.openedAt || 0) < 400) return; // ainda é o toque que abriu a folha
   actions[el.dataset.act]?.(el, el.closest('.wrap'));
