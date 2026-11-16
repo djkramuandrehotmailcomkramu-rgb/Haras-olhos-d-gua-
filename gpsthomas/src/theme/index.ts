@@ -1,0 +1,64 @@
+import { useColorScheme } from 'react-native';
+
+export type Paleta = {
+  fundo: string; cartao: string; cartaoSuave: string; texto: string; textoSuave: string; linha: string;
+  primaria: string; primariaSuave: string; sobrePrimaria: string; destaque: string; perigo: string;
+  vidro: 'light' | 'dark'; vidroCor: string;
+};
+
+export const paletas: Record<'claro' | 'escuro', Paleta> = {
+  claro: {
+    fundo: '#F1F4EF',
+    cartao: '#FFFFFF',
+    cartaoSuave: '#E8EDE6',
+    texto: '#13201A',
+    textoSuave: '#5B6B61',
+    linha: 'rgba(19,32,26,0.10)',
+    primaria: '#1F7A3E',
+    primariaSuave: 'rgba(31,122,62,0.12)',
+    sobrePrimaria: '#FFFFFF',
+    destaque: '#D99A00',
+    perigo: '#D64545',
+    vidro: 'light',
+    vidroCor: 'rgba(255,255,255,0.72)',
+  },
+  escuro: {
+    fundo: '#0A110D',
+    cartao: '#151F19',
+    cartaoSuave: '#1D2A22',
+    texto: '#EEF4EF',
+    textoSuave: '#93A59A',
+    linha: 'rgba(238,244,239,0.12)',
+    primaria: '#3FB063',
+    primariaSuave: 'rgba(63,176,99,0.18)',
+    sobrePrimaria: '#06210F',
+    destaque: '#F2B73D',
+    perigo: '#F07070',
+    vidro: 'dark',
+    vidroCor: 'rgba(21,31,25,0.72)',
+  },
+};
+
+
+export function useTema(): Paleta {
+  return useColorScheme() === 'dark' ? paletas.escuro : paletas.claro;
+}
+
+export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
+export const raio = { sm: 10, md: 16, lg: 22, xl: 30, pilula: 999 };
+
+export const fonte = {
+  regular: 'Inter_400Regular',
+  media: 'Inter_500Medium',
+  semi: 'Inter_600SemiBold',
+  negrito: 'Inter_700Bold',
+};
+
+export const tipo = {
+  tituloGrande: { fontFamily: fonte.negrito, fontSize: 34, letterSpacing: -0.8 },
+  titulo: { fontFamily: fonte.negrito, fontSize: 22, letterSpacing: -0.4 },
+  subtitulo: { fontFamily: fonte.semi, fontSize: 17, letterSpacing: -0.2 },
+  corpo: { fontFamily: fonte.regular, fontSize: 15 },
+  legenda: { fontFamily: fonte.media, fontSize: 12.5, letterSpacing: 0.2 },
+  numeroGrande: { fontFamily: fonte.negrito, fontSize: 40, letterSpacing: -1 },
+};
