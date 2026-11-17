@@ -17,6 +17,7 @@ export default function TalhoesTela() {
   const t = useTema();
   const unidade = usePrefs((s) => s.unidadeArea);
   const talhoes = useDados((s) => s.talhoes);
+  const campos = useDados((s) => s.campos);
   const [busca, setBusca] = useState('');
 
   const filtrados = useMemo(() => {
@@ -38,6 +39,27 @@ export default function TalhoesTela() {
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.cartao, borderRadius: raio.pilula, paddingHorizontal: 14, height: 44, gap: 8 }}>
           <Ionicons name="search" size={18} color={t.textoSuave} />
           <TextInput value={busca} onChangeText={setBusca} placeholder="Buscar talhão, fazenda ou cultura" placeholderTextColor={t.textoSuave} style={{ flex: 1, fontFamily: fonte.regular, fontSize: 15, color: t.texto, outlineWidth: 0 } as any} />
+        </View>
+      )}
+
+      {talhoes.length > 0 && (
+        <View style={{ gap: 10 }}>
+          <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>CAMPOS DE SEMENTES</Text>
+          {campos.map((c) => (
+            <Pressable key={c.id} onPress={() => router.push(`/campo/${c.id}`)}>
+              <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <View style={{ width: 46, height: 46, borderRadius: raio.md, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="flag" size={22} color={t.primaria} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text numberOfLines={1} style={[tipo.subtitulo, { color: t.texto }]}>{c.nome}</Text>
+                  <Text style={[tipo.corpo, { color: t.textoSuave }]}>{c.partes.length} partes · {c.bandeiras.filter((b) => b.colocada).length}/{c.bandeiras.length} bandeiras</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={t.textoSuave} />
+              </Cartao>
+            </Pressable>
+          ))}
+          <Botao titulo="Novo campo de sementes" variante="suave" icone={<Ionicons name="flag-outline" size={19} color={t.primaria} />} onPress={() => router.push('/campo/novo')} />
         </View>
       )}
 

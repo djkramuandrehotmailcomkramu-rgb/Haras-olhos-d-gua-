@@ -1,4 +1,5 @@
 import { Platform, Share } from 'react-native';
+import { kmlDeKmz } from './formatos';
 
 /** Baixa (web) ou compartilha (nativo) um arquivo de texto. */
 const limpaNome = (n: string) => {
@@ -29,10 +30,13 @@ export function escolherArquivo(): Promise<{ nome: string; texto: string } | nul
   return new Promise((resolve) => {
     const inp = document.createElement('input');
     inp.type = 'file';
-    inp.accept = '.geojson,.json,.kml,.gpx,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml,text/xml';
+    inp.accept = '.geojson,.json,.kml,.kmz,.gpx,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml,text/xml';
     inp.onchange = async () => {
       const f = inp.files?.[0];
-      resolve(f ? { nome: f.name, texto: await f.text() } : null);
+      if (!f) return resolve(null);
+      if (/\.kmz$/i.test(f.name)) {
+        try { resolve({ nome: f.name, texto: kmlDeKmz(new Uint8Array(await f.arrayBuffer())) }); } catch { resolve({ nome: f.name, texto: '' }); }
+      } else resolve({ nome: f.name, texto: await f.text() });
     };
     inp.oncancel = () => resolve(null);
     inp.click();

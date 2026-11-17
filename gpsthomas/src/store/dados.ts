@@ -22,6 +22,32 @@ export type Medicao = {
   criadoEm: number;
 };
 
+export type ParteCampo = {
+  /** talhão de origem */
+  talhaoId: string;
+  indice: number;
+  pedacos: Coord[][];
+  areaM2: number;
+  variedade: string;
+};
+
+export type BandeiraCampo = { id: string; coord: Coord; rotulo: string; colocada: boolean; linha: number };
+
+export type PlanoCampo = {
+  id: string;
+  nome: string;
+  criadoEm: number;
+  /** partes por talhão (ex.: Andropogon 5, Amendoim 6) */
+  config: { talhaoId: string; partes: number; anguloGraus: number | null; inverter: boolean }[];
+  corredorM: number;
+  espacamentoM: number;
+  variedades: string[];
+  partes: ParteCampo[];
+  bandeiras: BandeiraCampo[];
+  /** linhas de divisa (para guiar "seguindo a linha") */
+  divisas: { id: number; talhaoId: string; pontos: Coord[] }[];
+};
+
 export type Viagem = { id: string; destino: string; inicioMs: number; fimMs: number; distanciaM: number; vmedKmh: number; vmaxKmh: number };
 
 export const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -43,6 +69,10 @@ type Dados = {
   talhoes: Talhao[];
   medicoes: Medicao[];
   viagens: Viagem[];
+  campos: PlanoCampo[];
+  salvarCampo: (c: PlanoCampo) => void;
+  atualizarCampo: (id: string, p: Partial<PlanoCampo>) => void;
+  removerCampo: (id: string) => void;
   registrarViagem: (v: Omit<Viagem, 'id'>) => void;
   adicionarTalhao: (t: Omit<Talhao, 'id' | 'criadoEm'>) => string;
   atualizarTalhao: (id: string, p: Partial<Omit<Talhao, 'id'>>) => void;
@@ -58,6 +88,10 @@ export const useDados = create<Dados>()(
       talhoes: [],
       medicoes: [],
       viagens: [],
+      campos: [],
+      salvarCampo: (c) => set((s) => ({ campos: [c, ...s.campos.filter((x) => x.id !== c.id)] })),
+      atualizarCampo: (id, p) => set((s) => ({ campos: s.campos.map((x) => (x.id === id ? { ...x, ...p } : x)) })),
+      removerCampo: (id) => set((s) => ({ campos: s.campos.filter((x) => x.id !== id) })),
       registrarViagem: (v) => set((s) => ({ viagens: [{ ...v, id: novoId() }, ...s.viagens].slice(0, 30) })),
       adicionarTalhao: (t) => {
         const id = novoId();
@@ -72,7 +106,7 @@ export const useDados = create<Dados>()(
         return id;
       },
       removerMedicao: (id) => set((s) => ({ medicoes: s.medicoes.filter((m) => m.id !== id) })),
-      limparTudo: () => set({ talhoes: [], medicoes: [] }),
+      limparTudo: () => set({ talhoes: [], medicoes: [], campos: [] }),
     }),
     { name: 'gpsthomas-dados', storage: createJSONStorage(() => armazem) },
   ),

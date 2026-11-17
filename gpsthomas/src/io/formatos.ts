@@ -1,5 +1,6 @@
 import { areaM2, perimetroM, comprimentoM, fecharAnel, type Coord } from '../geo/medidas';
 import type { Talhao, Medicao } from '../store/dados';
+import { unzipSync, strFromU8 } from 'fflate';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const unesc = (s: string) =>
@@ -8,6 +9,8 @@ const unesc = (s: string) =>
 export type Importado = {
   poligonos: { nome: string; pontos: Coord[] }[];
   linhas: { nome: string; pontos: Coord[] }[];
+  /** avisos para mostrar ao usuário (ex.: áreas com buraco) */
+  avisos?: string[];
 };
 
 // ---------- exportação ----------
@@ -33,7 +36,9 @@ export function paraGeoJSON(talhoes: Talhao[], medicoes: Medicao[] = []): string
 
 const coordsKml = (pts: Coord[]) => pts.map((c) => `${c[0]},${c[1]},0`).join(' ');
 
-export function paraKML(talhoes: Talhao[], medicoes: Medicao[] = []): string {
+export type PontoExport = { nome: string; coord: Coord; descricao?: string };
+
+export function paraKML(talhoes: Talhao[], medicoes: Medicao[] = [], pontos: PontoExport[] = []): string {
   const poly = (nome: string, desc: string, pts: Coord[]) =>
     `<Placemark><name>${esc(nome)}</name><description>${esc(desc)}</description><Polygon><outerBoundaryIs><LinearRing><coordinates>${coordsKml(fecharAnel(pts))}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>`;
   const linha = (nome: string, pts: Coord[]) =>
@@ -41,16 +46,18 @@ export function paraKML(talhoes: Talhao[], medicoes: Medicao[] = []): string {
   const corpo = [
     ...talhoes.map((t) => poly(t.nome, `${t.fazenda} · ${t.cultura} ${t.safra} · ${(areaM2(t.contorno) / 10000).toFixed(2)} ha`, t.contorno)),
     ...medicoes.map((m) => (m.tipo === 'area' ? poly(m.nome, `${(areaM2(m.pontos) / 10000).toFixed(2)} ha`, m.pontos) : linha(m.nome, m.pontos))),
+    ...pontos.map((p) => `<Placemark><name>${esc(p.nome)}</name><description>${esc(p.descricao ?? '')}</description><Point><coordinates>${p.coord[0]},${p.coord[1]},0</coordinates></Point></Placemark>`),
   ].join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>GPSThomas</name>\n${corpo}\n</Document></kml>\n`;
 }
 
-export function paraGPX(talhoes: Talhao[], medicoes: Medicao[] = []): string {
+export function paraGPX(talhoes: Talhao[], medicoes: Medicao[] = [], pontos: PontoExport[] = []): string {
   const trk = (nome: string, pts: Coord[]) =>
     `<trk><name>${esc(nome)}</name><trkseg>${pts.map((c) => `<trkpt lat="${c[1]}" lon="${c[0]}"></trkpt>`).join('')}</trkseg></trk>`;
   const corpo = [
     ...talhoes.map((t) => trk(t.nome, fecharAnel(t.contorno))),
     ...medicoes.map((m) => trk(m.nome, m.tipo === 'area' ? fecharAnel(m.pontos) : m.pontos)),
+    ...pontos.map((p) => `<wpt lat="${p.coord[1]}" lon="${p.coord[0]}"><name>${esc(p.nome)}</name>${p.descricao ? `<desc>${esc(p.descricao)}</desc>` : ''}</wpt>`),
   ].join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="GPSThomas" xmlns="http://www.topografix.com/GPX/1/1">\n${corpo}\n</gpx>\n`;
 }
@@ -118,6 +125,7 @@ export function lerKML(texto: string): Importado {
     const pts = lerCoordsKml(coords);
     if (/<Polygon/i.test(pm)) {
       const s = semFechamento(pts);
+      if (/<innerBoundaryIs/i.test(pm)) (out.avisos ??= []).push(`"${nome}" tem buraco (área excluída); o app usa só o contorno externo.`);
       if (s.length >= 3) out.poligonos.push({ nome, pontos: s });
     } else if (/<LineString/i.test(pm) && pts.length >= 2) out.linhas.push({ nome, pontos: pts });
   }
@@ -147,4 +155,11 @@ export function lerArquivo(texto: string): Importado {
   if (/<kml/i.test(t)) return lerKML(t);
   if (/<gpx/i.test(t)) return lerGPX(t);
   return { poligonos: [], linhas: [] };
+}
+
+/** Abre um KMZ (zip) e devolve o texto do KML principal. */
+export function kmlDeKmz(bytes: Uint8Array): string {
+  const arq = unzipSync(bytes);
+  const nome = Object.keys(arq).find((n) => /doc\.kml$/i.test(n)) ?? Object.keys(arq).find((n) => /\.kml$/i.test(n));
+  return nome ? strFromU8(arq[nome]) : '';
 }

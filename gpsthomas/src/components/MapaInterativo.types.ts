@@ -5,6 +5,9 @@ import type { Veiculo } from './veiculos';
 
 export type TalhaoMapa = { id: string; nome: string; rotulo: string; contorno: Coord[] };
 
+export type ParcelaMapa = { id: string; pedacos: Coord[][]; cor: string; rotulo: string; sub?: string };
+export type BandeiraMapa = { id: string; coord: Coord; estado: 'pendente' | 'atual' | 'ok'; rotulo: string };
+
 export type PropsMapa = {
   talhoes: TalhaoMapa[];
   rascunho: Coord[];
@@ -27,4 +30,10 @@ export type PropsMapa = {
   veiculo?: { tipo: Veiculo; rumo: number; coord: Coord } | null;
   /** Segmento da rota já percorrido (desenhado em cinza). */
   progressoIdx?: number;
+  /** Parcelas coloridas do campo de sementes. */
+  parcelas?: ParcelaMapa[];
+  /** Bandeirinhas a colocar (cinza = pendente, âmbar = próxima, verde = colocada). */
+  bandeiras?: BandeiraMapa[];
+  /** Linha entre você e o ponto-alvo. */
+  linhaGuia?: [Coord, Coord] | null;
 };

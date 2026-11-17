@@ -77,6 +77,7 @@ export default function TalhaoDetalhe() {
 
         <Botao titulo="Ver no mapa de satélite" tamanho="g" icone={<Ionicons name="map" size={20} color={t.sobrePrimaria} />} onPress={() => { enviar({ tipo: 'ajustar', pontos: x.contorno }); router.navigate('/'); }} />
 
+        <Botao titulo="Dividir em parcelas (campo de sementes)" variante="suave" icone={<Ionicons name="grid" size={19} color={t.primaria} />} onPress={() => router.push(`/campo/novo?talhao=${x.id}`)} />
         <Botao titulo="Traçar rota até o talhão" tamanho="g" variante="suave" icone={<Ionicons name="navigate" size={20} color={t.primaria} />} onPress={() => { const n = x.contorno.length || 1; irPara([x.contorno.reduce((a, c) => a + c[0], 0) / n, x.contorno.reduce((a, c) => a + c[1], 0) / n], x.nome); router.navigate('/rotas'); }} />
 
         <Cartao style={{ gap: 12 }}>

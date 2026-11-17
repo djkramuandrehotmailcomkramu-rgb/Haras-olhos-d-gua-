@@ -19,6 +19,8 @@ export default function RaizLayout() {
       <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 260, contentStyle: { backgroundColor: cor } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="talhao/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
+        <Stack.Screen name="campo/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
+        <Stack.Screen name="campo/novo" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
       </Stack>
       <Toast />
       <Onboarding />

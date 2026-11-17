@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { Tela } from '../../components/Tela';
+import { Campo } from '../../components/Campo';
 import { Cartao } from '../../components/Cartao';
 import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
@@ -15,6 +16,7 @@ import { formatarDuracao } from '../../nav/progresso';
 import { ROTULO_AREA, type UnidadeArea } from '../../geo/unidades';
 import { lerArquivo, paraCSV, paraGeoJSON, paraGPX, paraKML } from '../../io/formatos';
 import { entregarArquivo, escolherArquivo } from '../../io/arquivos';
+import { areaM2 } from '../../geo/medidas';
 import { fonte, raio, tipo, useTema } from '../../theme';
 
 const UNIDADES: UnidadeArea[] = ['ha', 'alqPaulista', 'alqMineiro', 'alqGoiano', 'alqBaiano', 'm2'];
@@ -30,6 +32,8 @@ export default function MaisTela() {
   const viagens = useDados((x) => x.viagens);
   const { talhoes, medicoes, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
   const [msg, setMsg] = useState<string | null>(null);
+  const [fazendaImport, setFazendaImport] = useState('');
+  const [resumo, setResumo] = useState<{ nome: string; m2: number }[]>([]);
   const [importando, setImportando] = useState(false);
   const mostrar = useToast((s) => s.mostrar);
 
@@ -39,7 +43,9 @@ export default function MaisTela() {
     setImportando(false);
     if (!f) return;
     const r = lerArquivo(f.texto);
-    r.poligonos.forEach((p) => adicionarTalhao({ nome: p.nome, fazenda: 'Importado', cultura: 'Soja', safra: '2026/27', contorno: p.pontos }));
+    r.poligonos.forEach((p) => adicionarTalhao({ nome: p.nome, fazenda: fazendaImport.trim() || 'Importado', cultura: 'Soja', safra: '2026/27', contorno: p.pontos }));
+    setResumo(r.poligonos.map((p) => ({ nome: p.nome, m2: areaM2(p.pontos) })));
+    (r.avisos ?? []).forEach((a) => mostrar(a, 'info'));
     r.linhas.forEach((l) => adicionarMedicao({ tipo: 'linha', nome: l.nome, pontos: l.pontos, origem: 'importado' }));
     const vazio0 = r.poligonos.length + r.linhas.length === 0;
     const m = vazio0 ? 'Nenhuma área ou linha encontrada. Use GeoJSON, KML ou GPX.' : `Importado: ${r.poligonos.length} talhões e ${r.linhas.length} linhas`;
@@ -63,7 +69,19 @@ export default function MaisTela() {
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>ARQUIVOS</Text>
       <Cartao style={{ gap: 12 }}>
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Traga áreas do Google Earth, QGIS ou do monitor da máquina e leve suas medições para eles.</Text>
-        <Botao titulo="Importar KML / GeoJSON / GPX" variante="suave" carregando={importando} icone={<Ionicons name="download-outline" size={19} color={t.primaria} />} onPress={importar} />
+        <Campo rotulo="Nome da fazenda dos talhões importados" value={fazendaImport} onChangeText={setFazendaImport} placeholder="Ex.: Lagoa Formosa" />
+        <Botao titulo="Importar KML / KMZ / GeoJSON / GPX" variante="suave" carregando={importando} icone={<Ionicons name="download-outline" size={19} color={t.primaria} />} onPress={importar} />
+        {resumo.length > 0 && (
+          <View style={{ gap: 4 }}>
+            <Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREAS MEDIDAS NO ARQUIVO IMPORTADO</Text>
+            {resumo.map((r, i) => (
+              <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text numberOfLines={1} style={{ fontFamily: fonte.regular, fontSize: 15, color: t.texto, flex: 1 }}>{r.nome}</Text>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.primaria }}>{(r.m2 / 10000).toFixed(2).replace('.', ',')} ha</Text>
+              </View>
+            ))}
+          </View>
+        )}
         <Text style={[tipo.legenda, { color: t.textoSuave }]}>EXPORTAR TUDO ({talhoes.length} talhões · {medicoes.length} medições)</Text>
         <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
           {(['kml', 'geojson', 'gpx', 'csv'] as const).map((e) => (
@@ -124,7 +142,7 @@ export default function MaisTela() {
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
       <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa, busca e rotas © colaboradores do OpenStreetMap (Nominatim, OSRM)</Text>
-      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.5</Text>
+      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.6</Text>
     </Tela>
   );
 }

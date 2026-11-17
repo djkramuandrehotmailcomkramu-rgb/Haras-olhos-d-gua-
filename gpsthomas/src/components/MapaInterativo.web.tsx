@@ -40,7 +40,7 @@ export function MapaInterativo(props: PropsMapa) {
   const P = useRef(props);
   P.current = props;
   const mapa = useRef<L.Map | null>(null);
-  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
+  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; campo: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
   const primeiraVez = useRef(true);
   const veic = useRef<{ mk: L.Marker; giro: HTMLDivElement; tipo: Veiculo } | null>(null);
 
@@ -54,6 +54,7 @@ export function MapaInterativo(props: PropsMapa) {
     grupos.current = {
       base: L.layerGroup().addTo(m),
       talhoes: L.layerGroup().addTo(m),
+      campo: L.layerGroup().addTo(m),
       rotas: L.layerGroup().addTo(m),
       rascunho: L.layerGroup().addTo(m),
       pos: L.layerGroup().addTo(m),
@@ -169,6 +170,37 @@ export function MapaInterativo(props: PropsMapa) {
     veic.current.mk.setLatLng(paraLL(v.coord));
     veic.current.giro.style.transform = `rotate(${v.rumo}deg)`;
   }, [props.veiculo?.coord, props.veiculo?.rumo, props.veiculo?.tipo]);
+
+  // parcelas, bandeiras e linha-guia do campo de sementes
+  useEffect(() => {
+    const g = grupos.current;
+    if (!g) return;
+    g.campo.clearLayers();
+    for (const pc of props.parcelas ?? []) {
+      for (const anel of pc.pedacos) {
+        if (anel.length < 3) continue;
+        L.polygon(anel.map(paraLL), { color: pc.cor, weight: 2.5, fillColor: pc.cor, fillOpacity: props.linhaGuia ? 0.2 : 0.38, interactive: false }).addTo(g.campo);
+      }
+      const todos = pc.pedacos.flat();
+      if (todos.length) {
+        const rot = document.createElement('div');
+        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:600 11.5px Inter,system-ui,sans-serif;white-space:nowrap;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
+        const a = document.createElement('div'); a.textContent = pc.rotulo;
+        rot.appendChild(a);
+        if (pc.sub) { const b = document.createElement('div'); b.textContent = pc.sub; b.style.cssText = 'font-weight:500;opacity:.8;font-size:10.5px;'; rot.appendChild(b); }
+        L.marker(paraLL(centro(todos)), { icon: L.divIcon({ html: rot, className: '', iconSize: [0, 0] }), interactive: false }).addTo(g.campo);
+      }
+    }
+    if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 4, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
+    for (const b of props.bandeiras ?? []) {
+      const cor = b.estado === 'ok' ? '#3FB063' : b.estado === 'atual' ? '#F2B73D' : '#9AA7A0';
+      const grande = b.estado === 'atual';
+      const el2 = document.createElement('div');
+      el2.style.cssText = `width:${grande ? 30 : 22}px;height:${grande ? 30 : 22}px;transform:translate(-3px,-100%);filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));`;
+      el2.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+      L.marker(paraLL(b.coord), { icon: L.divIcon({ html: el2, className: '', iconSize: [0, 0] }), interactive: false, zIndexOffset: grande ? 900 : 0 }).addTo(g.campo);
+    }
+  }, [props.parcelas, props.bandeiras, props.linhaGuia]);
 
   // rotas e destino
   useEffect(() => {
