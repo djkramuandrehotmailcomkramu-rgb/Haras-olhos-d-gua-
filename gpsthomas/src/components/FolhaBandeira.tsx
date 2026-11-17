@@ -3,6 +3,7 @@ import { Dimensions, Modal, Pressable, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Botao } from './Botao';
+import { formatarNumeroBR } from '../geo/numero';
 import { fonte, tipo, useTema } from '../theme';
 
 const ALTURA = Dimensions.get('window').height;
@@ -43,7 +44,7 @@ export function FolhaBandeira({ visivel, rotulo, colocada, distanciaM, ehAlvo, o
 
   const eFolha = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }));
   const eFundo = useAnimatedStyle(() => ({ opacity: fundo.value }));
-  const dist = distanciaM == null ? 'Ative o GPS para ver a distância' : distanciaM >= 1000 ? `${(distanciaM / 1000).toFixed(2).replace('.', ',')} km de você` : `${Math.round(distanciaM)} m de você`;
+  const dist = distanciaM == null ? 'Ative o GPS para ver a distância' : distanciaM >= 1000 ? `${formatarNumeroBR(distanciaM / 1000)} km de você` : `${Math.round(distanciaM)} m de você`;
 
   return (
     <Modal visible={montada} transparent animationType="none" onRequestClose={onFechar}>

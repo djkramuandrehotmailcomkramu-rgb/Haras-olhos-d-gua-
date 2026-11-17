@@ -1,6 +1,9 @@
 import type { jsPDF } from 'jspdf';
 import type { PlanoCampo } from '../store/dados';
-import { CORES_VARIEDADE } from '../geo/campo';
+import { CORES_VARIEDADE, compararComMeta, conferirAreas } from '../geo/campo';
+import { formatarHa } from '../geo/unidades';
+import { formatarNumeroBR, formatarPercentual } from '../geo/numero';
+import type { Talhao } from '../store/dados';
 import type { Coord } from '../geo/medidas';
 
 type NomeTalhao = (id: string) => string;
@@ -10,7 +13,7 @@ const clarear = (rgb: [number, number, number], k: number): [number, number, num
 
 // A fonte padrão do PDF (Helvetica) aceita acentos, mas não símbolos como "·" ou "≈".
 const limpo = (s: string) => s.replace(/[·•]/g, '-').replace(/≈/g, '~').replace(/[^\x20-\x7E -ÿ]/g, '');
-const ha = (m2: number) => `${(m2 / 10000).toFixed(2).replace('.', ',')} ha`;
+const ha = (m2: number) => formatarHa(m2);
 const grau = (v: number) => v.toFixed(6).replace('.', ',');
 
 /** Projeção plana local, em metros, em torno de um ponto. */
@@ -19,10 +22,10 @@ function projetor(ref: Coord) {
   return (c: Coord): [number, number] => [(c[0] - ref[0]) * kx, (c[1] - ref[1]) * 111319.49];
 }
 
-export type DadosPdf = { plano: PlanoCampo; nomeTalhao: NomeTalhao; fazenda?: string };
+export type DadosPdf = { plano: PlanoCampo; nomeTalhao: NomeTalhao; fazenda?: string; talhoes?: Talhao[] };
 
 /** Monta o PDF do plano de campo de sementes (A4 retrato). */
-export async function montarPdfCampo({ plano, nomeTalhao, fazenda }: DadosPdf): Promise<jsPDF> {
+export async function montarPdfCampo({ plano, nomeTalhao, fazenda, talhoes }: DadosPdf): Promise<jsPDF> {
   const { jsPDF: PDF } = await import('jspdf');
   const doc = new PDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const W = 210, M = 14;
@@ -166,9 +169,34 @@ export async function montarPdfCampo({ plano, nomeTalhao, fazenda }: DadosPdf): 
   [...tot.entries()].forEach(([nome, v]) => {
     if (y > 278) { novaPagina(); y = 22; }
     doc.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...preto).text(limpo(`${nome}${v.n > 1 ? ` (${v.n} partes)` : ''}`), M + 2, y);
+    const c = compararComMeta(v.m2, plano.metaHa);
+    if (c.selo !== 'sem-meta') {
+      doc.setTextColor(...(c.selo === 'ok' ? verde : ([180, 110, 0] as [number, number, number])));
+      doc.text(c.selo === 'ok' ? 'na meta' : `${c.diffHa > 0 ? '+' : ''}${c.diffHa.toFixed(1).replace('.', ',')} ha`, W - M - 34, y, { align: 'right' });
+      doc.setTextColor(...preto);
+    }
     doc.text(ha(v.m2), W - M - 2, y, { align: 'right' });
     y += 6;
   });
+  if (plano.metaHa) {
+    doc.setFont('helvetica', 'italic').setFontSize(8.5).setTextColor(...cinza).text(limpo(`Meta por variedade: ${formatarNumeroBR(plano.metaHa)} ha (tolerância de 0,3 ha ou 2%)`), M + 2, y + 1);
+    y += 7;
+  }
+
+  // ---------- conferência de áreas ----------
+  if (talhoes && talhoes.length) {
+    if (y > 250) { novaPagina(); y = 22; }
+    y += 4;
+    doc.setTextColor(...preto).setFont('helvetica', 'bold').setFontSize(11).text('Conferência de áreas', M, y);
+    y += 7;
+    conferirAreas(plano, talhoes).forEach((c) => {
+      if (y > 278) { novaPagina(); y = 22; }
+      doc.setFont('helvetica', 'normal').setFontSize(9.5).setTextColor(...preto).text(limpo(nomeTalhao(c.talhaoId)), M + 2, y);
+      doc.setTextColor(...cinza).setFontSize(9).text(limpo(`partes ${ha(c.partesM2)} de ${ha(c.medidaM2)} medidos${c.corredorEsperadoM2 > 1 ? ` (corredor ${ha(c.corredorEsperadoM2)})` : ''}`), 70, y);
+      doc.setTextColor(...(c.alerta ? ([180, 110, 0] as [number, number, number]) : verde)).text(formatarPercentual(c.diffPercentual), W - M - 2, y, { align: 'right' });
+      y += 6;
+    });
+  }
 
   // ---------- bandeirinhas ----------
   novaPagina();

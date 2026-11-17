@@ -19,6 +19,7 @@ export default function TalhoesTela() {
   const talhoes = useDados((s) => s.talhoes);
   const campos = useDados((s) => s.campos);
   const [busca, setBusca] = useState('');
+  const [limite, setLimite] = useState(30);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -27,9 +28,9 @@ export default function TalhoesTela() {
 
   const porFazenda = useMemo(() => {
     const m = new Map<string, typeof talhoes>();
-    filtrados.forEach((x) => m.set(x.fazenda, [...(m.get(x.fazenda) ?? []), x]));
+    filtrados.slice(0, limite).forEach((x) => m.set(x.fazenda, [...(m.get(x.fazenda) ?? []), x]));
     return [...m.entries()];
-  }, [filtrados]);
+  }, [filtrados, limite]);
 
   const totalM2 = talhoes.reduce((s, x) => s + areaM2(x.contorno), 0);
 
@@ -96,6 +97,8 @@ export default function TalhoesTela() {
           ))}
         </View>
       ))}
+      {filtrados.length > limite && <Botao titulo={`Mostrar mais (${filtrados.length - limite})`} variante="suave" onPress={() => setLimite((l) => l + 30)} />}
+      {talhoes.length > 0 && filtrados.length === 0 && <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>Nenhum talhão encontrado para "{busca}".</Text>}
     </Tela>
   );
 }

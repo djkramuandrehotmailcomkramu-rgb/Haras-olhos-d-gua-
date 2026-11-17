@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import { Tela } from '../../components/Tela';
 import { Campo } from '../../components/Campo';
 import { Cartao } from '../../components/Cartao';
@@ -13,8 +15,9 @@ import { IconeVeiculo } from '../../components/IconeVeiculo';
 import { VEICULOS } from '../../components/veiculos';
 import { formatarDistancia } from '../../geo/unidades';
 import { formatarDuracao } from '../../nav/progresso';
-import { ROTULO_AREA, type UnidadeArea } from '../../geo/unidades';
+import { ROTULO_AREA, formatarHaSemUnidade, type UnidadeArea } from '../../geo/unidades';
 import { lerArquivo, paraCSV, paraGeoJSON, paraGPX, paraKML } from '../../io/formatos';
+import { aplicarBackup, gerarBackup, lerBackup, nomeArquivoBackup, resumoBackup } from '../../io/backup';
 import { entregarArquivo, escolherArquivo } from '../../io/arquivos';
 import { areaM2 } from '../../geo/medidas';
 import { fonte, raio, tipo, useTema } from '../../theme';
@@ -28,9 +31,9 @@ function confirmar(msg: string, ok: () => void) {
 
 export default function MaisTela() {
   const t = useTema();
-  const { unidadeArea, definirUnidadeArea, veiculo, definirVeiculo } = usePrefs();
+  const { unidadeArea, definirUnidadeArea, veiculo, definirVeiculo, ultimoBackupMs, marcarBackup } = usePrefs();
   const viagens = useDados((x) => x.viagens);
-  const { talhoes, medicoes, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
+  const { talhoes, medicoes, campos, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
   const [msg, setMsg] = useState<string | null>(null);
   const [fazendaImport, setFazendaImport] = useState('');
   const [resumo, setResumo] = useState<{ nome: string; m2: number }[]>([]);
@@ -43,10 +46,11 @@ export default function MaisTela() {
     setImportando(false);
     if (!f) return;
     const r = lerArquivo(f.texto);
-    r.poligonos.forEach((p) => adicionarTalhao({ nome: p.nome, fazenda: fazendaImport.trim() || 'Importado', cultura: 'Soja', safra: '2026/27', contorno: p.pontos }));
+    // a lista mostra o mais novo primeiro; importa de trás para frente para manter a ordem do arquivo
+    [...r.poligonos].reverse().forEach((p) => adicionarTalhao({ nome: p.nome, fazenda: fazendaImport.trim() || 'Importado', cultura: 'Soja', safra: '2026/27', contorno: p.pontos }));
     setResumo(r.poligonos.map((p) => ({ nome: p.nome, m2: areaM2(p.pontos) })));
     (r.avisos ?? []).forEach((a) => mostrar(a, 'info'));
-    r.linhas.forEach((l) => adicionarMedicao({ tipo: 'linha', nome: l.nome, pontos: l.pontos, origem: 'importado' }));
+    [...r.linhas].reverse().forEach((l) => adicionarMedicao({ tipo: 'linha', nome: l.nome, pontos: l.pontos, origem: 'importado' }));
     const vazio0 = r.poligonos.length + r.linhas.length === 0;
     const m = vazio0 ? 'Nenhuma área ou linha encontrada. Use GeoJSON, KML ou GPX.' : `Importado: ${r.poligonos.length} talhões e ${r.linhas.length} linhas`;
     setMsg(m);
@@ -62,7 +66,24 @@ export default function MaisTela() {
     mostrar('Arquivo exportado', 'ok');
   };
 
-  const vazio = talhoes.length + medicoes.length === 0;
+  const vazio = talhoes.length + medicoes.length + campos.length === 0;
+  const precisaBackup = !vazio && (!ultimoBackupMs || Date.now() - ultimoBackupMs > 30 * 86400000);
+
+  const baixarBackup = () => {
+    entregarArquivo(nomeArquivoBackup(), JSON.stringify(gerarBackup(), null, 2), 'application/json');
+    marcarBackup();
+    mostrar('Backup baixado', 'ok');
+  };
+  const restaurar = async () => {
+    const f = await escolherArquivo('.json,application/json');
+    if (!f) return;
+    const r = lerBackup(f.texto);
+    if (!r.ok) { mostrar(r.erro, 'erro'); return; }
+    confirmar(`Substituir os dados deste aparelho por este backup (${resumoBackup(r.backup)})? Os dados atuais serão apagados.`, () => {
+      aplicarBackup(r.backup);
+      mostrar('Backup restaurado', 'ok');
+    });
+  };
 
   return (
     <Tela titulo="Mais" subtitulo="Arquivos, unidades e ajustes">
@@ -77,7 +98,7 @@ export default function MaisTela() {
             {resumo.map((r, i) => (
               <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text numberOfLines={1} style={{ fontFamily: fonte.regular, fontSize: 15, color: t.texto, flex: 1 }}>{r.nome}</Text>
-                <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.primaria }}>{(r.m2 / 10000).toFixed(2).replace('.', ',')} ha</Text>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.primaria }}>{formatarHaSemUnidade(r.m2)} ha</Text>
               </View>
             ))}
           </View>
@@ -136,13 +157,38 @@ export default function MaisTela() {
         })}
       </Cartao>
 
+      <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>BACKUP E SEGURANÇA</Text>
+      <Cartao style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name={precisaBackup ? 'warning' : 'shield-checkmark'} size={19} color={precisaBackup ? t.atencao : t.ok} />
+          <Text style={[tipo.corpo, { color: t.texto, flex: 1 }]}>
+            {ultimoBackupMs ? `Último backup: ${new Date(ultimoBackupMs).toLocaleDateString('pt-BR')}` : vazio ? 'Seus dados ficam só neste aparelho.' : 'Você ainda não fez backup. Seus dados ficam só neste aparelho.'}
+          </Text>
+        </View>
+        <Botao titulo="Baixar backup completo" variante="suave" desabilitado={vazio && !ultimoBackupMs} icone={<Ionicons name="cloud-download" size={19} color={t.primaria} />} onPress={baixarBackup} />
+        <Botao titulo="Restaurar de um backup" variante="fantasma" icone={<Ionicons name="cloud-upload" size={19} color={t.primaria} />} onPress={restaurar} />
+      </Cartao>
+
+      <Pressable onPress={() => router.push('/ajuda')} accessibilityRole="button" accessibilityLabel="Ajuda e sobre">
+        <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="help-circle" size={22} color={t.primaria} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: fonte.semi, fontSize: 16, color: t.texto }}>Ajuda e sobre</Text>
+            <Text style={[tipo.legenda, { color: t.textoSuave }]}>Guia rápido, precisão do GPS e privacidade</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={t.textoSuave} />
+        </Cartao>
+      </Pressable>
+
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>DADOS</Text>
       <Cartao style={{ gap: 10 }}>
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Tudo fica salvo neste aparelho. Exporte um arquivo para fazer backup.</Text>
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
       <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa, busca e rotas © colaboradores do OpenStreetMap (Nominatim, OSRM)</Text>
-      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão 0.6</Text>
+      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão {Constants.expoConfig?.version ?? '1.0.0'}</Text>
     </Tela>
   );
 }

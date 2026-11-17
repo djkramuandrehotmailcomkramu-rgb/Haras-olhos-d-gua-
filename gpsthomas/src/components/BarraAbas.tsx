@@ -44,7 +44,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
   return (
     <Animated.View pointerEvents={esconder ? 'none' : 'box-none'} style={[s.raiz, { bottom: Math.max(ins.bottom, 12) }, estiloOculta]}>
       <Vidro raioBorda={raio.xl} style={{ width: '100%' }}>
-        <View style={s.linha} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
+        <View role="tablist" accessibilityRole="tablist" style={s.linha} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
           {larguraAba > 0 && (
             <Animated.View
               pointerEvents="none"
@@ -68,8 +68,8 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
                   if (!foco && !ev.defaultPrevented) navigateToTab(rota.key);
                 }}
               >
-                <Ionicons name={foco ? dentro : fora} size={23} color={foco ? t.primaria : t.textoSuave} />
-                <Text style={[s.rot, { color: foco ? t.primaria : t.textoSuave }]}>{rotulo}</Text>
+                <Ionicons name={foco ? dentro : fora} size={23} color={foco ? t.primariaTexto : t.textoSuave} />
+                <Text style={[s.rot, { color: foco ? t.primariaTexto : t.textoSuave }]}>{rotulo}</Text>
               </Pressable>
             );
           })}

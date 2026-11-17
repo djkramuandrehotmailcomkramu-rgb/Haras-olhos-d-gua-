@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>GPSThomas</title>
+    <meta name="description" content="GPSThomas: GPS para medir áreas e distâncias no campo, dividir talhões em parcelas, marcar bandeirinhas e navegar por rotas." />
+    <meta name="theme-color" content="#1F7A3E" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="GPSThomas" />
+    <link rel="preload" href="/fonts/Inter_400Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="/fonts/Inter_600SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="/icon-192.png" as="image" />
+    <style id="expo-reset">
+      html, body { height: 100%; }
+      body { overflow: hidden; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
+    <style>html,body{background:#F1F4EF;overscroll-behavior:none;scroll-behavior:smooth}@media (prefers-color-scheme:dark){html,body{background:#0A110D}}body{-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}@font-face{font-family:'Inter_400Regular';src:url(/fonts/Inter_400Regular.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_500Medium';src:url(/fonts/Inter_500Medium.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_600SemiBold';src:url(/fonts/Inter_600SemiBold.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_700Bold';src:url(/fonts/Inter_700Bold.woff2) format('woff2');font-display:swap}#gt-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#F1F4EF;font-family:Inter_700Bold,system-ui,sans-serif;color:#13201A;transition:opacity .25s}#gt-splash img{width:96px;height:96px;border-radius:22px}#gt-splash b{font-size:22px;letter-spacing:-.4px}@media (prefers-color-scheme:dark){#gt-splash{background:#0A110D;color:#EEF4EF}}</style>
+    <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(reg){window.__gtReg=reg;function avisa(){window.dispatchEvent(new CustomEvent('gt-nova-versao'))}if(reg.waiting&&navigator.serviceWorker.controller)avisa();reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',function(){if(nw.state==='installed'&&navigator.serviceWorker.controller)avisa()})});reg.update().catch(function(){});document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')reg.update().catch(function(){})})}).catch(function(){});var rec=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(rec||!window.__gtAtualizando)return;rec=true;location.reload()})})}</script>
+  </head>
+  <body>
+    <div id="gt-splash" role="status" aria-label="Carregando"><img src="/icon-192.png" width="96" height="96" alt="" /><b>GPSThomas</b></div>
+    <noscript>Ative o JavaScript para usar o GPSThomas.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

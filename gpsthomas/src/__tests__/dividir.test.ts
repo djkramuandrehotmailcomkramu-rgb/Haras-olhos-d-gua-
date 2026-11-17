@@ -174,3 +174,20 @@ describe('plano do campo de sementes', () => {
     expect(diferencaPercentual(910000, 92)).toBeLessThan(-1);
   });
 });
+
+describe('desempenho da divisão', () => {
+  it('talhão de 2.000 vértices divide em menos de 600 ms e fecha a área', () => {
+    const n = 2000;
+    const c: Coord[] = Array.from({ length: n }, (_, i) => {
+      const a = (i / n) * Math.PI * 2;
+      const r = 520 + 40 * Math.sin(a * 17) + 15 * Math.sin(a * 53);
+      return pt(Math.cos(a) * r * 1.6, Math.sin(a) * r * 0.8);
+    });
+    const t0 = Date.now();
+    const d = dividirEmFaixas(c, { partes: 10 });
+    expect(Date.now() - t0).toBeLessThan(600);
+    const soma = d.partes.reduce((s, p) => s + p.areaM2, 0);
+    expect(Math.abs(soma / d.areaTotalM2 - 1)).toBeLessThan(0.001);
+    for (const p of d.partes) expect(Math.abs(p.areaM2 / (d.areaTotalM2 / 10) - 1)).toBeLessThan(0.01);
+  });
+});

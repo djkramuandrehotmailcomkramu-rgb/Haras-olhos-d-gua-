@@ -15,6 +15,8 @@ type Prefs = {
   recentes: Recente[];
   vozLigada: boolean;
   painelRecolhido: boolean;
+  ultimoBackupMs: number | null;
+  marcarBackup: () => void;
   definirPainel: (v: boolean) => void;
   veiculo: Veiculo;
   favoritos: Recente[];
@@ -38,6 +40,8 @@ export const usePrefs = create<Prefs>()(
       recentes: [],
       vozLigada: true,
       painelRecolhido: false,
+      ultimoBackupMs: null,
+      marcarBackup: () => set({ ultimoBackupMs: Date.now() }),
       definirPainel: (painelRecolhido) => set({ painelRecolhido }),
       veiculo: 'carro',
       favoritos: [],
@@ -53,6 +57,8 @@ export const usePrefs = create<Prefs>()(
     }),
     {
       name: 'gpsthomas-prefs',
+      version: 1,
+      migrate: (estado: any) => ({ ...estado }),
       storage: createJSONStorage(() => ({
         getItem: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
         setItem: (k, v) => { try { localStorage.setItem(k, v); } catch {} },

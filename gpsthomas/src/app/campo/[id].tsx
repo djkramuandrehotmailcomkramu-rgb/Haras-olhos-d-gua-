@@ -19,7 +19,10 @@ import { useDados, useUi, type Comando } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { useLocalizacao } from '../../geo/useLocalizacao';
-import { CORES_VARIEDADE, distribuirVariedades, totaisPorVariedade } from '../../geo/campo';
+import { CORES_VARIEDADE, compararComMeta, conferirAreas, distribuirVariedades, totaisPorVariedade } from '../../geo/campo';
+import { formatarHa } from '../../geo/unidades';
+import { formatarPercentual, lerNumeroBR, paraCampoBR } from '../../geo/numero';
+import { Dica } from '../../components/Dica';
 import { desvioLateral, degrauDeAviso, guiaAtePonto, ordenarVisita, textoDesvio, textoGiro } from '../../nav/guiaPonto';
 import { useBussola } from '../../nav/bussola';
 import { falar, manterTelaLigada, pararVoz } from '../../nav/voz';
@@ -30,7 +33,7 @@ import { entregarArquivo } from '../../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../../theme';
 import type { Coord } from '../../geo/medidas';
 
-const ha = (m2: number) => `${(m2 / 10000).toFixed(2).replace('.', ',')} ha`;
+const ha = (m2: number) => formatarHa(m2);
 
 export default function CampoTela() {
   const t = useTema();
@@ -54,6 +57,7 @@ export default function CampoTela() {
   const [mapaCheio, setMapaCheio] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [verTodas, setVerTodas] = useState(false);
+  const [metaTxt, setMetaTxt] = useState('');
   const scrollY = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
   const alturaMapa = useSharedValue(300 + ins.top);
@@ -70,6 +74,7 @@ export default function CampoTela() {
   const bussola = useBussola(guiando);
 
   useEffect(() => { if (plano && textoVar === '') setTextoVar(plano.variedades.join('\n')); }, [plano?.id]);
+  useEffect(() => { if (plano) setMetaTxt(plano.metaHa ? paraCampoBR(plano.metaHa) : ''); }, [plano?.id]);
 
   const variedades = plano?.variedades ?? [];
   const corDe = (v: string) => { const i = variedades.indexOf(v); return CORES_VARIEDADE[(i < 0 ? CORES_VARIEDADE.length - 1 : i) % CORES_VARIEDADE.length]; };
@@ -150,7 +155,7 @@ export default function CampoTela() {
     setGerandoPdf(true);
     try {
       const fazenda = talhoes.find((x) => x.id === plano.config[0]?.talhaoId)?.fazenda;
-      await baixarPdfCampo({ plano, nomeTalhao: (idT) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão', fazenda });
+      await baixarPdfCampo({ plano, nomeTalhao: (idT) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão', fazenda, talhoes });
       mostrar('PDF gerado', 'ok');
     } catch { mostrar('Não foi possível gerar o PDF.', 'erro'); }
     finally { setGerandoPdf(false); }
@@ -196,6 +201,10 @@ export default function CampoTela() {
     mostrar('Variedades salvas e distribuídas nas partes', 'ok');
   };
 
+  const confirmar = (msg: string, ok: () => void) => {
+    if (Platform.OS === 'web') { if (window.confirm(msg)) ok(); }
+    else Alert.alert('Confirmar', msg, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Sim', onPress: ok }]);
+  };
   const confirmarExcluir = () => {
     const ok = () => { removerCampo(plano.id); router.back(); };
     if (Platform.OS === 'web') { if (window.confirm(`Excluir o plano "${plano.nome}"?`)) ok(); }
@@ -321,6 +330,7 @@ export default function CampoTela() {
 
   /* ---------------- MODO PLANO ---------------- */
   const totais = totaisPorVariedade(plano.partes);
+  const conferencia = conferirAreas(plano, talhoes);
   const nomeTalhao = (idT: string) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão';
   const exp = (ext: 'kml' | 'geojson' | 'csv' | 'gpx') => {
     const nome = `${plano.nome}.${ext}`;
@@ -346,12 +356,25 @@ export default function CampoTela() {
 
       <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} style={[{ position: 'absolute', top: 278 + ins.top, left: 0, right: 0, bottom: 0, backgroundColor: t.fundo, borderTopLeftRadius: 26, borderTopRightRadius: 26, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any, eSheet]} contentContainerStyle={{ padding: 18, paddingBottom: 60, gap: 14 }} keyboardShouldPersistTaps="handled">
         <View style={{ gap: 14 }}>
-          <View>
+          <View style={{ gap: 4 }}>
             <Text style={[tipo.titulo, { color: t.texto }]}>{plano.nome}</Text>
-            <Text style={[tipo.corpo, { color: t.textoSuave }]}>{plano.partes.length} partes · {plano.divisas.length} divisas · {plano.bandeiras.length} bandeirinhas ({colocadas} colocadas)</Text>
+            <Text style={[tipo.corpo, { color: t.textoSuave }]}>{plano.partes.length} partes · {plano.divisas.length} divisas · {plano.bandeiras.length} bandeirinhas</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Cartao style={{ flex: 1, padding: 14 }}>
+              <Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREA TOTAL</Text>
+              <Text numberOfLines={1} style={{ fontFamily: fonte.negrito, fontSize: 20, color: t.primaria, marginTop: 2, fontVariant: ['tabular-nums'] }}>{ha(plano.partes.reduce((s2, p) => s2 + p.areaM2, 0))}</Text>
+            </Cartao>
+            <Cartao style={{ flex: 1, padding: 14 }}>
+              <Text style={[tipo.legenda, { color: t.textoSuave }]}>BANDEIRAS</Text>
+              <Text numberOfLines={1} style={{ fontFamily: fonte.negrito, fontSize: 20, color: t.texto, marginTop: 2, fontVariant: ['tabular-nums'] }}>{colocadas}/{plano.bandeiras.length} · {Math.round((colocadas / Math.max(1, plano.bandeiras.length)) * 100)}%</Text>
+            </Cartao>
           </View>
 
           <Botao titulo={colocadas === 0 ? 'Marcar no campo' : colocadas >= plano.bandeiras.length ? 'Tudo colocado ✓' : 'Continuar marcando'} tamanho="g" desabilitado={plano.bandeiras.length === colocadas} icone={<Ionicons name="navigate" size={20} color={t.sobrePrimaria} />} onPress={iniciarGuia} />
+
+          <Botao titulo="Ajustar hectares e divisas" variante="suave" icone={<Ionicons name="options" size={19} color={t.primaria} />} onPress={() => router.push(`/campo/novo?editar=${plano.id}`)} />
 
           <Cartao style={{ gap: 10 }}>
             <Text style={[tipo.subtitulo, { color: t.texto }]}>Variedades</Text>
@@ -380,17 +403,54 @@ export default function CampoTela() {
           ))}
 
           {variedades.length > 0 && (
-            <Cartao style={{ gap: 8 }}>
-              <Text style={[tipo.subtitulo, { color: t.texto }]}>Total por variedade</Text>
-              {totais.map((x) => (
-                <View key={x.variedade} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: corDe(x.variedade) }} />
-                  <Text style={{ flex: 1, fontFamily: fonte.regular, fontSize: 15, color: t.texto }}>{x.variedade}{x.partes > 1 ? ` (${x.partes} partes)` : ''}</Text>
-                  <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.texto }}>{ha(x.areaM2)}</Text>
+            <Cartao style={{ gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[tipo.subtitulo, { color: t.texto }]}>Total por variedade</Text>
+                <Dica texto="Compara a área real de cada variedade com a meta que você definiu (ex.: 16 ha). A tolerância é de 0,3 ha ou 2%, o que for maior." />
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+                <View style={{ width: 150 }}>
+                  <Campo rotulo="Meta por variedade (ha)" value={metaTxt} onChangeText={(v) => { setMetaTxt(v); const n = lerNumeroBR(v); atualizarCampo(plano.id, { metaHa: n && n > 0 ? n : null }); }} keyboardType="decimal-pad" compacto placeholder="Ex.: 16" />
                 </View>
-              ))}
+              </View>
+              {totais.map((x) => {
+                const c = compararComMeta(x.areaM2, plano.metaHa);
+                return (
+                  <View key={x.variedade} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: corDe(x.variedade) }} />
+                    <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.regular, fontSize: 15, color: t.texto }}>{x.variedade}{x.partes > 1 ? ` (${x.partes} partes)` : ''}</Text>
+                    <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.texto, fontVariant: ['tabular-nums'] }}>{ha(x.areaM2)}</Text>
+                    {c.selo !== 'sem-meta' && (
+                      <View style={{ paddingHorizontal: 8, height: 24, borderRadius: 12, justifyContent: 'center', backgroundColor: c.selo === 'ok' ? t.primariaSuave : 'rgba(242,183,61,0.22)' }} accessibilityLabel={c.selo === 'ok' ? 'Dentro da meta' : 'Fora da meta'}>
+                        <Text style={{ fontFamily: fonte.semi, fontSize: 12, color: c.selo === 'ok' ? t.primariaTexto : t.atencao, fontVariant: ['tabular-nums'] }}>
+                          {c.selo === 'ok' ? 'na meta' : `${c.diffHa > 0 ? '+' : ''}${c.diffHa.toFixed(1).replace('.', ',')} ha`}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </Cartao>
           )}
+
+          <Cartao style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={[tipo.subtitulo, { color: t.texto }]}>Conferência de áreas</Text>
+              <Dica texto="Soma das partes comparada com a área medida de cada talhão. Se houver corredor, a área dele é descontada e entra na conta. Diferença maior que 0,5% merece atenção." />
+            </View>
+            {conferencia.map((c) => (
+              <View key={c.talhaoId} style={{ gap: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name={c.alerta ? 'alert-circle' : 'checkmark-circle'} size={18} color={c.alerta ? t.atencao : t.ok} />
+                  <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.semi, fontSize: 14.5, color: t.texto }}>{nomeTalhao(c.talhaoId)}</Text>
+                  <Text style={{ fontFamily: fonte.semi, fontSize: 14, color: c.alerta ? t.atencao : t.ok, fontVariant: ['tabular-nums'] }}>{formatarPercentual(c.diffPercentual)}</Text>
+                </View>
+                <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 26 }]}>
+                  Partes {ha(c.partesM2)} de {ha(c.medidaM2)} medidos{c.corredorEsperadoM2 > 1 ? ` · corredor ${ha(c.corredorEsperadoM2)}` : ''}
+                </Text>
+              </View>
+            ))}
+          </Cartao>
 
           <Text style={[tipo.legenda, { color: t.textoSuave }]}>BANDEIRINHAS · TOQUE PARA SER GUIADO ATÉ ELA</Text>
           <Cartao style={{ padding: 6 }}>
@@ -424,7 +484,7 @@ export default function CampoTela() {
             </View>
           </Cartao>
 
-          {colocadas > 0 && <Botao titulo="Recomeçar as bandeirinhas" variante="suave" onPress={() => atualizarCampo(plano.id, { bandeiras: plano.bandeiras.map((b) => ({ ...b, colocada: false })) })} />}
+          {colocadas > 0 && <Botao titulo="Recomeçar as bandeirinhas" variante="suave" onPress={() => confirmar('Marcar todas as bandeirinhas como pendentes de novo?', () => atualizarCampo(plano.id, { bandeiras: plano.bandeiras.map((b) => ({ ...b, colocada: false })) }))} />}
           <Botao titulo="Excluir plano" variante="perigo" onPress={confirmarExcluir} />
         </View>
       </Animated.ScrollView>

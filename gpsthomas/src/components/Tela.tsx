@@ -1,6 +1,7 @@
 import { Children, ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Vidro } from './Vidro';
 import { Revelar } from './Revelar';
@@ -13,11 +14,17 @@ export function Tela({ titulo, subtitulo, children }: { titulo: string; subtitul
   const ins = useSafeAreaInsets();
   const entrada = useEntradaFoco();
   const y = useSharedValue(0);
+  const alturaConteudo = useSharedValue(0);
+  const alturaVisivel = useSharedValue(0);
   const onScroll = useAnimatedScrollHandler((e) => { y.value = e.contentOffset.y; });
 
   const grande = useAnimatedStyle(() => ({
     opacity: interpolate(y.value, [0, 60], [1, 0], Extrapolation.CLAMP),
     transform: [{ translateY: interpolate(y.value, [0, 60], [0, -8], Extrapolation.CLAMP) }, { scale: interpolate(y.value, [-80, 0], [1.06, 1], Extrapolation.CLAMP) }],
+  }));
+  // mostra um esmaecido no rodapé enquanto ainda há conteúdo para rolar
+  const maisAbaixo = useAnimatedStyle(() => ({
+    opacity: interpolate(alturaConteudo.value - alturaVisivel.value - y.value, [0, 90], [0, 1], Extrapolation.CLAMP),
   }));
   const barra = useAnimatedStyle(() => ({ opacity: interpolate(y.value, [40, 80], [0, 1], Extrapolation.CLAMP) }));
 
@@ -26,6 +33,10 @@ export function Tela({ titulo, subtitulo, children }: { titulo: string; subtitul
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
+        onContentSizeChange={(_, h) => { alturaConteudo.value = h; }}
+        onLayout={(e) => { alturaVisivel.value = e.nativeEvent.layout.height; }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         style={[{ flex: 1, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any, entrada]}
         contentContainerStyle={{ paddingTop: ins.top + 18, paddingBottom: 130, paddingHorizontal: 18, gap: 14 }}
         showsVerticalScrollIndicator={false}
@@ -39,6 +50,10 @@ export function Tela({ titulo, subtitulo, children }: { titulo: string; subtitul
           {Children.toArray(children).map((c, i) => <Revelar key={(c as any)?.key ?? i} atraso={Math.min(i, 4) * 40}>{c}</Revelar>)}
         </View>
       </Animated.ScrollView>
+
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 150 }, maisAbaixo]}>
+        <LinearGradient colors={['transparent', t.fundo]} style={{ flex: 1 }} />
+      </Animated.View>
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: undefined, height: ins.top + 52 }, barra]}>
         <Vidro raioBorda={0} style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 12, borderWidth: 0 }}>

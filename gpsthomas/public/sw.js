@@ -1,9 +1,17 @@
-const V = 'gpsthomas-v3';
+const V = 'gpsthomas-v4';
 const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
-self.addEventListener('install', () => { self.skipWaiting(); });
+
+// Não pula a espera sozinho: o app mostra "Nova versão disponível" e o usuário decide quando atualizar.
+self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
+
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => !k.startsWith('gpsthomas-') || (k !== V && k !== 'gpsthomas-tiles')).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys()
+      .then((ks) => Promise.all(ks.filter((k) => k.startsWith('gpsthomas-') && k !== V && k !== 'gpsthomas-tiles').map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
 });
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
@@ -18,8 +26,9 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (url.origin !== location.origin) return;
+  // Aplicativo: rede primeiro (sempre a versão mais nova) e, sem internet, a cópia guardada.
   e.respondWith(
-    fetch(req).then((r) => { const cp = r.clone(); caches.open(V).then((k) => k.put(req, cp)); return r; })
+    fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(V).then((k) => k.put(req, cp)); } return r; })
       .catch(() => caches.match(req).then((m) => m || caches.match('/'))),
   );
 });

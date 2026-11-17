@@ -33,15 +33,30 @@ export type ParteCampo = {
 
 export type BandeiraCampo = { id: string; coord: Coord; rotulo: string; colocada: boolean; linha: number };
 
+export type ConfigCampo = {
+  talhaoId: string;
+  partes: number;
+  anguloGraus: number | null;
+  inverter: boolean;
+  /** 'iguais' (padrão) ou 'manual': hectares digitados pelo usuário */
+  modo?: 'iguais' | 'manual';
+  /** hectares digitados (a última parte é o que sobra e não precisa ser informada) */
+  areasHa?: number[];
+  /** área informada do talhão (ex.: 92), usada para calibrar os hectares digitados */
+  areaInformadaHa?: number | null;
+};
+
 export type PlanoCampo = {
   id: string;
   nome: string;
   criadoEm: number;
   /** partes por talhão (ex.: Andropogon 5, Amendoim 6) */
-  config: { talhaoId: string; partes: number; anguloGraus: number | null; inverter: boolean }[];
+  config: ConfigCampo[];
   corredorM: number;
   espacamentoM: number;
   variedades: string[];
+  /** meta de hectares por variedade (ex.: 16) */
+  metaHa?: number | null;
   partes: ParteCampo[];
   bandeiras: BandeiraCampo[];
   /** linhas de divisa (para guiar "seguindo a linha") */
@@ -108,7 +123,19 @@ export const useDados = create<Dados>()(
       removerMedicao: (id) => set((s) => ({ medicoes: s.medicoes.filter((m) => m.id !== id) })),
       limparTudo: () => set({ talhoes: [], medicoes: [], campos: [] }),
     }),
-    { name: 'gpsthomas-dados', storage: createJSONStorage(() => armazem) },
+    {
+      name: 'gpsthomas-dados',
+      version: 1,
+      storage: createJSONStorage(() => armazem),
+      // v0 -> v1: garante os campos que surgiram nas versões 0.5–0.7 (viagens, campos)
+      migrate: (estado: any) => ({
+        ...estado,
+        talhoes: Array.isArray(estado?.talhoes) ? estado.talhoes : [],
+        medicoes: Array.isArray(estado?.medicoes) ? estado.medicoes : [],
+        viagens: Array.isArray(estado?.viagens) ? estado.viagens : [],
+        campos: Array.isArray(estado?.campos) ? estado.campos : [],
+      }),
+    },
   ),
 );
 

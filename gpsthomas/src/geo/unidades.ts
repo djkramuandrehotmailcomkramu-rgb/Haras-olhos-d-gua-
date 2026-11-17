@@ -43,3 +43,7 @@ export function formatarDistancia(m: number, unidade?: UnidadeDistancia): string
   const u = unidade ?? (m >= 1000 ? 'km' : 'm');
   return u === 'km' ? `${fmt(m / 1000, 2)} km` : `${fmt(m, 0)} m`;
 }
+
+/** Hectares com vírgula e casas fixas: 163,64 ha. Usado em telas, PDF e exportações. */
+export const formatarHa = (m2: number, casas = 2) => `${fmt(m2 / 10000, casas)} ha`;
+export const formatarHaSemUnidade = (m2: number, casas = 2) => fmt(m2 / 10000, casas);

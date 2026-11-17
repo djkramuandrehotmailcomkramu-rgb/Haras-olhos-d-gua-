@@ -1,6 +1,7 @@
-node_modules/
+*.aab
+*.apk
+.env*
 .expo/
 dist/
-*.apk
-*.aab
-.env*
+e2e/saida/
+node_modules/

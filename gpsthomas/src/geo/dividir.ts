@@ -121,11 +121,35 @@ export function dividirEmFaixas(contorno: Coord[], op: OpcoesDivisao): Divisao {
   }
   const alvosN = alvosReal.map((a) => a * escala);
 
+  // Área do talhão com projeção <= d, por recorte contra um semiplano (O(n)).
+  // Sutherland–Hodgman gera arestas degeneradas em polígonos côncavos, mas a área com sinal sai correta.
+  const proj1 = (p: XY) => p[0] * normal[0] + p[1] * normal[1];
   const areaAte = (d: number): number => {
     if (d <= dMin) return 0;
     if (d >= dMax) return total;
-    const r = polygonClipping.intersection(poli, faixa(dMin - 1, d, normal, tang, meio, raio));
-    return areaPlana(r as Poligono[]);
+    const n = xy.length - 1; // o anel repete o primeiro ponto no fim
+    let soma = 0;
+    let ant: XY = xy[n - 1];
+    let antDentro = proj1(ant) <= d;
+    let ultimo: XY | null = null, primeiro: XY | null = null;
+    const emite = (q: XY) => {
+      if (ultimo) soma += ultimo[0] * q[1] - q[0] * ultimo[1]; else primeiro = q;
+      ultimo = q;
+    };
+    for (let i = 0; i < n; i++) {
+      const cur = xy[i];
+      const curDentro = proj1(cur) <= d;
+      if (curDentro !== antDentro) {
+        const a = proj1(ant), b = proj1(cur);
+        const f = (d - a) / (b - a);
+        emite([ant[0] + (cur[0] - ant[0]) * f, ant[1] + (cur[1] - ant[1]) * f]);
+      }
+      if (curDentro) emite(cur);
+      ant = cur;
+      antDentro = curDentro;
+    }
+    if (ultimo && primeiro) soma += (ultimo as XY)[0] * (primeiro as XY)[1] - (primeiro as XY)[0] * (ultimo as XY)[1];
+    return Math.abs(soma) / 2;
   };
 
   // posição de cada corte por busca binária da área acumulada
@@ -135,7 +159,7 @@ export function dividirEmFaixas(contorno: Coord[], op: OpcoesDivisao): Divisao {
     acumulado += alvosN[i];
     let lo = cortesD[cortesD.length - 1];
     let hi = dMax;
-    for (let it = 0; it < 60; it++) {
+    for (let it = 0; it < 55; it++) {
       const mid = (lo + hi) / 2;
       if (areaAte(mid) < acumulado) lo = mid; else hi = mid;
     }

@@ -25,12 +25,12 @@ export async function entregarArquivo(nomeOriginal: string, conteudo: string, mi
 }
 
 /** Abre o seletor de arquivo (web) e devolve o texto. */
-export function escolherArquivo(): Promise<{ nome: string; texto: string } | null> {
+export function escolherArquivo(aceitar?: string): Promise<{ nome: string; texto: string } | null> {
   if (Platform.OS !== 'web') return Promise.resolve(null);
   return new Promise((resolve) => {
     const inp = document.createElement('input');
     inp.type = 'file';
-    inp.accept = '.geojson,.json,.kml,.kmz,.gpx,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml,text/xml';
+    inp.accept = aceitar ?? '.geojson,.json,.kml,.kmz,.gpx,application/json,application/vnd.google-earth.kml+xml,application/gpx+xml,text/xml';
     inp.onchange = async () => {
       const f = inp.files?.[0];
       if (!f) return resolve(null);

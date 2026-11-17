@@ -1,4 +1,4 @@
-# GPSThomas
+# GPSThomas 1.0.0
 
 App GPS para medir área e distância no campo (React Native + Expo). Roda como PWA no Android/iPhone e, nas próximas fases, como app nativo.
 
@@ -32,3 +32,16 @@ Importe o KML/KMZ dos talhões, divida cada um em partes de área igual (faixas 
 ## v0.7
 PDF do plano do campo de sementes (mapa vetorial, partes, variedades e bandeirinhas com link do Google Maps), toque na bandeirinha para ser guiado até ela (a pé ou por estrada), painéis recolhíveis para ver o mapa limpo, mapa em tela cheia e rolagem com efeito suave.
 `npx tsx tools/gerar-pdf-exemplo.ts saida.pdf` gera um PDF de exemplo.
+
+
+## Verificar antes de publicar
+```bash
+npm run typecheck && npm test            # tipos e 80 testes
+npm run build:web                        # gera dist/
+NODE_PATH=$(npm root -g) npm run e2e     # 15 cenários de ponta a ponta (precisa de Playwright)
+NODE_PATH=$(npm root -g) npm run auditoria   # axe-core + capturas de tela
+```
+Veja `CHECKLIST.md` (resultado de cada item) e `CHANGELOG.md`.
+
+## Serviços externos (configuráveis)
+`EXPO_PUBLIC_OSRM_URL` (rotas) e `EXPO_PUBLIC_NOMINATIM_URL` (busca). Os padrões são servidores públicos gratuitos para uso leve.

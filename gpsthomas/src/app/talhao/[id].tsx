@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { Paralaxe } from '../../components/Paralaxe';
 import { Revelar } from '../../components/Revelar';
+import { Dica } from '../../components/Dica';
 import { MapaCampo } from '../../components/MapaCampo';
 import { Cartao } from '../../components/Cartao';
 import { Botao } from '../../components/Botao';
@@ -72,11 +73,11 @@ export default function TalhaoDetalhe() {
       <View style={{ marginTop: -26, backgroundColor: t.fundo, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <Cartao style={{ flex: 1 }}>
-            <Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREA</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREA</Text><Dica texto="Calculada sobre a curvatura da Terra (elipsoide WGS 84), por isso pode diferir um pouco de contas feitas em mapa plano. Se vier de um KML, é a área do contorno desenhado." /></View>
             <Text numberOfLines={1} style={{ fontFamily: fonte.negrito, fontSize: formatarArea(m2, 'ha').length > 12 ? 17 : 24, color: t.primaria, marginTop: 4 }}>{formatarArea(m2, 'ha')}</Text>
           </Cartao>
           <Cartao style={{ flex: 1 }}>
-            <Text style={[tipo.legenda, { color: t.textoSuave }]}>PERÍMETRO</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Text style={[tipo.legenda, { color: t.textoSuave }]}>PERÍMETRO</Text><Dica texto="Comprimento total do contorno do talhão, somando todos os lados." /></View>
             <Text numberOfLines={1} style={{ fontFamily: fonte.negrito, fontSize: 22, color: t.texto, marginTop: 4 }}>{formatarDistancia(perimetroM(x.contorno))}</Text>
           </Cartao>
         </View>

@@ -27,6 +27,7 @@ export default function MedicoesTela() {
   const mostrar = useToast((s) => s.mostrar);
   const baixar = (n: string, c: string, m: string) => { entregarArquivo(n, c, m); mostrar('Arquivo exportado', 'ok'); };
   const [aberta, setAberta] = useState<string | null>(null);
+  const [limite, setLimite] = useState(30);
   const [converter, setConverter] = useState<Medicao | null>(null);
 
   const valor = (m: Medicao) => (m.tipo === 'area' ? formatarArea(areaM2(m.pontos), unidade) : formatarDistancia(comprimentoM(m.pontos)));
@@ -43,7 +44,7 @@ export default function MedicoesTela() {
         </Cartao>
       )}
 
-      {medicoes.map((m, i) => {
+      {medicoes.slice(0, limite).map((m, i) => {
         const ab = aberta === m.id;
         return (
           <View key={m.id}>
@@ -80,6 +81,8 @@ export default function MedicoesTela() {
           </View>
         );
       })}
+
+      {medicoes.length > limite && <Botao titulo={`Mostrar mais (${medicoes.length - limite})`} variante="suave" onPress={() => setLimite((l) => l + 30)} />}
 
       <FolhaSalvar
         visivel={!!converter}

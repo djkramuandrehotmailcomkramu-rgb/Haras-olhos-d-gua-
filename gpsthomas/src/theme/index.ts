@@ -8,6 +8,10 @@ export type Paleta = {
   primaria: string; primariaSuave: string; sobrePrimaria: string; destaque: string; perigo: string;
   vidro: 'light' | 'dark'; vidroCor: string;
   gps: string; terra: string; ok: string; atencao: string;
+  /** texto verde sobre fundos suaves (contraste AA) */
+  primariaTexto: string;
+  /** texto sobre o botão de perigo */
+  sobrePerigo: string;
 };
 
 export const paletas: Record<'claro' | 'escuro', Paleta> = {
@@ -22,10 +26,10 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     primariaSuave: 'rgba(31,122,62,0.12)',
     sobrePrimaria: '#FFFFFF',
     destaque: '#D99A00',
-    perigo: '#D64545',
+    perigo: '#C73636',
     vidro: 'light',
     vidroCor: 'rgba(255,255,255,0.82)',
-    gps: '#2F7DF6', terra: '#8B5E34', ok: '#1F9D55', atencao: '#D99A00',
+    gps: '#2F7DF6', terra: '#8B5E34', ok: '#166A38', atencao: '#9A6400', primariaTexto: '#17632F', sobrePerigo: '#FFFFFF',
   },
   escuro: {
     fundo: '#0A110D',
@@ -41,7 +45,7 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     perigo: '#F07070',
     vidro: 'dark',
     vidroCor: 'rgba(16,25,20,0.80)',
-    gps: '#5B9BFF', terra: '#C28A55', ok: '#3FB063', atencao: '#F2B73D',
+    gps: '#5B9BFF', terra: '#C28A55', ok: '#3FB063', atencao: '#F2B73D', primariaTexto: '#3FB063', sobrePerigo: '#2B0A0A',
   },
 };
 

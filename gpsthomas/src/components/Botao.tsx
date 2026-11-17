@@ -24,9 +24,9 @@ export function Botao({ titulo, onPress, icone, variante = 'primario', tamanho =
 
   const cores = {
     primario: { bg: t.primaria, fg: t.sobrePrimaria },
-    suave: { bg: t.primariaSuave, fg: t.primaria },
-    fantasma: { bg: 'transparent', fg: t.primaria },
-    perigo: { bg: t.perigo, fg: '#fff' },
+    suave: { bg: t.primariaSuave, fg: t.primariaTexto },
+    fantasma: { bg: 'transparent', fg: t.primariaTexto },
+    perigo: { bg: t.perigo, fg: t.sobrePerigo },
   }[variante];
 
   return (
