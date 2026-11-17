@@ -15,6 +15,8 @@ type Prefs = {
   recentes: Recente[];
   vozLigada: boolean;
   painelRecolhido: boolean;
+  avisoInstalarFechado: boolean;
+  fecharAvisoInstalar: () => void;
   ultimoBackupMs: number | null;
   marcarBackup: () => void;
   definirPainel: (v: boolean) => void;
@@ -40,6 +42,8 @@ export const usePrefs = create<Prefs>()(
       recentes: [],
       vozLigada: true,
       painelRecolhido: false,
+      avisoInstalarFechado: false,
+      fecharAvisoInstalar: () => set({ avisoInstalarFechado: true }),
       ultimoBackupMs: null,
       marcarBackup: () => set({ ultimoBackupMs: Date.now() }),
       definirPainel: (painelRecolhido) => set({ painelRecolhido }),

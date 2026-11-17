@@ -101,3 +101,12 @@ describe('meta por variedade e conferência', () => {
     expect(c.alerta).toBe(false);
   });
 });
+
+import { VERSAO } from '../versao';
+import app from '../../app.json';
+describe('versão', () => {
+  it('app.json e package.json estão sincronizados', () => {
+    expect(VERSAO).toBe(app.expo.version);
+    expect(VERSAO).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+});

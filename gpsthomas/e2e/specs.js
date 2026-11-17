@@ -233,7 +233,7 @@ module.exports = [
     async fn({ browser, url }) {
       const p = await novaPagina(browser, { url });
       await p.ir('/ajuda');
-      check(await p.getByText('Versão 1.0.0').count() === 1, 'mostra a versão 1.0.0');
+      check(await p.getByText('Versão 1.1.0').count() === 1, 'mostra a versão 1.1.0');
       await p.getByText('Campo de sementes').first().click(); await p.waitForTimeout(400);
       check(await p.getByText(/Digitar hectares/).count() >= 1, 'guia explica hectares digitados');
     },
@@ -286,6 +286,128 @@ module.exports = [
       await p.evaluate(() => window.dispatchEvent(new CustomEvent('gt-nova-versao'))); await p.waitForTimeout(600);
       check(await p.getByText('Nova versão disponível').count() === 1, 'banner de nova versão');
       check(await p.getByRole('button', { name: 'Atualizar o aplicativo' }).count() === 1, 'botão Atualizar');
+    },
+  },
+  {
+    nome: 'Ajuste de precisão: selecionar ponto, alça ao lado (1× e ¼×) e setas',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.ir('/');
+      // três pontos bem separados no mapa
+      for (const [x, y] of [[120, 330], [300, 330], [210, 470]]) { await p.mouse.click(x, y); await p.waitForTimeout(250); }
+      check(await p.getByText('3 pontos').count() >= 1, '3 pontos marcados');
+      const centroDe = async (loc) => { const b = await loc.boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+      const vertice = (i) => p.locator('.leaflet-marker-icon').filter({ has: p.locator('div[style*="border-radius: 50%"]') }).nth(i);
+      // toque no 3º ponto seleciona
+      await p.mouse.click(210, 470); await p.waitForTimeout(500);
+      check(await p.getByText('Ponto 3', { exact: true }).count() === 1, 'painel de ajuste aparece');
+      check(await p.locator('.gt-alca').count() === 1, 'alça ao lado do ponto');
+      const alcaPos = await centroDe(p.locator('.gt-alca'));
+      check(Math.hypot(alcaPos.x - 210, alcaPos.y - 470) > 60, `alça fora do dedo (${Math.round(Math.hypot(alcaPos.x - 210, alcaPos.y - 470))} px do ponto)`);
+
+      const areaAntes = await p.getByTestId('valor-area').textContent();
+      // arrasta a alça 60 px para cima (fator 1×): o ponto sobe cerca de 60 px
+      const a0 = await centroDe(p.locator('.gt-alca'));
+      await p.mouse.move(a0.x, a0.y); await p.mouse.down();
+      await p.mouse.move(a0.x, a0.y - 30, { steps: 6 }); await p.mouse.move(a0.x, a0.y - 60, { steps: 6 }); await p.mouse.up();
+      await p.waitForTimeout(600);
+      const areaDepois = await p.getByTestId('valor-area').textContent();
+      check(areaAntes !== areaDepois, `área mudou ao arrastar a alça (${areaAntes} -> ${areaDepois})`);
+      check(await p.getByText('Ponto 3', { exact: true }).count() === 1, 'continua selecionado depois de mover');
+
+      // fator ¼×: a mesma arrastada mexe 4× menos
+      await p.getByRole('button', { name: '¼×' }).first().click().catch(async () => { await p.getByText('¼×', { exact: true }).click(); });
+      await p.waitForTimeout(300);
+      const a1 = await centroDe(p.locator('.gt-alca'));
+      const antes = areaDepois;
+      await p.mouse.move(a1.x, a1.y); await p.mouse.down();
+      await p.mouse.move(a1.x, a1.y + 40, { steps: 8 }); await p.mouse.up();
+      await p.waitForTimeout(600);
+      const depoisFino = await p.getByTestId('valor-area').textContent();
+      check(antes !== depoisFino, 'a alça fina também move o ponto');
+
+      // setas: norte 5 m
+      await p.getByText('5 m', { exact: true }).click(); await p.waitForTimeout(200);
+      const antesSeta = await p.getByTestId('valor-area').textContent();
+      await p.getByRole('button', { name: 'Mover para o norte' }).click(); await p.waitForTimeout(400);
+      const depoisSeta = await p.getByTestId('valor-area').textContent();
+      check(antesSeta !== depoisSeta, `seta move o ponto (${antesSeta} -> ${depoisSeta})`);
+
+      // toque seguido nas setas vira um único "desfazer"
+      await p.getByRole('button', { name: 'Mover para o norte' }).click(); await p.getByRole('button', { name: 'Mover para o norte' }).click();
+      await p.getByRole('button', { name: 'Concluir ajuste' }).click(); await p.waitForTimeout(500);
+      check(await p.getByText('Ponto 3', { exact: true }).count() === 0, 'concluir fecha o painel');
+
+      // remover ponto
+      await p.mouse.click(210, 470); await p.waitForTimeout(400);
+      const sel = await p.getByText(/^Ponto \d$/).count();
+      if (sel) {
+        await p.getByRole('button', { name: 'Remover ponto' }).click(); await p.waitForTimeout(500);
+        check(await p.getByText('2 pontos').count() >= 1, 'ponto removido (2 restantes)');
+      }
+      check(p.erros.length === 0, `erros: ${p.erros}`);
+    },
+  },
+  {
+    nome: 'Toque no mapa com ponto selecionado só conclui o ajuste (não cria ponto novo)',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.ir('/');
+      for (const [x, y] of [[120, 330], [300, 330], [210, 470]]) { await p.mouse.click(x, y); await p.waitForTimeout(250); }
+      await p.mouse.click(210, 470); await p.waitForTimeout(400);
+      check(await p.getByText('Ponto 3', { exact: true }).count() === 1, 'selecionado');
+      await p.mouse.click(60, 360); await p.waitForTimeout(500);
+      check(await p.getByText('Ponto 3', { exact: true }).count() === 0, 'primeiro toque só fecha o painel');
+      check(await p.getByText('3 pontos').count() >= 1, 'continua com 3 pontos');
+      await p.mouse.click(60, 360); await p.waitForTimeout(400);
+      check(await p.getByText('4 pontos').count() >= 1, 'o toque seguinte marca um ponto novo');
+    },
+  },
+  {
+    nome: 'Modo Mira: cruz no centro, marcar no centro e prévia da área',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.ir('/');
+      await p.getByRole('button', { name: 'Mira' }).click(); await p.waitForTimeout(700);
+      check(await p.getByText('Marcar no centro', { exact: true }).count() === 1, 'botão Marcar no centro');
+      // toque no mapa não cria ponto na mira
+      await p.mouse.click(100, 400); await p.waitForTimeout(300);
+      check(await p.getByText('0 pontos').count() >= 1, 'toque no mapa não marca em modo mira');
+      // marcar 3 cantos movendo o mapa (arrasto) e marcando no centro
+      for (const [dx, dy] of [[0, 0], [90, 0], [45, 110]]) {
+        if (dx || dy) { await p.mouse.move(210, 430); await p.mouse.down(); await p.mouse.move(210 - dx, 430 - dy, { steps: 8 }); await p.mouse.up(); await p.waitForTimeout(500); }
+        await p.getByText('Marcar no centro', { exact: true }).click(); await p.waitForTimeout(350);
+      }
+      check(await p.getByText('3 pontos').count() >= 1, '3 pontos marcados pela mira');
+      const area = await p.getByTestId('valor-area').textContent();
+      check(!/^0(,00)?$/.test(area), `área calculada (${area})`);
+    },
+  },
+  {
+    nome: 'Tela cheia e instalação: botão em Mais e aviso para instalar',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.addInitScript(() => { window.__chamouFs = 0; Element.prototype.requestFullscreen = function () { window.__chamouFs += 1; return Promise.resolve(); }; });
+      await p.ir('/mais');
+      check(await p.getByText('TELA E INSTALAÇÃO').count() === 1, 'bloco Tela e instalação');
+      check(await p.getByText(/barra verde/).count() >= 1, 'explica a barra verde');
+      await p.getByText('Tela cheia (esconde as barras)').click(); await p.waitForTimeout(400);
+      check(await p.evaluate(() => window.__chamouFs) >= 1, 'pediu tela cheia ao navegador');
+      // pedido de instalação disponível: o botão chama o prompt do navegador
+      await p.evaluate(() => { window.__prompts = 0; window.__gtInstalar = { prompt() { window.__prompts += 1; }, userChoice: Promise.resolve({ outcome: 'accepted' }) }; window.dispatchEvent(new CustomEvent('gt-pode-instalar')); });
+      await p.waitForTimeout(500);
+      await p.getByText('Instalar o aplicativo').click(); await p.waitForTimeout(500);
+      check(await p.evaluate(() => window.__prompts) === 1, 'abriu o pedido de instalação');
+      // banner no mapa (depois de ~5 s, fora do modo instalado)
+      await p.evaluate(() => localStorage.removeItem('x'));
+      await p.ir('/'); await p.waitForTimeout(5800);
+      check(await p.getByText(/tirar a barra verde/).count() === 1, 'banner de instalação aparece');
+      await p.getByRole('button', { name: 'Dispensar aviso' }).click(); await p.waitForTimeout(400);
+      check(await p.getByText(/tirar a barra verde/).count() === 0, 'aviso dispensado');
+      // recolher o painel entra em tela cheia
+      const antes = await p.evaluate(() => window.__chamouFs);
+      await p.getByLabel('Recolher painel').click(); await p.waitForTimeout(500);
+      check(await p.evaluate(() => window.__chamouFs) > antes, 'recolher o painel pede tela cheia');
     },
   },
 ];

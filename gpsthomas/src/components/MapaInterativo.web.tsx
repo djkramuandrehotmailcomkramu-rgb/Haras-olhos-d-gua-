@@ -21,11 +21,27 @@ const CAMADAS = {
 const VERDE = '#3FB063';
 const AMBAR = '#F2B73D';
 
-function pino(grande: boolean): L.DivIcon {
-  const d = grande ? 24 : 18;
-  const el = document.createElement('div');
-  el.style.cssText = `width:${d}px;height:${d}px;border-radius:50%;background:#fff;border:4px solid ${VERDE};box-shadow:0 2px 8px rgba(0,0,0,.45);box-sizing:border-box;`;
-  return L.divIcon({ html: el, className: '', iconSize: [d, d], iconAnchor: [d / 2, d / 2] });
+/** Marcador de vértice: círculo visível pequeno dentro de uma área de toque de 44 px. */
+function pino(primeiro: boolean, selecionado: boolean): L.DivIcon {
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+  const d = selecionado ? 26 : primeiro ? 24 : 18;
+  const c = document.createElement('div');
+  c.style.cssText = `width:${d}px;height:${d}px;border-radius:50%;background:${selecionado ? AMBAR : '#fff'};border:4px solid ${selecionado ? '#fff' : VERDE};box-shadow:0 2px 8px rgba(0,0,0,.5)${selecionado ? ',0 0 0 7px rgba(242,183,61,.35)' : ''};box-sizing:border-box;`;
+  caixa.appendChild(c);
+  return L.divIcon({ html: caixa, className: '', iconSize: [44, 44], iconAnchor: [22, 22] });
+}
+
+/** Alça de arraste (setas nos quatro sentidos), colocada ao lado do ponto. */
+function iconeAlca(): L.DivIcon {
+  const caixa = document.createElement('div');
+  caixa.className = 'gt-alca';
+  caixa.style.cssText = 'width:64px;height:64px;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;';
+  const c = document.createElement('div');
+  c.style.cssText = `width:50px;height:50px;border-radius:50%;background:${AMBAR};border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;`;
+  c.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#2B1D00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>';
+  caixa.appendChild(c);
+  return L.divIcon({ html: caixa, className: '', iconSize: [64, 64], iconAnchor: [32, 32] });
 }
 
 function centro(pts: Coord[]): Coord {
@@ -33,16 +49,17 @@ function centro(pts: Coord[]): Coord {
   return [pts.reduce((s, c) => s + c[0], 0) / n, pts.reduce((s, c) => s + c[1], 0) / n];
 }
 
-const CSS = '.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+const CSS = '.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
 
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
   const P = useRef(props);
   P.current = props;
   const mapa = useRef<L.Map | null>(null);
-  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; campo: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; pos: L.LayerGroup } | null>(null);
+  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; campo: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; fantasma: L.LayerGroup; pos: L.LayerGroup } | null>(null);
   const primeiraVez = useRef(true);
   const veic = useRef<{ mk: L.Marker; giro: HTMLDivElement; tipo: Veiculo } | null>(null);
+  const ultimaSel = useRef<number | null>(null);
 
   useEffect(() => {
     if (!el.current) return;
@@ -57,9 +74,14 @@ export function MapaInterativo(props: PropsMapa) {
       campo: L.layerGroup().addTo(m),
       rotas: L.layerGroup().addTo(m),
       rascunho: L.layerGroup().addTo(m),
+      fantasma: L.layerGroup().addTo(m),
       pos: L.layerGroup().addTo(m),
     };
     m.on('click', (e: L.LeafletMouseEvent) => P.current.onAdicionar(deLL(e.latlng)));
+    let quadro = 0;
+    const avisarCentro = () => { if (P.current.mira) P.current.onCentro?.(deLL(m.getCenter())); };
+    m.on('move', () => { if (!P.current.mira || quadro) return; quadro = requestAnimationFrame(() => { quadro = 0; avisarCentro(); }); });
+    m.on('moveend', avisarCentro);
     mapa.current = m;
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
@@ -113,26 +135,93 @@ export function MapaInterativo(props: PropsMapa) {
   // rascunho (medição em andamento)
   useEffect(() => {
     const g = grupos.current;
-    if (!g) return;
+    const m = mapa.current;
+    if (!g || !m) return;
     g.rascunho.clearLayers();
     const pts = props.rascunho;
     if (pts.length === 0) return;
+    const sel = props.selecionado != null && props.selecionado < pts.length ? props.selecionado : null;
+    if (sel == null) ultimaSel.current = null;
     let forma: L.Path & { setLatLngs: (l: L.LatLngExpression[]) => unknown };
     const ll = pts.map(paraLL);
     if (props.poligono && pts.length >= 3) forma = L.polygon(ll, { color: VERDE, weight: 4, fillColor: VERDE, fillOpacity: 0.25, interactive: false });
     else forma = L.polyline(ll, { color: VERDE, weight: 4, interactive: false });
     forma.addTo(g.rascunho);
+    let marcadorSel: L.Marker | null = null;
     pts.forEach((c, i) => {
-      const mk = L.marker(paraLL(c), { icon: pino(i === 0), draggable: true, autoPan: true }).addTo(g.rascunho);
+      const ehSel = i === sel;
+      // o ponto selecionado só se move pela alça (evita arrastar sem querer com o dedo em cima)
+      const mk = L.marker(paraLL(c), { icon: pino(i === 0, ehSel), draggable: !ehSel, autoPan: true, keyboard: false, zIndexOffset: ehSel ? 500 : 0 }).addTo(g.rascunho);
+      if (ehSel) marcadorSel = mk;
       mk.on('drag', () => {
         const nl = ll.slice();
         nl[i] = [mk.getLatLng().lat, mk.getLatLng().lng];
         forma.setLatLngs(nl);
       });
       mk.on('dragend', () => P.current.onMover(i, deLL(mk.getLatLng())));
-      mk.on('click', (e) => L.DomEvent.stopPropagation(e));
+      mk.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onSelecionar?.(ehSel ? null : i); });
     });
-  }, [props.rascunho, props.poligono]);
+
+    // alça ao lado do ponto selecionado: o dedo fica na alça e o ponto aparece livre
+    if (sel != null && marcadorSel) {
+      const selMk = marcadorSel as L.Marker;
+      const tam = m.getSize();
+      const topo = P.current.margemTopo ?? 190;
+      const base = P.current.margemBase ?? 340;
+      // ao selecionar, leva o ponto para a área livre (fora dos painéis) antes de desenhar a alça
+      if (ultimaSel.current !== sel) {
+        const q = m.latLngToContainerPoint(ll[sel]);
+        const fora = q.y < topo + 40 || q.y > tam.y - base - 40 || q.x < 50 || q.x > tam.x - 110;
+        if (fora) {
+          const alvoY = Math.round((topo + (tam.y - base)) / 2);
+          const alvoX = Math.min(Math.max(q.x, 70), tam.x - 120);
+          m.panBy([q.x - alvoX, q.y - alvoY], { animate: false });
+        }
+      }
+      ultimaSel.current = sel;
+      const ponto = m.latLngToContainerPoint(ll[sel]);
+      const dx = ponto.x > tam.x - 130 ? -78 : 78;
+      const dy = ponto.y + 78 > tam.y - base - 16 ? -78 : 78;
+      const posAlca = m.containerPointToLatLng([ponto.x + dx, ponto.y + dy]);
+      const ligacao = L.polyline([ll[sel], posAlca], { color: '#fff', weight: 2.5, dashArray: '2 6', opacity: 0.95, interactive: false }).addTo(g.rascunho);
+      const alca = L.marker(posAlca, { icon: iconeAlca(), draggable: true, autoPan: false, keyboard: false, zIndexOffset: 1000 }).addTo(g.rascunho);
+      let alcaIni = L.point(0, 0);
+      let pontoIni = L.point(0, 0);
+      alca.on('dragstart', () => {
+        alcaIni = m.latLngToLayerPoint(alca.getLatLng());
+        pontoIni = m.latLngToLayerPoint(ll[sel]);
+      });
+      alca.on('drag', () => {
+        const f = P.current.fatorAlca ?? 1;
+        const a = m.latLngToLayerPoint(alca.getLatLng());
+        const novo = m.layerPointToLatLng(L.point(pontoIni.x + (a.x - alcaIni.x) * f, pontoIni.y + (a.y - alcaIni.y) * f));
+        selMk.setLatLng(novo);
+        const nl = ll.slice();
+        nl[sel] = [novo.lat, novo.lng];
+        forma.setLatLngs(nl);
+        ligacao.setLatLngs([novo, alca.getLatLng()]);
+      });
+      alca.on('dragend', () => P.current.onMover(sel, deLL(selMk.getLatLng())));
+    }
+  }, [props.rascunho, props.poligono, props.selecionado]);
+
+  // ponto provisório da mira (tracejado)
+  useEffect(() => {
+    const g = grupos.current;
+    if (!g) return;
+    g.fantasma.clearLayers();
+    const f = props.fantasma;
+    const pts = props.rascunho;
+    if (!f || pts.length === 0) return;
+    const opc = { color: '#fff', weight: 3, dashArray: '4 7', opacity: 0.95, interactive: false } as L.PolylineOptions;
+    L.polyline([paraLL(pts[pts.length - 1]), paraLL(f)], opc).addTo(g.fantasma);
+    if (props.poligono && pts.length >= 2) L.polyline([paraLL(f), paraLL(pts[0])], { ...opc, opacity: 0.55 }).addTo(g.fantasma);
+  }, [props.fantasma, props.rascunho, props.poligono]);
+
+  // ao ligar a mira, avisa o centro atual
+  useEffect(() => {
+    if (props.mira && mapa.current) props.onCentro?.(deLL(mapa.current.getCenter()));
+  }, [props.mira]);
 
   // posição do GPS
   useEffect(() => {

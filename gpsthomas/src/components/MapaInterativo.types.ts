@@ -38,4 +38,17 @@ export type PropsMapa = {
   linhaGuia?: [Coord, Coord] | null;
   /** Toque numa bandeirinha. */
   onBandeira?: (id: string) => void;
+  /** Índice do vértice selecionado (ganha a alça de arraste ao lado e fica fora do dedo). */
+  /** Área ocupada pelos painéis (px) — o mapa leva o ponto selecionado para a área livre. */
+  margemTopo?: number;
+  margemBase?: number;
+  selecionado?: number | null;
+  onSelecionar?: (indice: number | null) => void;
+  /** Quanto o ponto anda para cada pixel que a alça anda: 1 = igual, 0,25 = quatro vezes mais fino. */
+  fatorAlca?: number;
+  /** Modo mira: o centro do mapa é o alvo; avisa o centro a cada movimento. */
+  mira?: boolean;
+  onCentro?: (c: Coord) => void;
+  /** Ponto provisório (centro da mira) desenhado tracejado a partir do último ponto. */
+  fantasma?: Coord | null;
 };

@@ -3,7 +3,7 @@ import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import Constants from 'expo-constants';
+import { VERSAO } from '../../versao';
 import { Tela } from '../../components/Tela';
 import { Campo } from '../../components/Campo';
 import { Cartao } from '../../components/Cartao';
@@ -17,6 +17,8 @@ import { formatarDistancia } from '../../geo/unidades';
 import { formatarDuracao } from '../../nav/progresso';
 import { ROTULO_AREA, formatarHaSemUnidade, type UnidadeArea } from '../../geo/unidades';
 import { lerArquivo, paraCSV, paraGeoJSON, paraGPX, paraKML } from '../../io/formatos';
+import { useSistema } from '../../store/sistema';
+import { INSTRUCAO_INSTALAR, emStandalone, entrarTelaCheia, instalarApp, podeTelaCheia, sairTelaCheia } from '../../nav/tela';
 import { aplicarBackup, gerarBackup, lerBackup, nomeArquivoBackup, resumoBackup } from '../../io/backup';
 import { entregarArquivo, escolherArquivo } from '../../io/arquivos';
 import { areaM2 } from '../../geo/medidas';
@@ -38,6 +40,7 @@ export default function MaisTela() {
   const [fazendaImport, setFazendaImport] = useState('');
   const [resumo, setResumo] = useState<{ nome: string; m2: number }[]>([]);
   const [importando, setImportando] = useState(false);
+  const { instalado, podeInstalar, telaCheia } = useSistema();
   const mostrar = useToast((s) => s.mostrar);
 
   const importar = async () => {
@@ -157,6 +160,36 @@ export default function MaisTela() {
         })}
       </Cartao>
 
+      {Platform.OS === 'web' && (
+        <>
+          <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>TELA E INSTALAÇÃO</Text>
+          <Cartao style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name={instalado ? 'checkmark-circle' : 'information-circle'} size={19} color={instalado ? t.ok : t.atencao} />
+              <Text style={[tipo.corpo, { color: t.texto, flex: 1 }]}>
+                {instalado ? 'Aplicativo instalado: abre sem a barra do navegador.' : 'A barra verde com o endereço aparece quando o app é aberto por um atalho antigo ou pelo navegador.'}
+              </Text>
+            </View>
+            {!instalado && (
+              <Botao
+                titulo={podeInstalar ? 'Instalar o aplicativo' : 'Como instalar'}
+                icone={<Ionicons name="download" size={19} color={t.sobrePrimaria} />}
+                onPress={async () => { const r = await instalarApp(); if (r === 'aceito') mostrar('Instalando… abra o app pelo ícone novo na tela inicial.', 'ok'); else if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }}
+              />
+            )}
+            {podeTelaCheia() && (
+              <Botao
+                titulo={telaCheia ? 'Sair da tela cheia' : 'Tela cheia (esconde as barras)'}
+                variante="suave"
+                icone={<Ionicons name={telaCheia ? 'contract' : 'expand'} size={19} color={t.primariaTexto} />}
+                onPress={async () => { if (telaCheia) await sairTelaCheia(); else if (!(await entrarTelaCheia())) mostrar('Seu navegador não permitiu a tela cheia.', 'erro'); }}
+              />
+            )}
+            <Text style={[tipo.legenda, { color: t.textoSuave, lineHeight: 18 }]}>Na tela de medição, ao recolher o painel o app também entra em tela cheia. Para sair, use o gesto de voltar do celular.</Text>
+          </Cartao>
+        </>
+      )}
+
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>BACKUP E SEGURANÇA</Text>
       <Cartao style={{ gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -188,7 +221,7 @@ export default function MaisTela() {
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
       <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa, busca e rotas © colaboradores do OpenStreetMap (Nominatim, OSRM)</Text>
-      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+      <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão {VERSAO}</Text>
     </Tela>
   );
 }

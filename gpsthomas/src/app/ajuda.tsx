@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import Constants from 'expo-constants';
+import { VERSAO } from '../versao';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -55,7 +55,7 @@ export default function Ajuda() {
   const { talhoes, medicoes, campos, viagens } = useDados();
   const marcarBackup = usePrefs((s) => s.marcarBackup);
   const { armazenamentoPersistente, novaVersao } = useSistema();
-  const versao = Constants.expoConfig?.version ?? '1.0.0';
+  const versao = VERSAO;
 
   const verificar = async () => {
     if (Platform.OS !== 'web') { mostrar('Você está na versão mais recente.', 'ok'); return; }

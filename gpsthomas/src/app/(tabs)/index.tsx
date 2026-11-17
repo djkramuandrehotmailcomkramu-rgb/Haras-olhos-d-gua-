@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Vidro } from '../../components/Vidro';
 import { Botao } from '../../components/Botao';
 import { AlcaRecolher, PilulaMostrar, Recolhivel } from '../../components/Recolhivel';
 import { FolhaSalvar } from '../../components/FolhaSalvar';
+import { Segmentos } from '../../components/Segmentos';
+import { entrarTelaCheia, emStandalone } from '../../nav/tela';
 import { areaM2, comprimentoM, perimetroM, type Coord } from '../../geo/medidas';
 import { formatarArea, formatarDistancia, type UnidadeArea } from '../../geo/unidades';
 import { aceitarAmostra, type AmostraGps } from '../../geo/filtroGps';
@@ -20,12 +22,30 @@ import { useToast } from '../../store/toast';
 import { useNumeroAnimado } from '../../hooks/animacao';
 import { fonte, raio, tipo, useTema } from '../../theme';
 
-type Modo = 'caminhar' | 'marcar' | 'linha';
-const MODOS: { id: Modo; rotulo: string; icone: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'caminhar', rotulo: 'Caminhar', icone: 'walk' },
-  { id: 'marcar', rotulo: 'Marcar', icone: 'pin' },
-  { id: 'linha', rotulo: 'Distância', icone: 'git-commit' },
+type Modo = 'caminhar' | 'marcar' | 'mira' | 'linha';
+const MODOS: { id: Modo; rotulo: string }[] = [
+  { id: 'caminhar', rotulo: 'Caminhar' },
+  { id: 'marcar', rotulo: 'Marcar' },
+  { id: 'mira', rotulo: 'Mira' },
+  { id: 'linha', rotulo: 'Distância' },
 ];
+
+function IconeModo({ id, cor, tamanho = 17 }: { id: Modo; cor: string; tamanho?: number }) {
+  if (id === 'mira') return <MaterialCommunityIcons name="crosshairs" size={tamanho + 1} color={cor} />;
+  const nome = id === 'caminhar' ? 'walk' : id === 'marcar' ? 'pin' : 'git-commit';
+  return <Ionicons name={nome} size={tamanho} color={cor} />;
+}
+
+const PASSOS = ['0,5 m', '1 m', '5 m'];
+const FATORES = ['1×', '½×', '¼×'];
+const metros = (rot: string) => (rot === '0,5 m' ? 0.5 : rot === '5 m' ? 5 : 1);
+const fatorDe = (rot: string) => (rot === '½×' ? 0.5 : rot === '¼×' ? 0.25 : 1);
+
+/** Move uma coordenada [lon, lat] por dx metros a leste e dy metros ao norte. */
+function deslocar(c: Coord, dx: number, dy: number): Coord {
+  const k = 111319.49;
+  return [c[0] + dx / (k * Math.cos((c[1] * Math.PI) / 180)), c[1] + dy / k];
+}
 
 const CICLO: UnidadeArea[] = ['ha', 'alqPaulista', 'alqMineiro', 'alqGoiano', 'alqBaiano', 'm2'];
 const mmss = (seg: number) => `${String(Math.floor(seg / 60)).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
@@ -41,6 +61,15 @@ function BotaoRedondo({ icone, onPress, ativo, desabilitado }: { icone: keyof ty
       <Vidro raioBorda={26} style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
         <Ionicons name={icone} size={24} color={ativo ? t.primaria : t.texto} />
       </Vidro>
+    </Pressable>
+  );
+}
+
+function SetaAjuste({ icone, rotulo, onPress }: { icone: keyof typeof Ionicons.glyphMap; rotulo: string; onPress: () => void }) {
+  const t = useTema();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={rotulo} style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 14, backgroundColor: pressed ? t.primaria : t.cartaoSuave, alignItems: 'center', justifyContent: 'center' })}>
+      {({ pressed }) => <Ionicons name={icone} size={22} color={pressed ? t.sobrePrimaria : t.texto} />}
     </Pressable>
   );
 }
@@ -62,16 +91,38 @@ export default function MapaTela() {
   const [salvando, setSalvando] = useState(false);
   const [futuro, setFuturo] = useState<Coord[][]>([]);
   const [segundos, setSegundos] = useState(0);
+  const [selecionado, setSelecionado] = useState<number | null>(null);
+  const [fator, setFator] = useState('1×');
+  const [passo, setPasso] = useState('1 m');
+  const [centro, setCentro] = useState<Coord | null>(null);
+  const ultimoAjuste = useRef<{ i: number; t: number } | null>(null);
+  const { width: largura } = useWindowDimensions();
   const setAviso = (m: string) => mostrar(m, 'info');
   const ultima = useRef<AmostraGps | null>(null);
   const primeiroFoco = useRef(true);
   const buscando = useRef(false);
 
   const poligono = modo !== 'linha';
-  const mudar = (novos: Coord[]) => {
-    setHistorico((h) => [...h.slice(-30), pontos]);
+  const mira = modo === 'mira';
+  /** `juntar`: toques seguidos nas setas do mesmo ponto viram um único passo de "desfazer". */
+  const mudar = (novos: Coord[], juntar?: number) => {
+    const agora = Date.now();
+    const seguido = juntar != null && ultimoAjuste.current?.i === juntar && agora - ultimoAjuste.current.t < 2500;
+    if (juntar != null) ultimoAjuste.current = { i: juntar, t: agora }; else ultimoAjuste.current = null;
+    if (!seguido) setHistorico((h) => [...h.slice(-30), pontos]);
     setFuturo([]);
     setPontos(novos);
+  };
+  const empurrar = (dx: number, dy: number) => {
+    if (selecionado == null || !pontos[selecionado]) return;
+    const m = metros(passo);
+    mudar(pontos.map((p, k) => (k === selecionado ? deslocar(p, dx * m, dy * m) : p)), selecionado);
+    Haptics.selectionAsync();
+  };
+  const removerSelecionado = () => {
+    if (selecionado == null) return;
+    mudar(pontos.filter((_, k) => k !== selecionado));
+    setSelecionado(null);
   };
 
   // GPS: centraliza na primeira posição; durante a caminhada, grava os pontos
@@ -98,16 +149,26 @@ export default function MapaTela() {
   useEffect(() => { if (comandoExterno) setComando(comandoExterno); }, [comandoExterno]);
   useEffect(() => { if (gps.erro) mostrar(gps.erro, 'erro'); }, [gps.erro]);
 
-  const area = poligono ? areaM2(pontos) : 0;
-  const perimetro = poligono ? perimetroM(pontos) : 0;
-  const comprimento = comprimentoM(pontos);
+  // na mira, os valores já incluem o ponto do centro (prévia enquanto você move o mapa)
+  const pontosCalc = mira && centro ? [...pontos, centro] : pontos;
+  const area = poligono ? areaM2(pontosCalc) : 0;
+  const perimetro = poligono ? perimetroM(pontosCalc) : 0;
+  const comprimento = comprimentoM(pontosCalc);
   const podeSalvar = poligono ? pontos.length >= 3 : pontos.length >= 2;
   const fazendas = useMemo(() => [...new Set(talhoes.map((x) => x.fazenda))], [talhoes]);
 
   const marcarAqui = async () => {
     if (!gps.pos) { await gps.ligar(); setAviso('Buscando sinal de GPS… toque de novo em instantes.'); return; }
     ultima.current = { coord: gps.pos.coord, precisaoM: gps.pos.precisaoM, tempoMs: gps.pos.tempoMs };
+    setSelecionado(null);
     mudar([...pontos, gps.pos.coord]);
+  };
+
+  const marcarNoCentro = () => {
+    if (!centro) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelecionado(null);
+    mudar([...pontos, centro]);
   };
 
   const alternarCaminhada = async () => {
@@ -128,15 +189,17 @@ export default function MapaTela() {
     if (gps.pos && buscando.current) { buscando.current = false; setComando({ n: Date.now(), tipo: 'voar', coord: gps.pos.coord, zoom: 18 }); }
   }, [gps.pos]);
 
-  const limpar = () => { setPontos([]); setHistorico([]); setFuturo([]); setCaminhando(false); setSegundos(0); ultima.current = null; };
+  const limpar = () => { setSelecionado(null); setPontos([]); setHistorico([]); setFuturo([]); setCaminhando(false); setSegundos(0); ultima.current = null; };
   const desfazer = () => {
     if (historico.length === 0) return;
+    setSelecionado(null);
     setFuturo((f) => [...f, pontos]);
     setPontos(historico[historico.length - 1]);
     setHistorico(historico.slice(0, -1));
   };
   const refazer = () => {
     if (futuro.length === 0) return;
+    setSelecionado(null);
     setHistorico((h) => [...h, pontos]);
     setPontos(futuro[futuro.length - 1]);
     setFuturo(futuro.slice(0, -1));
@@ -147,10 +210,12 @@ export default function MapaTela() {
   const prec = gps.pos?.precisaoM ?? null;
   const corPrec = prec == null ? t.textoSuave : prec <= 10 ? t.ok : prec <= 25 ? t.atencao : t.perigo;
   const nomePrec = prec == null ? '' : prec <= 10 ? 'boa' : prec <= 25 ? 'média' : 'ruim';
-  const dica = pontos.length === 0
-    ? modo === 'caminhar' ? 'Toque em Iniciar e caminhe pelo contorno da área' : modo === 'marcar' ? 'Toque no mapa para marcar o primeiro ponto' : 'Toque no mapa para começar a medir a distância'
+  const dica = selecionado != null
+    ? 'Arraste a alça laranja ou use as setas. Toque no mapa para concluir'
+    : pontos.length === 0
+    ? modo === 'caminhar' ? 'Toque em Iniciar e caminhe pelo contorno da área' : modo === 'marcar' ? 'Toque no mapa para marcar o primeiro ponto' : mira ? 'Arraste o mapa até o canto e toque em Marcar no centro' : 'Toque no mapa para começar a medir a distância'
     : poligono && pontos.length < 3 ? `Marque mais ${3 - pontos.length} ${3 - pontos.length === 1 ? 'ponto' : 'pontos'} para formar a área`
-    : podeSalvar && !caminhando ? 'Arraste os pontos para ajustar ou toque em Salvar' : null;
+    : podeSalvar && !caminhando ? 'Toque num ponto para ajustar com precisão, ou em Salvar' : null;
   const resumo = poligono ? `${formatarArea(area, unidadeArea)} · perímetro ${formatarDistancia(perimetro)}` : `Distância ${formatarDistancia(comprimento)}`;
   const grande = poligono ? formatarArea(areaAnim, unidadeArea) : formatarDistancia(compAnim);
   const [valorGrande, ...unid] = grande.split(' ');
@@ -165,8 +230,20 @@ export default function MapaTela() {
         camada={camada}
         posicao={gps.pos ? { coord: gps.pos.coord, precisaoM: gps.pos.precisaoM } : null}
         comando={comando}
-        onAdicionar={(c) => { if (modo !== 'caminhar') mudar([...pontos, c]); }}
+        onAdicionar={(c) => {
+          if (selecionado != null) { setSelecionado(null); return; } // primeiro toque só conclui o ajuste
+          if (modo === 'caminhar' || mira) return;
+          mudar([...pontos, c]);
+        }}
         onMover={(i, c) => mudar(pontos.map((p, k) => (k === i ? c : p)))}
+        margemTopo={ins.top + 178}
+        margemBase={Math.max(ins.bottom, 12) + 92 + 270}
+        selecionado={selecionado}
+        onSelecionar={(i) => { Haptics.selectionAsync(); setSelecionado(i); }}
+        fatorAlca={fatorDe(fator)}
+        mira={mira}
+        onCentro={setCentro}
+        fantasma={mira ? centro : null}
         onTalhao={(id) => router.push(`/talhao/${id}`)}
       />
 
@@ -195,8 +272,8 @@ export default function MapaTela() {
             >
               <Text style={[tipo.legenda, { color: t.textoSuave }]}>{poligono ? 'ÁREA' : 'DISTÂNCIA'}{caminhando ? ' · GRAVANDO' : ''}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text numberOfLines={1} style={[tipo.numeroGrande, { color: t.primaria, fontSize: tamFonte, flexShrink: 1 }]}>{pontos.length ? valorGrande : '0'}</Text>
-                <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.textoSuave }}>{pontos.length ? unid.join(' ') : unidadeArea === 'ha' ? 'ha' : ''}</Text>
+                <Text testID="valor-area" numberOfLines={1} style={[tipo.numeroGrande, { color: t.primaria, fontSize: tamFonte, flexShrink: 1 }]}>{pontosCalc.length ? valorGrande : '0'}</Text>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.textoSuave }}>{pontosCalc.length ? unid.join(' ') : unidadeArea === 'ha' ? 'ha' : ''}</Text>
                 {poligono && <Ionicons name="swap-vertical" size={14} color={t.textoSuave} />}
               </View>
             </Pressable>
@@ -235,23 +312,83 @@ export default function MapaTela() {
         <BotaoRedondo icone="trash" onPress={limpar} desabilitado={pontos.length === 0} />
       </Animated.View>
 
+      {/* Ajuste fino do ponto selecionado */}
+      {selecionado != null && pontos[selecionado] && (
+        <Animated.View entering={FadeInUp.duration(220)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 12 }}>
+          <Vidro>
+            <View style={{ padding: 14, gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: t.atencao, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontFamily: fonte.negrito, fontSize: 13, color: '#2B1D00' }}>{selecionado + 1}</Text>
+                </View>
+                <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.semi, fontSize: 16, color: t.texto }}>Ponto {selecionado + 1}</Text>
+                <Pressable onPress={removerSelecionado} accessibilityRole="button" accessibilityLabel="Remover ponto" hitSlop={6} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: t.cartaoSuave, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="trash-outline" size={21} color={t.perigo} />
+                </Pressable>
+                <Pressable onPress={() => setSelecionado(null)} accessibilityRole="button" accessibilityLabel="Concluir ajuste" hitSlop={6} style={{ height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: t.primaria, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="checkmark" size={20} color={t.sobrePrimaria} />
+                  <Text style={{ fontFamily: fonte.semi, fontSize: 14.5, color: t.sobrePrimaria }}>Pronto</Text>
+                </Pressable>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
+                <View style={{ alignItems: 'center', gap: 4 }}>
+                  <SetaAjuste icone="arrow-up" rotulo="Mover para o norte" onPress={() => empurrar(0, 1)} />
+                  <View style={{ flexDirection: 'row', gap: 4 }}>
+                    <SetaAjuste icone="arrow-back" rotulo="Mover para o oeste" onPress={() => empurrar(-1, 0)} />
+                    <View style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: t.atencao }} />
+                    </View>
+                    <SetaAjuste icone="arrow-forward" rotulo="Mover para o leste" onPress={() => empurrar(1, 0)} />
+                  </View>
+                  <SetaAjuste icone="arrow-down" rotulo="Mover para o sul" onPress={() => empurrar(0, -1)} />
+                </View>
+
+                <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>CADA TOQUE NA SETA</Text>
+                  <Segmentos opcoes={PASSOS} valor={passo} onChange={setPasso} />
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>ALÇA (¼× = MAIS FINA)</Text>
+                  <Segmentos opcoes={FATORES} valor={fator} onChange={setFator} />
+                </View>
+              </View>
+
+            </View>
+          </Vidro>
+        </Animated.View>
+      )}
+
+      {/* Mira: cruz fixa no centro; o mapa anda por baixo */}
+      {mira && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 6 }}>
+          <View style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ position: 'absolute', width: 2.5, height: 76, backgroundColor: '#fff', opacity: 0.9, shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 3 }} />
+            <View style={{ position: 'absolute', height: 2.5, width: 76, backgroundColor: '#fff', opacity: 0.9, shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 3 }} />
+            <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 3, borderColor: t.atencao, backgroundColor: 'rgba(0,0,0,0.12)' }} />
+          </View>
+        </View>
+      )}
+
       {/* Controles inferiores */}
+      {selecionado == null && (
       <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, gap: 10, zIndex: 10 }}>
         <View style={{ alignItems: 'center', marginBottom: -4 }}>
-          <Vidro raioBorda={raio.pilula}><View style={{ paddingHorizontal: 22 }}><AlcaRecolher onRecolher={() => definirPainel(true)} /></View></Vidro>
+          <Vidro raioBorda={raio.pilula}><View style={{ paddingHorizontal: 22 }}><AlcaRecolher onRecolher={() => { definirPainel(true); if (!emStandalone()) entrarTelaCheia(); }} /></View></Vidro>
         </View>
         <Vidro raioBorda={raio.pilula}>
           <View style={{ flexDirection: 'row', padding: 4 }}>
             {MODOS.map((m) => {
               const ativo = m.id === modo;
+              const estreito = largura < 390;
               return (
                 <Pressable
                   key={m.id}
-                  onPress={() => { Haptics.selectionAsync(); setModo(m.id); if (m.id !== 'caminhar') setCaminhando(false); }}
-                  style={{ flex: 1, height: 40, borderRadius: raio.pilula, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? t.primaria : 'transparent' }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: ativo }}
+                  onPress={() => { Haptics.selectionAsync(); setModo(m.id); setSelecionado(null); if (m.id !== 'caminhar') setCaminhando(false); }}
+                  style={{ flex: 1, height: 42, borderRadius: raio.pilula, flexDirection: 'row', gap: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? t.primaria : 'transparent' }}
                 >
-                  <Ionicons name={m.icone} size={17} color={ativo ? t.sobrePrimaria : t.textoSuave} />
-                  <Text style={{ fontFamily: fonte.semi, fontSize: 14, color: ativo ? t.sobrePrimaria : t.textoSuave }}>{m.rotulo}</Text>
+                  {!estreito && <IconeModo id={m.id} cor={ativo ? t.sobrePrimaria : t.textoSuave} />}
+                  <Text style={{ fontFamily: fonte.semi, fontSize: estreito ? 12.5 : 13.5, color: ativo ? t.sobrePrimaria : t.textoSuave }}>{m.rotulo}</Text>
                 </Pressable>
               );
             })}
@@ -267,14 +404,17 @@ export default function MapaTela() {
               onPress={alternarCaminhada}
               style={{ flex: 1 }}
             />
+          ) : mira ? (
+            <Botao titulo="Marcar no centro" tamanho="g" desabilitado={!centro} icone={<MaterialCommunityIcons name="crosshairs-gps" size={20} color={t.sobrePrimaria} />} onPress={marcarNoCentro} style={{ flex: 1.4 }} />
           ) : (
             <Botao titulo="Ponto aqui" tamanho="g" variante="suave" icone={<Ionicons name="navigate" size={19} color={t.primaria} />} onPress={marcarAqui} style={{ flex: 1 }} />
           )}
           <Botao titulo="Salvar" tamanho="g" desabilitado={!podeSalvar} icone={<Ionicons name="checkmark" size={21} color={t.sobrePrimaria} />} onPress={() => { setCaminhando(false); setSalvando(true); }} style={{ flex: 1 }} />
         </View>
       </Recolhivel>
+      )}
 
-      <PilulaMostrar visivel={painelRecolhido} rotulo="Mostrar controles" onPress={() => definirPainel(false)} />
+      <PilulaMostrar visivel={painelRecolhido && selecionado == null} rotulo="Mostrar controles" onPress={() => definirPainel(false)} />
 
       <FolhaSalvar
         visivel={salvando}

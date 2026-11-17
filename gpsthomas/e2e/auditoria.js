@@ -28,6 +28,20 @@ const LARGURAS = [[360, 740], [412, 915], [768, 1024]];
       const idPlano = await p.evaluate(() => JSON.parse(localStorage.getItem('gpsthomas-dados')).state.campos[0].id);
       const idTalhao = await p.evaluate(() => JSON.parse(localStorage.getItem('gpsthomas-dados')).state.talhoes[0].id);
       const todas = [...TELAS, ['campo-plano', `/campo/${idPlano}`], ['talhao', `/talhao/${idTalhao}`]];
+      // medição com 3 pontos + Mira e + ponto selecionado (painel de ajuste)
+      await p.ir('/');
+      for (const [x, y] of [[Math.round(w * 0.3), 330], [Math.round(w * 0.7), 330], [Math.round(w * 0.5), 440]]) { await p.mouse.click(x, y); await p.waitForTimeout(200); }
+      await p.mouse.click(Math.round(w * 0.5), 440); await p.waitForTimeout(500);
+      await p.screenshot({ path: path.join(SAIDA, 'telas', `medir-ajuste-${w}-${esquema}.png`) });
+      await p.evaluate(axe);
+      const ra = await p.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] }, resultTypes: ['violations'] }));
+      for (const v of ra.violations) { const nos = v.nodes.filter((n) => !/leaflet/.test(n.html) || v.id !== 'color-contrast'); if (nos.length) problemas.push({ tela: 'medir-ajuste', larg: w, esquema, id: v.id, impacto: v.impact, n: nos.length, exemplo: nos[0].html.slice(0, 140) }); }
+      await p.ir('/');
+      await p.getByRole('button', { name: 'Mira' }).click(); await p.waitForTimeout(600);
+      await p.screenshot({ path: path.join(SAIDA, 'telas', `medir-mira-${w}-${esquema}.png`) });
+      await p.evaluate(axe);
+      const rm = await p.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] }, resultTypes: ['violations'] }));
+      for (const v of rm.violations) { const nos = v.nodes.filter((n) => !/leaflet/.test(n.html) || v.id !== 'color-contrast'); if (nos.length) problemas.push({ tela: 'medir-mira', larg: w, esquema, id: v.id, impacto: v.impact, n: nos.length, exemplo: nos[0].html.slice(0, 140) }); }
       for (const [nome, rota] of todas) {
         await p.ir(rota);
         await p.screenshot({ path: path.join(SAIDA, 'telas', `${nome}-${w}-${esquema}.png`) });

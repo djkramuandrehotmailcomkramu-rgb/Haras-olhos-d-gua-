@@ -1,4 +1,4 @@
-# GPSThomas 1.0.0: checklist de entrega
+# GPSThomas 1.1.0: checklist de entrega
 
 Resultado de cada item na versão 1.0.0. `[x]` = verificado automaticamente aqui; `[~]` = verificado só em parte; `[ ]` = não dá para verificar neste ambiente (precisa do seu aparelho ou de serviço externo).
 
@@ -8,6 +8,8 @@ Resultado de cada item na versão 1.0.0. `[x]` = verificado automaticamente aqui
 - [x] Salvar como talhão ou só medição; editar, buscar, excluir
 - [x] Importar KML, KMZ, GeoJSON e GPX (ordem do arquivo preservada, nome da fazenda, aviso de buracos)
 - [x] Exportar KML, GeoJSON, GPX e CSV
+- [x] **Ajuste de precisão**: selecionar ponto, alça ao lado (1×, ½×, ¼×), setas (0,5/1/5 m), remover, tela de 360 px
+- [x] **Modo Mira** (cruz no centro, marcar no centro, prévia da área)
 - [ ] Caminhada com GPS real no campo (precisa do celular)
 
 ## 2. Campo de sementes
@@ -38,12 +40,13 @@ Resultado de cada item na versão 1.0.0. `[x]` = verificado automaticamente aqui
 - [x] `index.html` com idioma pt-BR, manifest, ícones 192/512/maskable, atalhos (Medir, Rotas, Talhões), service worker
 - [x] App abre sem internet; mapas já vistos ficam em cache; aviso de "sem internet"
 - [x] Aviso "Nova versão disponível" com botão Atualizar
-- [ ] Instalar na tela inicial do seu Android e conferir o ícone
+- [x] Botão Tela cheia (Mais), tela cheia ao recolher o painel, aviso e botão de instalar (testado com o pedido de instalação simulado)
+- [ ] Instalar na tela inicial do seu Android e conferir o ícone (remova antes o atalho antigo: a barra verde é do atalho, não do app instalado)
 
 > Atenção: até a v0.7 o `index.html` do modo web não incluía o manifest nem o service worker (o `+html.tsx` não é usado no modo `single`). Isso foi corrigido na 1.0.0 com `public/index.html`.
 
 ## 6. Acessibilidade e interface
-- [x] axe-core (WCAG 2.0 A/AA): 0 violações em 9 telas × 360/412/768 px × claro/escuro
+- [x] axe-core (WCAG 2.0 A/AA): 0 violações em 11 telas × 360/412/768 px × claro/escuro
 - [x] Lighthouse acessibilidade 100; alvos de toque ≥ 44 px; zoom liberado; contraste AA nos dois temas
 - [x] Rolagem suave, cartões que aparecem ao rolar, paralaxe, painéis recolhíveis, esmaecido "há mais conteúdo"
 - [x] Dicas "?" em Área, Perímetro, Corredor, Área informada e Meta; guia rápido em Ajuda e sobre
@@ -64,7 +67,7 @@ Fontes reduzidas de 4 × 335 KB para 4 × 16 KB. Em celular real o tempo é bem 
 ## 8. Testes automatizados
 - [x] `npm run typecheck` sem erros
 - [x] `npm test`: 80 testes (geometria, divisão, hectares digitados, formatos, backup, navegação, PDF, desempenho)
-- [x] `npm run e2e`: 15 cenários de ponta a ponta (importar, medir, campo, hectares digitados, ajustar, meta, PDF, bandeirinha, rotas, painéis, backup, ajuda, migração, PWA offline, aviso de versão)
+- [x] `npm run e2e`: 19 cenários de ponta a ponta (importar, medir, campo, hectares digitados, ajustar, meta, PDF, bandeirinha, rotas, painéis, backup, ajuda, migração, PWA offline, aviso de versão)
 - [x] `npm run auditoria`: axe-core + capturas em 3 larguras e 2 temas (`e2e/saida/telas`)
 
 ## 9. Limites conhecidos (não são defeitos)
