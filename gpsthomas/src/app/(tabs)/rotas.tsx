@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Vidro } from '../../components/Vidro';
 import { Botao } from '../../components/Botao';
+import { AlcaRecolher, PilulaMostrar, Recolhivel } from '../../components/Recolhivel';
 import { useLocalizacao } from '../../geo/useLocalizacao';
 import { areaM2, type Coord } from '../../geo/medidas';
 import { formatarArea, formatarDistancia } from '../../geo/unidades';
@@ -43,7 +44,7 @@ export default function RotasTela() {
   const ins = useSafeAreaInsets();
   const gps = useLocalizacao();
   const { talhoes } = useDados();
-  const { unidadeArea, camada, recentes, lembrarDestino, vozLigada, definirVoz, veiculo, definirVeiculo, favoritos, alternarFavorito, viagemAtiva, definirViagemAtiva } = usePrefs();
+  const { unidadeArea, camada, recentes, lembrarDestino, vozLigada, definirVoz, veiculo, definirVeiculo, favoritos, alternarFavorito, viagemAtiva, definirViagemAtiva, painelRecolhido, definirPainel } = usePrefs();
   const registrarViagem = useDados((x) => x.registrarViagem);
   const forcarTema = useTemaForcado((x) => x.definir);
   const mostrar = useToast((s) => s.mostrar);
@@ -423,9 +424,10 @@ export default function RotasTela() {
 
       {/* ---------- PRÉVIA ---------- */}
       {etapa === 'previa' && rota && (
-        <Animated.View entering={FadeInUp.duration(350)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 10 }}>
+        <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 10 }}>
           <Vidro>
-            <View style={{ padding: 16, gap: 12 }}>
+            <View style={{ padding: 16, paddingTop: 4, gap: 12 }}>
+              <AlcaRecolher onRecolher={() => definirPainel(true)} />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Ionicons name="location" size={20} color={t.perigo} />
                 <View style={{ flex: 1 }}>
@@ -483,7 +485,7 @@ export default function RotasTela() {
               )}
             </View>
           </Vidro>
-        </Animated.View>
+        </Recolhivel>
       )}
 
       {/* ---------- NAVEGANDO ---------- */}
@@ -499,7 +501,7 @@ export default function RotasTela() {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, bottom: Math.max(ins.bottom, 12) + 186, zIndex: 10 }}>
+          <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, bottom: painelRecolhido ? Math.max(ins.bottom, 12) + 74 : Math.max(ins.bottom, 12) + 186, zIndex: 10 }}>
             {(() => {
               const lim = prep ? limiteNoTrecho(prep, idxRef.current) : null;
               const excesso = lim != null && kmh > lim + 5;
@@ -525,9 +527,10 @@ export default function RotasTela() {
             })()}
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 10 }}>
+          <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, zIndex: 10 }}>
             <Vidro>
-              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 }}>
+              <AlcaRecolher onRecolher={() => definirPainel(true)} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14, paddingTop: 2, gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: fonte.negrito, fontSize: 22, color: t.primaria, fontVariant: ['tabular-nums'] }}>{formatarDuracao(estado.restanteS)}</Text>
                   <Text style={[tipo.legenda, { color: t.textoSuave }]}>{formatarDistancia(estado.restanteM)} · chegada {horaChegada(estado.restanteS)}</Text>
@@ -550,9 +553,15 @@ export default function RotasTela() {
                 <Botao titulo="Sair" variante="perigo" onPress={() => encerrar()} />
               </View>
             </Vidro>
-          </Animated.View>
+          </Recolhivel>
         </>
       )}
+
+      <PilulaMostrar
+        visivel={painelRecolhido && (etapa === 'previa' || etapa === 'nav')}
+        rotulo={etapa === 'nav' && estado ? `${formatarDuracao(estado.restanteS)} · ${formatarDistancia(estado.restanteM)}` : 'Mostrar rotas'}
+        onPress={() => definirPainel(false)}
+      />
     </View>
   );
 }

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Vidro } from '../../components/Vidro';
 import { Botao } from '../../components/Botao';
+import { AlcaRecolher, PilulaMostrar, Recolhivel } from '../../components/Recolhivel';
 import { FolhaSalvar } from '../../components/FolhaSalvar';
 import { areaM2, comprimentoM, perimetroM, type Coord } from '../../geo/medidas';
 import { formatarArea, formatarDistancia, type UnidadeArea } from '../../geo/unidades';
@@ -48,7 +49,7 @@ export default function MapaTela() {
   const t = useTema();
   const ins = useSafeAreaInsets();
   const { talhoes, adicionarTalhao, adicionarMedicao } = useDados();
-  const { unidadeArea, camada, definirCamada, definirUnidadeArea, onboardingVisto } = usePrefs();
+  const { unidadeArea, camada, definirCamada, definirUnidadeArea, onboardingVisto, painelRecolhido, definirPainel } = usePrefs();
   const mostrar = useToast((x) => x.mostrar);
   const comandoExterno = useUi((s) => s.comando);
   const gps = useLocalizacao();
@@ -170,7 +171,20 @@ export default function MapaTela() {
       />
 
       {/* Painel de valores */}
-      <Animated.View entering={FadeInUp.duration(400)} pointerEvents="box-none" style={{ position: 'absolute', top: ins.top + 10, left: 14, right: 14, zIndex: 10 }}>
+      {painelRecolhido && (
+        <Animated.View entering={FadeInUp.duration(250)} style={{ position: 'absolute', top: ins.top + 10, left: 14, zIndex: 10 }}>
+          <Pressable onPress={() => definirPainel(false)} accessibilityLabel="Mostrar painel">
+            <Vidro raioBorda={raio.pilula}>
+              <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 16, height: 46, alignItems: 'center' }}>
+                <Text style={{ fontFamily: fonte.negrito, fontSize: 20, color: t.primaria, fontVariant: ['tabular-nums'] }}>{pontos.length ? valorGrande : '0'}</Text>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 13, color: t.textoSuave }}>{pontos.length ? unid.join(' ') : unidadeArea === 'ha' ? 'ha' : ''}</Text>
+                <Ionicons name="chevron-down" size={15} color={t.textoSuave} />
+              </View>
+            </Vidro>
+          </Pressable>
+        </Animated.View>
+      )}
+      <Recolhivel recolhido={painelRecolhido} de="cima" style={{ position: 'absolute', top: ins.top + 10, left: 14, right: 14, zIndex: 10 }}>
         <Vidro>
           <View style={{ padding: 14, flexDirection: 'row', alignItems: 'flex-end', gap: 18 }}>
             <Pressable
@@ -209,7 +223,7 @@ export default function MapaTela() {
             </Vidro>
           </Animated.View>
         )}
-      </Animated.View>
+      </Recolhivel>
 
       {/* Botões laterais */}
       <Animated.View entering={FadeInUp.delay(100).duration(400)} style={{ position: 'absolute', right: 14, top: ins.top + 160, gap: 9, zIndex: 10 }}>
@@ -222,7 +236,10 @@ export default function MapaTela() {
       </Animated.View>
 
       {/* Controles inferiores */}
-      <Animated.View entering={FadeInUp.delay(150).duration(400)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, gap: 10, zIndex: 10 }}>
+      <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 92, gap: 10, zIndex: 10 }}>
+        <View style={{ alignItems: 'center', marginBottom: -4 }}>
+          <Vidro raioBorda={raio.pilula}><View style={{ paddingHorizontal: 22 }}><AlcaRecolher onRecolher={() => definirPainel(true)} /></View></Vidro>
+        </View>
         <Vidro raioBorda={raio.pilula}>
           <View style={{ flexDirection: 'row', padding: 4 }}>
             {MODOS.map((m) => {
@@ -255,7 +272,9 @@ export default function MapaTela() {
           )}
           <Botao titulo="Salvar" tamanho="g" desabilitado={!podeSalvar} icone={<Ionicons name="checkmark" size={21} color={t.sobrePrimaria} />} onPress={() => { setCaminhando(false); setSalvando(true); }} style={{ flex: 1 }} />
         </View>
-      </Animated.View>
+      </Recolhivel>
+
+      <PilulaMostrar visivel={painelRecolhido} rotulo="Mostrar controles" onPress={() => definirPainel(false)} />
 
       <FolhaSalvar
         visivel={salvando}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Cartao } from '../../components/Cartao';
@@ -11,7 +11,11 @@ import { Botao } from '../../components/Botao';
 import { Campo } from '../../components/Campo';
 import { Fichas } from '../../components/Fichas';
 import { Vidro } from '../../components/Vidro';
-import { useDados, type Comando } from '../../store/dados';
+import { FolhaBandeira } from '../../components/FolhaBandeira';
+import { AlcaRecolher, PilulaMostrar, Recolhivel } from '../../components/Recolhivel';
+import { Paralaxe } from '../../components/Paralaxe';
+import { Revelar } from '../../components/Revelar';
+import { useDados, useUi, type Comando } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { useLocalizacao } from '../../geo/useLocalizacao';
@@ -21,6 +25,7 @@ import { useBussola } from '../../nav/bussola';
 import { falar, manterTelaLigada, pararVoz } from '../../nav/voz';
 import { rumoEntre } from '../../nav/movimento';
 import { paraCSV2, paraGeoJSONCampo, paraKMLCampo, pontosExport } from '../../io/campo';
+import { baixarPdfCampo } from '../../io/pdfCampo';
 import { entregarArquivo } from '../../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../../theme';
 import type { Coord } from '../../geo/medidas';
@@ -34,7 +39,9 @@ export default function CampoTela() {
   const plano = useDados((s) => s.campos.find((c) => c.id === id));
   const talhoes = useDados((s) => s.talhoes);
   const { atualizarCampo, removerCampo } = useDados();
-  const { camada, vozLigada } = usePrefs();
+  const { camada, vozLigada, painelRecolhido, definirPainel } = usePrefs();
+  const irPara = useUi((x) => x.irPara);
+  const { height: alturaTela } = useWindowDimensions();
   const mostrar = useToast((s) => s.mostrar);
   const gps = useLocalizacao();
 
@@ -42,6 +49,21 @@ export default function CampoTela() {
   const [textoVar, setTextoVar] = useState('');
   const [comando, setComando] = useState<Comando | null>(null);
   const [pulados, setPulados] = useState<string[]>([]);
+  const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [alvoManual, setAlvoManual] = useState<string | null>(null);
+  const [mapaCheio, setMapaCheio] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [verTodas, setVerTodas] = useState(false);
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
+  const alturaMapa = useSharedValue(300 + ins.top);
+  const sobeSheet = useSharedValue(0);
+  useEffect(() => {
+    alturaMapa.value = withSpring(mapaCheio ? alturaTela : 300 + ins.top, { damping: 24, stiffness: 190 });
+    sobeSheet.value = withSpring(mapaCheio ? 1 : 0, { damping: 24, stiffness: 190 });
+  }, [mapaCheio, alturaTela, ins.top]);
+  const eMapa = useAnimatedStyle(() => ({ height: alturaMapa.value }));
+  const eSheet = useAnimatedStyle(() => ({ transform: [{ translateY: sobeSheet.value * alturaTela }] }));
   const avisado = useRef<{ id: string; degrau: number }>({ id: '', degrau: 0 });
   const chegou = useRef<string>('');
   const ultimoRumo = useRef<number | null>(null);
@@ -66,11 +88,13 @@ export default function CampoTela() {
   // Alvo atual: o mais perto da última bandeira colocada (ou de você), pulando os que você adiou
   const alvo = useMemo(() => {
     if (!plano || pendentes.length === 0) return null;
+    const manual = alvoManual ? pendentes.find((b) => b.id === alvoManual) : null;
+    if (manual) return manual;
     const ult = [...plano.bandeiras].reverse().find((b) => b.colocada)?.coord ?? gps.pos?.coord ?? null;
     const livres = pendentes.filter((b) => !pulados.includes(b.id));
     const lista = livres.length ? livres : pendentes;
     return ordenarVisita(lista, ult)[0] ?? null;
-  }, [plano, pendentes, pulados, gps.pos ? 1 : 0]);
+  }, [plano, pendentes, pulados, alvoManual, gps.pos ? 1 : 0]);
 
   // Guia: distância, rumo, desvio lateral
   useEffect(() => {
@@ -109,6 +133,29 @@ export default function CampoTela() {
     atualizarCampo(plano.id, { bandeiras: plano.bandeiras.map((b) => (b.id === idB ? { ...b, colocada } : b)) });
   };
 
+  const bandeiraSel = plano?.bandeiras.find((b) => b.id === selecionada) ?? null;
+  const distDe = (c: Coord) => (gps.pos ? guiaAtePonto(gps.pos.coord, c, null).distanciaM : null);
+  const guiarAte = async (idB: string) => {
+    setSelecionada(null);
+    setAlvoManual(idB);
+    setPulados([]);
+    const b = plano?.bandeiras.find((x) => x.id === idB);
+    if (!guiando) await iniciarGuia();
+    if (b) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [b.coord, ...(gps.pos ? [gps.pos.coord] : [])] });
+  };
+
+  const gerarPdf = async () => {
+    if (Platform.OS !== 'web') { mostrar('O PDF está disponível na versão web/PWA por enquanto.', 'info'); return; }
+    if (!plano) return;
+    setGerandoPdf(true);
+    try {
+      const fazenda = talhoes.find((x) => x.id === plano.config[0]?.talhaoId)?.fazenda;
+      await baixarPdfCampo({ plano, nomeTalhao: (idT) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão', fazenda });
+      mostrar('PDF gerado', 'ok');
+    } catch { mostrar('Não foi possível gerar o PDF.', 'erro'); }
+    finally { setGerandoPdf(false); }
+  };
+
   const iniciarGuia = async () => {
     await gps.ligar();
     setGuiando(true);
@@ -123,6 +170,7 @@ export default function CampoTela() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     marcar(alvo.id, true);
     setPulados([]);
+    setAlvoManual(null);
     if (pendentes.length === 1) {
       mostrar('Todas as bandeirinhas foram colocadas!', 'ok');
       if (vozLigada) falar('Todas as bandeirinhas foram colocadas.');
@@ -168,6 +216,7 @@ export default function CampoTela() {
       parcelas={parcelas}
       bandeiras={plano.bandeiras.map((b) => ({ id: b.id, coord: b.coord, estado: b.colocada ? 'ok' : guiando && alvo?.id === b.id ? 'atual' : 'pendente', rotulo: b.rotulo }))}
       linhaGuia={guiando && alvo && gps.pos ? [gps.pos.coord, alvo.coord] : null}
+      onBandeira={(idB) => { Haptics.selectionAsync(); setSelecionada(idB); }}
     />
   );
 
@@ -223,9 +272,10 @@ export default function CampoTela() {
           )}
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 16, zIndex: 10 }}>
+        <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 16, zIndex: 10 }}>
           <Vidro>
-            <View style={{ padding: 14, gap: 12 }}>
+            <AlcaRecolher onRecolher={() => definirPainel(true)} />
+            <View style={{ padding: 14, paddingTop: 2, gap: 12 }}>
               <View style={{ height: 8, borderRadius: 4, backgroundColor: t.cartaoSuave, overflow: 'hidden' }}>
                 <View style={{ width: `${(colocadas / Math.max(1, plano.bandeiras.length)) * 100}%`, height: 8, backgroundColor: t.primaria }} />
               </View>
@@ -242,9 +292,29 @@ export default function CampoTela() {
                 <Botao titulo="Pular este" variante="suave" style={{ flex: 1 }} onPress={() => alvo && setPulados((p) => [...p, alvo.id])} />
                 <Botao titulo="Sair do guia" variante="perigo" style={{ flex: 1 }} onPress={sairGuia} />
               </View>
+              {alvoManual && <Botao titulo="Voltar à ordem automática" variante="fantasma" onPress={() => setAlvoManual(null)} />}
             </View>
           </Vidro>
-        </Animated.View>
+        </Recolhivel>
+
+        <PilulaMostrar
+          visivel={painelRecolhido}
+          icone="flag"
+          rotulo={guia ? `${guia.distanciaM < 100 ? guia.distanciaM.toFixed(0) : Math.round(guia.distanciaM)} m · ${colocadas}/${plano.bandeiras.length}` : 'Mostrar guia'}
+          onPress={() => definirPainel(false)}
+        />
+
+        <FolhaBandeira
+          visivel={!!bandeiraSel}
+          rotulo={bandeiraSel?.rotulo ?? ''}
+          colocada={!!bandeiraSel?.colocada}
+          distanciaM={bandeiraSel ? distDe(bandeiraSel.coord) : null}
+          ehAlvo={!!bandeiraSel && alvo?.id === bandeiraSel.id}
+          onGuiar={() => bandeiraSel && guiarAte(bandeiraSel.id)}
+          onRota={() => { if (bandeiraSel) { irPara(bandeiraSel.coord, bandeiraSel.rotulo); setSelecionada(null); sairGuia(); router.navigate('/rotas'); } }}
+          onAlternar={() => { if (bandeiraSel) { marcar(bandeiraSel.id, !bandeiraSel.colocada); setSelecionada(null); } }}
+          onFechar={() => setSelecionada(null)}
+        />
       </View>
     );
   }
@@ -263,15 +333,19 @@ export default function CampoTela() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.fundo }}>
-      <View style={{ height: 300 + ins.top, overflow: 'hidden' }}>
-        {mapa}
+      <Animated.View style={[{ overflow: 'hidden' }, eMapa]}>
+        <Paralaxe y={scrollY} style={{ flex: 1 }}>{mapa}</Paralaxe>
         <Pressable onPress={() => router.back()} style={{ position: 'absolute', top: ins.top + 10, left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: t.cartao, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
           <Ionicons name="chevron-back" size={24} color={t.texto} />
         </Pressable>
-      </View>
+        <Pressable onPress={() => { Haptics.selectionAsync(); setMapaCheio((v) => !v); }} accessibilityLabel={mapaCheio ? 'Voltar ao plano' : 'Mapa em tela cheia'} style={{ position: 'absolute', top: ins.top + 10, right: 16, height: 42, paddingHorizontal: 14, borderRadius: 21, backgroundColor: t.cartao, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, zIndex: 10 }}>
+          <Ionicons name={mapaCheio ? 'contract' : 'expand'} size={18} color={t.texto} />
+          <Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.texto }}>{mapaCheio ? 'Voltar ao plano' : 'Tela cheia'}</Text>
+        </Pressable>
+      </Animated.View>
 
-      <ScrollView style={{ flex: 1, marginTop: -22, backgroundColor: t.fundo, borderTopLeftRadius: 26, borderTopRightRadius: 26 }} contentContainerStyle={{ padding: 18, paddingBottom: 60, gap: 14 }} keyboardShouldPersistTaps="handled">
-        <Animated.View entering={FadeInDown.duration(350)} style={{ gap: 14 }}>
+      <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} style={[{ position: 'absolute', top: 278 + ins.top, left: 0, right: 0, bottom: 0, backgroundColor: t.fundo, borderTopLeftRadius: 26, borderTopRightRadius: 26, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any, eSheet]} contentContainerStyle={{ padding: 18, paddingBottom: 60, gap: 14 }} keyboardShouldPersistTaps="handled">
+        <View style={{ gap: 14 }}>
           <View>
             <Text style={[tipo.titulo, { color: t.texto }]}>{plano.nome}</Text>
             <Text style={[tipo.corpo, { color: t.textoSuave }]}>{plano.partes.length} partes · {plano.divisas.length} divisas · {plano.bandeiras.length} bandeirinhas ({colocadas} colocadas)</Text>
@@ -288,7 +362,8 @@ export default function CampoTela() {
 
           <Text style={[tipo.legenda, { color: t.textoSuave }]}>PARTES</Text>
           {plano.partes.map((p, i) => (
-            <Cartao key={`${p.talhaoId}-${p.indice}`} style={{ gap: 10 }}>
+            <Revelar key={`${p.talhaoId}-${p.indice}`}>
+            <Cartao style={{ gap: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.variedade ? corDe(p.variedade) : '#8FA39A' }} />
                 <View style={{ flex: 1 }}>
@@ -301,6 +376,7 @@ export default function CampoTela() {
                 <Fichas opcoes={variedades} valor={p.variedade} onChange={(v) => atualizarCampo(plano.id, { partes: plano.partes.map((q, k) => (k === i ? { ...q, variedade: v } : q)) })} />
               )}
             </Cartao>
+            </Revelar>
           ))}
 
           {variedades.length > 0 && (
@@ -316,8 +392,30 @@ export default function CampoTela() {
             </Cartao>
           )}
 
+          <Text style={[tipo.legenda, { color: t.textoSuave }]}>BANDEIRINHAS · TOQUE PARA SER GUIADO ATÉ ELA</Text>
+          <Cartao style={{ padding: 6 }}>
+            {(verTodas ? plano.bandeiras : plano.bandeiras.slice(0, 8)).map((b, i) => {
+              const d = distDe(b.coord);
+              return (
+                <Pressable key={b.id} onPress={() => { Haptics.selectionAsync(); setSelecionada(b.id); }} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderRadius: raio.md, backgroundColor: pressed ? t.primariaSuave : 'transparent', borderTopWidth: i ? 0.5 : 0, borderTopColor: t.linha })}>
+                  <Ionicons name={b.colocada ? 'checkmark-circle' : 'flag-outline'} size={20} color={b.colocada ? t.ok : t.atencao} />
+                  <Text numberOfLines={1} style={{ flex: 1, fontFamily: fonte.regular, fontSize: 14.5, color: t.texto }}>{b.rotulo}</Text>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>{d == null ? '' : d >= 1000 ? `${(d / 1000).toFixed(1).replace('.', ',')} km` : `${Math.round(d)} m`}</Text>
+                  <Ionicons name="chevron-forward" size={15} color={t.textoSuave} />
+                </Pressable>
+              );
+            })}
+            {plano.bandeiras.length > 8 && (
+              <Pressable onPress={() => setVerTodas((v) => !v)} style={{ alignItems: 'center', paddingVertical: 12 }}>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 14, color: t.primaria }}>{verTodas ? 'Mostrar menos' : `Ver todas (${plano.bandeiras.length})`}</Text>
+              </Pressable>
+            )}
+            {!gps.pos && <Pressable onPress={() => gps.ligar()} style={{ alignItems: 'center', paddingVertical: 10 }}><Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.textoSuave }}>Ativar GPS para ver as distâncias</Text></Pressable>}
+          </Cartao>
+
           <Cartao style={{ gap: 10 }}>
-            <Text style={[tipo.legenda, { color: t.textoSuave }]}>EXPORTAR (PARA O MONITOR DA MÁQUINA OU GOOGLE EARTH)</Text>
+            <Text style={[tipo.legenda, { color: t.textoSuave }]}>IMPRIMIR E EXPORTAR</Text>
+            <Botao titulo="Gerar PDF do plano" tamanho="g" variante="suave" carregando={gerandoPdf} icone={<Ionicons name="document-text" size={20} color={t.primaria} />} onPress={gerarPdf} />
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
               <Botao titulo="KML" variante="suave" onPress={() => exp('kml')} />
               <Botao titulo="GeoJSON" variante="suave" onPress={() => exp('geojson')} />
@@ -328,8 +426,22 @@ export default function CampoTela() {
 
           {colocadas > 0 && <Botao titulo="Recomeçar as bandeirinhas" variante="suave" onPress={() => atualizarCampo(plano.id, { bandeiras: plano.bandeiras.map((b) => ({ ...b, colocada: false })) })} />}
           <Botao titulo="Excluir plano" variante="perigo" onPress={confirmarExcluir} />
-        </Animated.View>
-      </ScrollView>
+        </View>
+      </Animated.ScrollView>
+
+      <PilulaMostrar visivel={mapaCheio} icone="list" rotulo="Ver plano" onPress={() => setMapaCheio(false)} />
+
+      <FolhaBandeira
+        visivel={!!bandeiraSel}
+        rotulo={bandeiraSel?.rotulo ?? ''}
+        colocada={!!bandeiraSel?.colocada}
+        distanciaM={bandeiraSel ? distDe(bandeiraSel.coord) : null}
+        ehAlvo={false}
+        onGuiar={() => bandeiraSel && guiarAte(bandeiraSel.id)}
+        onRota={() => { if (bandeiraSel) { irPara(bandeiraSel.coord, bandeiraSel.rotulo); setSelecionada(null); router.navigate('/rotas'); } }}
+        onAlternar={() => { if (bandeiraSel) { marcar(bandeiraSel.id, !bandeiraSel.colocada); setSelecionada(null); } }}
+        onFechar={() => setSelecionada(null)}
+      />
     </View>
   );
 }

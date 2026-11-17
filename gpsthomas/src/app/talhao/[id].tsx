@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View, Alert, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, Text, View, Alert, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { Paralaxe } from '../../components/Paralaxe';
+import { Revelar } from '../../components/Revelar';
 import { MapaCampo } from '../../components/MapaCampo';
 import { Cartao } from '../../components/Cartao';
 import { Botao } from '../../components/Botao';
@@ -33,6 +35,8 @@ export default function TalhaoDetalhe() {
   const baixar = (n: string, c: string, m: string) => { entregarArquivo(n, c, m); mostrar('Arquivo exportado', 'ok'); };
   const [f, setF] = useState({ nome: '', fazenda: '', cultura: 'Soja', safra: '', obs: '' });
   const [salvo, setSalvo] = useState(false);
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
 
   useEffect(() => {
     if (x) setF({ nome: x.nome, fazenda: x.fazenda, cultura: x.cultura, safra: x.safra, obs: x.obs ?? '' });
@@ -55,15 +59,17 @@ export default function TalhaoDetalhe() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.fundo }} contentContainerStyle={{ paddingBottom: 60 }}>
-      <View style={{ height: 260 + ins.top }}>
-        <MapaCampo largura={width} altura={260 + ins.top} poligonos={[{ id: x.id, pontos: x.contorno, destaque: true }]} margem={50} />
+    <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} style={{ flex: 1, backgroundColor: t.fundo, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any} contentContainerStyle={{ paddingBottom: 60 }}>
+      <View style={{ height: 260 + ins.top, overflow: 'hidden' }}>
+        <Paralaxe y={scrollY} fator={0.5} style={{ flex: 1 }}>
+          <MapaCampo largura={width} altura={260 + ins.top} poligonos={[{ id: x.id, pontos: x.contorno, destaque: true }]} margem={50} />
+        </Paralaxe>
         <Pressable onPress={() => router.back()} style={{ position: 'absolute', top: ins.top + 10, left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: t.cartao, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={24} color={t.texto} />
         </Pressable>
       </View>
 
-      <Animated.View entering={FadeInDown.duration(380)} style={{ marginTop: -26, backgroundColor: t.fundo, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, gap: 14 }}>
+      <View style={{ marginTop: -26, backgroundColor: t.fundo, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <Cartao style={{ flex: 1 }}>
             <Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREA</Text>
@@ -80,7 +86,7 @@ export default function TalhaoDetalhe() {
         <Botao titulo="Dividir em parcelas (campo de sementes)" variante="suave" icone={<Ionicons name="grid" size={19} color={t.primaria} />} onPress={() => router.push(`/campo/novo?talhao=${x.id}`)} />
         <Botao titulo="Traçar rota até o talhão" tamanho="g" variante="suave" icone={<Ionicons name="navigate" size={20} color={t.primaria} />} onPress={() => { const n = x.contorno.length || 1; irPara([x.contorno.reduce((a, c) => a + c[0], 0) / n, x.contorno.reduce((a, c) => a + c[1], 0) / n], x.nome); router.navigate('/rotas'); }} />
 
-        <Cartao style={{ gap: 12 }}>
+        <Revelar><Cartao style={{ gap: 12 }}>
           <Text style={[tipo.subtitulo, { color: t.texto }]}>Dados do talhão</Text>
           <Campo rotulo="Nome" value={f.nome} onChangeText={(v) => { setF({ ...f, nome: v }); setSalvo(false); }} />
           <Campo rotulo="Fazenda" value={f.fazenda} onChangeText={(v) => { setF({ ...f, fazenda: v }); setSalvo(false); }} />
@@ -89,9 +95,9 @@ export default function TalhaoDetalhe() {
           <Campo rotulo="Safra" value={f.safra} onChangeText={(v) => { setF({ ...f, safra: v }); setSalvo(false); }} />
           <Campo rotulo="Observações" value={f.obs} onChangeText={(v) => { setF({ ...f, obs: v }); setSalvo(false); }} multiline placeholder="Solo, variedade, histórico…" />
           <Botao titulo={salvo ? 'Salvo ✓' : 'Salvar alterações'} onPress={() => { atualizarTalhao(x.id, { ...f, nome: f.nome.trim() || x.nome }); setSalvo(true); mostrar('Alterações salvas', 'ok'); }} />
-        </Cartao>
+        </Cartao></Revelar>
 
-        <Cartao style={{ gap: 8 }}>
+        <Revelar><Cartao style={{ gap: 8 }}>
           <Text style={[tipo.legenda, { color: t.textoSuave }]}>EM OUTRAS UNIDADES</Text>
           {OUTRAS.map((u) => (
             <View key={u} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -102,19 +108,19 @@ export default function TalhaoDetalhe() {
             </View>
           ))}
           <Text style={[tipo.corpo, { color: t.textoSuave, marginTop: 4 }]}>{x.contorno.length} vértices</Text>
-        </Cartao>
+        </Cartao></Revelar>
 
-        <Cartao style={{ gap: 10 }}>
+        <Revelar><Cartao style={{ gap: 10 }}>
           <Text style={[tipo.legenda, { color: t.textoSuave }]}>EXPORTAR ESTE TALHÃO</Text>
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <Botao titulo="KML" variante="suave" onPress={() => baixar(`${x.nome}.kml`, paraKML([x]), 'application/vnd.google-earth.kml+xml')} />
             <Botao titulo="GeoJSON" variante="suave" onPress={() => baixar(`${x.nome}.geojson`, paraGeoJSON([x]), 'application/geo+json')} />
             <Botao titulo="GPX" variante="suave" onPress={() => baixar(`${x.nome}.gpx`, paraGPX([x]), 'application/gpx+xml')} />
           </View>
-        </Cartao>
+        </Cartao></Revelar>
 
         <Botao titulo="Excluir talhão" variante="perigo" onPress={apagar} />
-      </Animated.View>
-    </ScrollView>
+      </View>
+    </Animated.ScrollView>
   );
 }

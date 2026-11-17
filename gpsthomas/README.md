@@ -28,3 +28,7 @@ Nuvem (Supabase) e backup · análise de solo (pontos de coleta, laudos) · plan
 
 ## Campo de sementes (v0.6)
 Importe o KML/KMZ dos talhões, divida cada um em partes de área igual (faixas paralelas ao lado mais longo), distribua as variedades e use o guia para ir até cada ponto de divisa e fincar a bandeirinha. Exporta KML, GeoJSON, GPX (bandeiras) e CSV.
+
+## v0.7
+PDF do plano do campo de sementes (mapa vetorial, partes, variedades e bandeirinhas com link do Google Maps), toque na bandeirinha para ser guiado até ela (a pé ou por estrada), painéis recolhíveis para ver o mapa limpo, mapa em tela cheia e rolagem com efeito suave.
+`npx tsx tools/gerar-pdf-exemplo.ts saida.pdf` gera um PDF de exemplo.

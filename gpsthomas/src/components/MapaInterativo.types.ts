@@ -36,4 +36,6 @@ export type PropsMapa = {
   bandeiras?: BandeiraMapa[];
   /** Linha entre você e o ponto-alvo. */
   linhaGuia?: [Coord, Coord] | null;
+  /** Toque numa bandeirinha. */
+  onBandeira?: (id: string) => void;
 };

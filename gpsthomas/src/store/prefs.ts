@@ -14,6 +14,8 @@ type Prefs = {
   onboardingVisto: boolean;
   recentes: Recente[];
   vozLigada: boolean;
+  painelRecolhido: boolean;
+  definirPainel: (v: boolean) => void;
   veiculo: Veiculo;
   favoritos: Recente[];
   viagemAtiva: Recente | null;
@@ -35,6 +37,8 @@ export const usePrefs = create<Prefs>()(
       onboardingVisto: false,
       recentes: [],
       vozLigada: true,
+      painelRecolhido: false,
+      definirPainel: (painelRecolhido) => set({ painelRecolhido }),
       veiculo: 'carro',
       favoritos: [],
       viagemAtiva: null,

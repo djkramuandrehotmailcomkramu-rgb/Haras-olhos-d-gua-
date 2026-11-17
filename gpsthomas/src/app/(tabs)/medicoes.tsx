@@ -46,7 +46,7 @@ export default function MedicoesTela() {
       {medicoes.map((m, i) => {
         const ab = aberta === m.id;
         return (
-          <Animated.View key={m.id} entering={FadeInDown.delay(50 + i * 40).duration(320)}>
+          <View key={m.id}>
             <Pressable onPress={() => setAberta(ab ? null : m.id)}>
               <Cartao style={{ gap: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -77,7 +77,7 @@ export default function MedicoesTela() {
                 )}
               </Cartao>
             </Pressable>
-          </Animated.View>
+          </View>
         );
       })}
 

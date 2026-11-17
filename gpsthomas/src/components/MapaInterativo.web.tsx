@@ -90,7 +90,7 @@ export function MapaInterativo(props: PropsMapa) {
       if (t.contorno.length < 3) continue;
       L.polygon(t.contorno.map(paraLL), { color: AMBAR, weight: 3, fillColor: AMBAR, fillOpacity: 0.18, interactive: false }).addTo(g.talhoes);
       const rot = document.createElement('div');
-      rot.style.cssText = 'background:rgba(10,17,13,.82);color:#fff;border-radius:12px;padding:5px 10px;font:600 12px Inter,system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:center;cursor:pointer;transform:translate(-50%,-50%);';
+      rot.style.cssText = 'background:rgba(10,17,13,.82);color:#fff;border-radius:12px;padding:5px 10px;font:600 12px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:center;cursor:pointer;transform:translate(-50%,-50%);';
       const n = document.createElement('div');
       n.textContent = t.nome;
       const r = document.createElement('div');
@@ -184,7 +184,7 @@ export function MapaInterativo(props: PropsMapa) {
       const todos = pc.pedacos.flat();
       if (todos.length) {
         const rot = document.createElement('div');
-        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:600 11.5px Inter,system-ui,sans-serif;white-space:nowrap;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
+        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:600 11.5px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
         const a = document.createElement('div'); a.textContent = pc.rotulo;
         rot.appendChild(a);
         if (pc.sub) { const b = document.createElement('div'); b.textContent = pc.sub; b.style.cssText = 'font-weight:500;opacity:.8;font-size:10.5px;'; rot.appendChild(b); }
@@ -195,10 +195,15 @@ export function MapaInterativo(props: PropsMapa) {
     for (const b of props.bandeiras ?? []) {
       const cor = b.estado === 'ok' ? '#3FB063' : b.estado === 'atual' ? '#F2B73D' : '#9AA7A0';
       const grande = b.estado === 'atual';
-      const el2 = document.createElement('div');
-      el2.style.cssText = `width:${grande ? 30 : 22}px;height:${grande ? 30 : 22}px;transform:translate(-3px,-100%);filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));`;
-      el2.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
-      L.marker(paraLL(b.coord), { icon: L.divIcon({ html: el2, className: '', iconSize: [0, 0] }), interactive: false, zIndexOffset: grande ? 900 : 0 }).addTo(g.campo);
+      const tam = grande ? 32 : 24;
+      const caixa = document.createElement('div');
+      caixa.style.cssText = 'width:48px;height:48px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+      const bandeira = document.createElement('div');
+      bandeira.style.cssText = `position:absolute;left:4px;bottom:6px;width:${tam}px;height:${tam}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));transition:transform .15s;`;
+      bandeira.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+      caixa.appendChild(bandeira);
+      const mkb = L.marker(paraLL(b.coord), { icon: L.divIcon({ html: caixa, className: '', iconSize: [48, 48], iconAnchor: [4 + tam * (5 / 24), 48 - 6] }), interactive: true, zIndexOffset: grande ? 900 : 0, keyboard: false }).addTo(g.campo);
+      mkb.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onBandeira?.(b.id); });
     }
   }, [props.parcelas, props.bandeiras, props.linhaGuia]);
 

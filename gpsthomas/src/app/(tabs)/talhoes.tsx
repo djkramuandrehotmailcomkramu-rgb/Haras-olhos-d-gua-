@@ -76,7 +76,7 @@ export default function TalhoesTela() {
         <View key={fazenda} style={{ gap: 10 }}>
           <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>{fazenda.toUpperCase()}</Text>
           {lista.map((x, i) => (
-            <Animated.View key={x.id} entering={FadeInDown.delay(60 + (gi + i) * 50).duration(340)}>
+            <View key={x.id}>
               <Pressable onPress={() => router.push(`/talhao/${x.id}`)}>
                 <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   <View style={{ width: 46, height: 46, borderRadius: raio.md, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
@@ -92,7 +92,7 @@ export default function TalhoesTela() {
                   </View>
                 </Cartao>
               </Pressable>
-            </Animated.View>
+            </View>
           ))}
         </View>
       ))}

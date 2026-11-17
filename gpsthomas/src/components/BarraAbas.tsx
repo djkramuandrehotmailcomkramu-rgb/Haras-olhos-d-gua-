@@ -5,6 +5,8 @@ import type { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, useDerivedValue } from 'react-native-reanimated';
+import { useEffect } from 'react';
+import { usePrefs } from '../store/prefs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Vidro } from './Vidro';
 import { fonte, raio, useTema } from '../theme';
@@ -26,6 +28,12 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
   const ins = useSafeAreaInsets();
   const [largura, setLargura] = useState(0);
   const n = state.routes.length;
+  const rotaAtual = state.routes[state.index]?.name;
+  const noMapa = rotaAtual === 'index' || rotaAtual === 'rotas';
+  const esconder = usePrefs((x) => x.painelRecolhido) && noMapa;
+  const oculta = useSharedValue(esconder ? 1 : 0);
+  useEffect(() => { oculta.value = withSpring(esconder ? 1 : 0, { damping: 21, stiffness: 210, mass: 0.9 }); }, [esconder]);
+  const estiloOculta = useAnimatedStyle(() => ({ opacity: 1 - oculta.value, transform: [{ translateY: oculta.value * 140 }] }));
   const larguraAba = largura > 0 ? (largura - PAD * 2) / n : 0;
 
   const alvo = useSharedValue(state.index);
@@ -34,7 +42,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
   const indicador = useAnimatedStyle(() => ({ transform: [{ translateX: pos.value * larguraAba }] }));
 
   return (
-    <View pointerEvents="box-none" style={[s.raiz, { bottom: Math.max(ins.bottom, 12) }]}>
+    <Animated.View pointerEvents={esconder ? 'none' : 'box-none'} style={[s.raiz, { bottom: Math.max(ins.bottom, 12) }, estiloOculta]}>
       <Vidro raioBorda={raio.xl} style={{ width: '100%' }}>
         <View style={s.linha} onLayout={(e) => setLargura(e.nativeEvent.layout.width)}>
           {larguraAba > 0 && (
@@ -67,7 +75,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
           })}
         </View>
       </Vidro>
-    </View>
+    </Animated.View>
   );
 }
 

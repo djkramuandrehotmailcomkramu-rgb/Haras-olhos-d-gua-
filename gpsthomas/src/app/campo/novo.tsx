@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { Paralaxe } from '../../components/Paralaxe';
+import { Revelar } from '../../components/Revelar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Cartao } from '../../components/Cartao';
@@ -30,6 +32,8 @@ export default function NovoCampo() {
   const { camada } = usePrefs();
   const mostrar = useToast((s) => s.mostrar);
 
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
   const [nome, setNome] = useState('Campo de sementes');
   const [config, setConfig] = useState<ConfigTalhao[]>(
     talhaoInicial ? [{ talhaoId: talhaoInicial, partes: 4, anguloGraus: null, inverter: false }] : [],
@@ -82,6 +86,7 @@ export default function NovoCampo() {
   return (
     <View style={{ flex: 1, backgroundColor: t.fundo }}>
       <View style={{ height: 270 + ins.top, overflow: 'hidden' }}>
+        <Paralaxe y={scrollY} style={{ flex: 1 }}>
         <MapaInterativo
           talhoes={talhoes.filter((x) => !config.some((c) => c.talhaoId === x.id)).map((x) => ({ id: x.id, nome: x.nome, rotulo: '', contorno: x.contorno }))}
           rascunho={[]}
@@ -95,13 +100,14 @@ export default function NovoCampo() {
           parcelas={parcelasMapa}
           bandeiras={(previa?.bandeiras ?? []).map((b) => ({ id: b.id, coord: b.coord, estado: 'pendente' as const, rotulo: b.rotulo }))}
         />
+        </Paralaxe>
         <Pressable onPress={() => router.back()} style={{ position: 'absolute', top: ins.top + 10, left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: t.cartao, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
           <Ionicons name="chevron-back" size={24} color={t.texto} />
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1, marginTop: -22, backgroundColor: t.fundo, borderTopLeftRadius: 26, borderTopRightRadius: 26 }} contentContainerStyle={{ padding: 18, paddingBottom: 60, gap: 14 }} keyboardShouldPersistTaps="handled">
-        <Animated.View entering={FadeInDown.duration(350)} style={{ gap: 14 }}>
+      <Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} style={{ flex: 1, marginTop: -22, backgroundColor: t.fundo, borderTopLeftRadius: 26, borderTopRightRadius: 26, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any} contentContainerStyle={{ padding: 18, paddingBottom: 60, gap: 14 }} keyboardShouldPersistTaps="handled">
+        <View style={{ gap: 14 }}>
           <View>
             <Text style={[tipo.titulo, { color: t.texto }]}>Novo campo de sementes</Text>
             <Text style={[tipo.corpo, { color: t.textoSuave }]}>Escolha os talhões e em quantas partes iguais dividir cada um.</Text>
@@ -180,8 +186,8 @@ export default function NovoCampo() {
           )}
 
           <Botao titulo="Criar plano" tamanho="g" desabilitado={!previa || previa.partes.length === 0} icone={<Ionicons name="checkmark" size={21} color={t.sobrePrimaria} />} onPress={criar} />
-        </Animated.View>
-      </ScrollView>
+        </View>
+      </Animated.ScrollView>
     </View>
   );
 }

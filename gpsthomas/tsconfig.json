@@ -5,5 +5,10 @@
     "types": [
       "jest"
     ]
-  }
+  },
+  "exclude": [
+    "tools",
+    "node_modules",
+    "dist"
+  ]
 }

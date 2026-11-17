@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { Children, ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Vidro } from './Vidro';
+import { Revelar } from './Revelar';
 import { useEntradaFoco } from '../hooks/animacao';
 import { fonte, tipo, useTema } from '../theme';
 
@@ -25,15 +26,18 @@ export function Tela({ titulo, subtitulo, children }: { titulo: string; subtitul
       <Animated.ScrollView
         onScroll={onScroll}
         scrollEventThrottle={16}
-        style={[{ flex: 1 }, entrada]}
+        style={[{ flex: 1, overscrollBehaviorY: 'contain', scrollBehavior: 'smooth' } as any, entrada]}
         contentContainerStyle={{ paddingTop: ins.top + 18, paddingBottom: 130, paddingHorizontal: 18, gap: 14 }}
         showsVerticalScrollIndicator={false}
+        decelerationRate="normal"
       >
         <Animated.View style={[{ transformOrigin: 'left center' } as any, grande]}>
           <Text style={[tipo.tituloGrande, { color: t.texto }]}>{titulo}</Text>
           {subtitulo ? <Text style={[tipo.corpo, { color: t.textoSuave, marginTop: 2 }]}>{subtitulo}</Text> : null}
         </Animated.View>
-        <View style={{ gap: 14 }}>{children}</View>
+        <View style={{ gap: 14 }}>
+          {Children.toArray(children).map((c, i) => <Revelar key={(c as any)?.key ?? i} atraso={Math.min(i, 4) * 40}>{c}</Revelar>)}
+        </View>
       </Animated.ScrollView>
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { bottom: undefined, height: ins.top + 52 }, barra]}>
