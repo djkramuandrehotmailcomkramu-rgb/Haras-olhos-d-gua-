@@ -6,6 +6,8 @@ const web = () => Platform.OS === 'web' && typeof window !== 'undefined' && type
 export function emStandalone(): boolean {
   if (!web()) return true;
   try {
+    // A casca Android (APK) se identifica no navegador interno e já abre em tela cheia.
+    if (/GPSThomasApp/.test(navigator.userAgent)) return true;
     return window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || (navigator as any).standalone === true;
   } catch { return false; }
 }

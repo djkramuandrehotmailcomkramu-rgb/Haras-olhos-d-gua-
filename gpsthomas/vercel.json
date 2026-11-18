@@ -4,11 +4,19 @@
   "installCommand": "npm install --legacy-peer-deps",
   "rewrites": [
     {
-      "source": "/((?!_expo|assets|fonts|sw\\.js|manifest\\.webmanifest|robots\\.txt|favicon\\.ico|apple-touch-icon.*|icon-.*).*)",
+      "source": "/((?!_expo|assets|fonts|sw\\.js|manifest\\.webmanifest|robots\\.txt|favicon\\.ico|apple-touch-icon.*|icon-.*|GPSThomas\\.apk).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/GPSThomas.apk",
+      "headers": [
+        { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+        { "key": "Content-Disposition", "value": "attachment; filename=GPSThomas.apk" },
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    },
     {
       "source": "/sw.js",
       "headers": [

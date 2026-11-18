@@ -1,0 +1,15 @@
+{
+  "appId": "br.com.gpsthomas.app",
+  "appName": "GPSThomas",
+  "webDir": "www",
+  "backgroundColor": "#0F4A27",
+  "appendUserAgent": "GPSThomasApp",
+  "server": {
+    "url": "https://gpsthomas.vercel.app",
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.1
+- **APK (casca Android em tela cheia):** projeto `casca/` (Capacitor) que abre o gpsthomas.vercel.app sem barra do navegador e com GPS; o GitHub Actions (`.github/workflows/apk.yml`) compila o APK de graça e o guarda em `public/GPSThomas.apk` (download em `/GPSThomas.apk`). O app reconhece a casca e não mostra mais o aviso "Instale o app".
+
 ## 1.3.0
 - **Visual mais fino e moderno:** fontes um degrau mais leves em todo o app, ícones só de contorno (inclusive na barra de abas), bordas de 0,5 px em vez de sombras pesadas, cartões e botões mais baixos e arredondados, sombras suaves.
 - **Mapa mais delicado:** linhas dos talhões, parcelas e rotas mais finas, pontos com borda leve (a área de toque continua grande).
