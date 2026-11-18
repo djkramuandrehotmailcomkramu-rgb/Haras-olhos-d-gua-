@@ -34,6 +34,59 @@ jobs:
           npx cap add android
           npx @capacitor/assets generate --android --iconBackgroundColor '#0F4A27'
           npx cap sync android
+          # Ponte de impressão: o site envia o HTML do plano e o Android abre a impressão do sistema
+          JAVA_DIR=android/app/src/main/java/br/com/gpsthomas/app
+          mkdir -p $JAVA_DIR
+          cat > $JAVA_DIR/ImpressaoJs.java <<'JAVA'
+          package br.com.gpsthomas.app;
+
+          import android.app.Activity;
+          import android.content.Context;
+          import android.print.PrintAttributes;
+          import android.print.PrintDocumentAdapter;
+          import android.print.PrintManager;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class ImpressaoJs {
+            private static WebView segurando;
+            private final Activity activity;
+
+            public ImpressaoJs(Activity activity) { this.activity = activity; }
+
+            @JavascriptInterface
+            public void imprimirHtml(final String html, final String nome) {
+              activity.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                  final WebView wv = new WebView(activity);
+                  segurando = wv;
+                  wv.setWebViewClient(new WebViewClient() {
+                    @Override public void onPageFinished(WebView view, String url) {
+                      PrintManager pm = (PrintManager) activity.getSystemService(Context.PRINT_SERVICE);
+                      PrintDocumentAdapter adaptador = view.createPrintDocumentAdapter(nome);
+                      pm.print(nome, adaptador, new PrintAttributes.Builder().build());
+                    }
+                  });
+                  wv.loadDataWithBaseURL("https://gpsthomas.vercel.app/", html, "text/html", "UTF-8", null);
+                }
+              });
+            }
+          }
+          JAVA
+          cat > $JAVA_DIR/MainActivity.java <<'JAVA'
+          package br.com.gpsthomas.app;
+
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onStart() {
+              super.onStart();
+              getBridge().getWebView().addJavascriptInterface(new ImpressaoJs(this), "AndroidPrint");
+            }
+          }
+          JAVA
           M=android/app/src/main/AndroidManifest.xml
           grep -q ACCESS_FINE_LOCATION $M || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />#' $M
           grep uses-permission $M

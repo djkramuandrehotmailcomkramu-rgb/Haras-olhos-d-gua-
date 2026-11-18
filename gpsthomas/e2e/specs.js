@@ -128,8 +128,8 @@ module.exports = [
     async fn({ browser, url }) {
       const p = await novaPagina(browser, { url });
       await criarPlanoPadrao(p, url);
-      await p.getByText('Gerar PDF do plano').scrollIntoViewIfNeeded();
-      const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Gerar PDF do plano').click()]);
+      await p.getByText('Baixar PDF', { exact: true }).scrollIntoViewIfNeeded();
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Baixar PDF', { exact: true }).click()]);
       const arq = path.join(SAIDA, 'plano.pdf');
       await dl.saveAs(arq);
       check(fs.statSync(arq).size > 20000, 'PDF com conteúdo');
@@ -522,8 +522,8 @@ module.exports = [
       check(c.bandeiras.length === c.divisas.length * 2, `bandeirinhas nas pontas de cada divisa (${c.bandeiras.length})`);
       // tela do plano e PDF
       check(await p.getByText(/Sem variedade · Andropogon 92 ha [\d,]+ ha \+ Amendoim 72 ha/).count() >= 1, 'partes listadas com a origem');
-      await p.getByText('Gerar PDF do plano').scrollIntoViewIfNeeded();
-      const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Gerar PDF do plano').click()]);
+      await p.getByText('Baixar PDF', { exact: true }).scrollIntoViewIfNeeded();
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Baixar PDF', { exact: true }).click()]);
       const arq = path.join(SAIDA, 'plano-junto.pdf');
       await dl.saveAs(arq);
       check(fs.readFileSync(arq).slice(0, 5).toString() === '%PDF-', 'PDF gerado');
@@ -541,6 +541,43 @@ module.exports = [
       await p.getByText('Salvar alterações').click(); await p.waitForTimeout(1500);
       const c2 = (await estado(p)).campos[0];
       check(c2.partes.length === 9 && Math.abs(c2.partes[0].areaM2 / 10000 - 20) < 0.05, `plano reajustado (${c2.partes.length} partes)`);
+      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
+    },
+  },
+  {
+    nome: 'Imprimir plano: abre a impressão só com o plano (sem o app) e limpa depois',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await criarPlanoPadrao(p, url);
+      await p.addInitScript(() => {});
+      await p.evaluate(() => {
+        window.__impr = { chamou: 0, temPlano: false, textoPlano: '' };
+        window.print = () => {
+          const el = document.getElementById('gt-impressao');
+          window.__impr.chamou += 1; window.__impr.temPlano = !!el; window.__impr.textoPlano = el ? el.innerText : '';
+        };
+      });
+      check(await p.getByText('Gerar PDF do plano').count() === 0, 'o botão antigo saiu');
+      await p.getByText('Imprimir plano', { exact: true }).scrollIntoViewIfNeeded();
+      await p.getByText('Imprimir plano', { exact: true }).click(); await p.waitForTimeout(800);
+      const r = await p.evaluate(() => window.__impr);
+      check(r.chamou === 1, `abriu a impressão (${r.chamou}x)`);
+      check(r.temPlano && /Plano de campo de sementes/.test(r.textoPlano), 'o plano está montado na página');
+      check(/Bandeirinhas \(pontos das divisas\)/.test(r.textoPlano) && /Conferência de áreas/.test(r.textoPlano), 'tem bandeirinhas e conferência');
+      // com a mídia de impressão só o plano aparece: gera o PDF do navegador e lê o texto
+      await p.emulateMedia({ media: 'print' });
+      const arq = path.join(SAIDA, 'impressao.pdf');
+      await p.pdf({ path: arq, format: 'A4', printBackground: true });
+      try {
+        const txt = execFileSync('pdftotext', ['-layout', arq, '-'], { encoding: 'utf8' });
+        check(/Plano de campo de sementes/.test(txt), 'impressão tem o plano');
+        check(/Bandeirinhas \(pontos das divisas\)/.test(txt), 'impressão tem as bandeirinhas');
+        check(!/Medições/.test(txt) && !/Rotas/.test(txt), 'impressão não traz a barra de abas do app');
+      } catch (e) { if (e instanceof Error && e.name === 'Falha') throw e; }
+      await p.emulateMedia({ media: 'screen' });
+      // depois da impressão o bloco é removido
+      await p.evaluate(() => window.dispatchEvent(new Event('afterprint'))); await p.waitForTimeout(200);
+      check(await p.evaluate(() => !document.getElementById('gt-impressao')), 'bloco de impressão removido');
       check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
     },
   },

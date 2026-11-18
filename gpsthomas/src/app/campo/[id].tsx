@@ -28,7 +28,8 @@ import { useBussola } from '../../nav/bussola';
 import { falar, manterTelaLigada, pararVoz } from '../../nav/voz';
 import { rumoEntre } from '../../nav/movimento';
 import { paraCSV2, paraGeoJSONCampo, paraKMLCampo, pontosExport } from '../../io/campo';
-import { baixarPdfCampo } from '../../io/pdfCampo';
+import { baixarPdfCampo, type DadosPdf } from '../../io/pdfCampo';
+import { imprimirPlano } from '../../io/htmlImpressao';
 import { entregarArquivo } from '../../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../../theme';
 import type { Coord } from '../../geo/medidas';
@@ -149,16 +150,33 @@ export default function CampoTela() {
     if (b) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [b.coord, ...(gps.pos ? [gps.pos.coord] : [])] });
   };
 
+  const dadosImpressao = (): DadosPdf | null => {
+    if (!plano) return null;
+    const fazenda = talhoes.find((x) => x.id === plano.config[0]?.talhaoId)?.fazenda;
+    return { plano, nomeTalhao: (idT) => (idT === 'junto' && plano.junto ? plano.junto.talhaoIds.map((i) => talhoes.find((x) => x.id === i)?.nome ?? 'Talhão').join(' + ') : talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão'), fazenda, talhoes };
+  };
+
   const gerarPdf = async () => {
     if (Platform.OS !== 'web') { mostrar('O PDF está disponível na versão web/PWA por enquanto.', 'info'); return; }
-    if (!plano) return;
+    const dados = dadosImpressao();
+    if (!dados) return;
     setGerandoPdf(true);
     try {
-      const fazenda = talhoes.find((x) => x.id === plano.config[0]?.talhaoId)?.fazenda;
-      await baixarPdfCampo({ plano, nomeTalhao: (idT) => (idT === 'junto' && plano.junto ? plano.junto.talhaoIds.map((i) => talhoes.find((x) => x.id === i)?.nome ?? 'Talhão').join(' + ') : talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão'), fazenda, talhoes });
+      await baixarPdfCampo(dados);
       mostrar('PDF gerado', 'ok');
     } catch { mostrar('Não foi possível gerar o PDF.', 'erro'); }
     finally { setGerandoPdf(false); }
+  };
+
+  /** Abre direto a tela de impressão com o plano (no app Android usa a impressão do sistema). */
+  const imprimir = async () => {
+    const dados = dadosImpressao();
+    if (!dados) return;
+    try {
+      const r = await imprimirPlano(dados);
+      if (r === 'apk-antigo') mostrar('Para imprimir pelo app, baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima. Enquanto isso, use "Baixar PDF".', 'info');
+      else if (r === 'indisponivel') mostrar('Impressão indisponível aqui. Use "Baixar PDF".', 'info');
+    } catch { mostrar('Não foi possível abrir a impressão.', 'erro'); }
   };
 
   const iniciarGuia = async () => {
@@ -476,7 +494,8 @@ export default function CampoTela() {
 
           <Cartao style={{ gap: 10 }}>
             <Text style={[tipo.legenda, { color: t.textoSuave }]}>IMPRIMIR E EXPORTAR</Text>
-            <Botao titulo="Gerar PDF do plano" tamanho="g" variante="suave" carregando={gerandoPdf} icone={<Ionicons name="document-text" size={20} color={t.primaria} />} onPress={gerarPdf} />
+            <Botao titulo="Imprimir plano" tamanho="g" icone={<Ionicons name="print-outline" size={20} color={t.sobrePrimaria} />} onPress={imprimir} />
+            <Botao titulo="Baixar PDF" variante="fantasma" carregando={gerandoPdf} icone={<Ionicons name="document-text-outline" size={19} color={t.primaria} />} onPress={gerarPdf} />
             <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
               <Botao titulo="KML" variante="suave" onPress={() => exp('kml')} />
               <Botao titulo="GeoJSON" variante="suave" onPress={() => exp('geojson')} />

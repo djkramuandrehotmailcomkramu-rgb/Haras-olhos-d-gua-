@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+- **Imprimir plano:** o botão "Gerar PDF" virou **"Imprimir plano"** e abre direto a impressão (ou "Salvar como PDF") com o plano completo: mapa com a linha AB, partes, totais por variedade, conferência e bandeirinhas com link do Google Maps. "Baixar PDF" continua disponível.
+- **App Android (APK):** nova ponte de impressão nativa; é preciso **baixar o APK novo** (`/GPSThomas.apk`) e instalar por cima para imprimir pelo app. No Chrome já funciona.
+- Testes: 96 unitários e 23 ponta a ponta.
+
 ## 1.5.0
 - **Campo de sementes com talhões juntos:** marque dois ou mais talhões (ex.: Andropgno e Amendoim) e ligue **"Plantar os talhões juntos"**: eles viram **um só campo**, dividido em partes iguais de X ha (ex.: 16 ha). As faixas atravessam todos os talhões e cada parte mostra quanto vem de cada um.
 - **Rastro reto (linha AB do monitor):** digite os pontos A e B (ponto ou vírgula nos decimais); as divisas ficam **paralelas à linha**. A linha aparece no mapa (com A e B), no PDF e nas exportações (KML, GeoJSON, GPX).

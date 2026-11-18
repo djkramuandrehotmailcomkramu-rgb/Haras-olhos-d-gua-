@@ -106,7 +106,7 @@ export default function Ajuda() {
           <Item n="2">Para cada talhão, escolha <Text style={{ fontFamily: fonte.semi }}>Partes iguais</Text> ou <Text style={{ fontFamily: fonte.semi }}>Digitar hectares</Text> (a última parte fica com o que sobra).</Item>
           <Item n="3">Crie o plano, cole as variedades (uma por linha) e, se quiser, defina a meta por variedade (ex.: 16 ha).</Item>
           <Item n="4">Toque em <Text style={{ fontFamily: fonte.semi }}>Marcar no campo</Text> (ou numa bandeirinha) para ser guiado até cada ponto das divisas. Ao chegar, o celular vibra; cravar a bandeirinha e tocar em "Bandeira colocada".</Item>
-          <Item n="5">Gere o PDF do plano para imprimir ou exporte KML/GPX para a máquina.</Item>
+          <Item n="5">Toque em Imprimir plano para abrir direto a impressão (ou salvar como PDF); "Baixar PDF" guarda o arquivo. Exporte KML/GPX para a máquina.</Item>
           <Item n="6"><Text style={{ fontFamily: fonte.semi }}>Talhões juntos:</Text> marque dois ou mais talhões e ligue "Plantar os talhões juntos". Digite os pontos A e B da linha do monitor (rastro reto) e os hectares de cada parte (ex.: 16): as faixas atravessam todos os talhões, paralelas à linha, e o que sobra vira uma parte extra.</Item>
         </Secao>
         <Secao titulo="Instalar e tirar a barra verde" icone="phone-portrait">
