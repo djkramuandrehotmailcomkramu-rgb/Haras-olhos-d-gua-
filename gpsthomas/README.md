@@ -1,6 +1,6 @@
 # GPSThomas 1.0.0
 
-App GPS para medir área e distância no campo (React Native + Expo). Roda como PWA no Android/iPhone e, nas próximas fases, como app nativo.
+App GPS para medir área e distância no campo (React Native + Expo). Roda como PWA no Android/iPhone (abra `gpsthomas.vercel.app` no Chrome e instale pelo menu ⋮ → Instalar app).
 
 ## Funciona hoje
 - Mapa de satélite (Esri) e mapa de ruas, com GPS e precisão em tempo real

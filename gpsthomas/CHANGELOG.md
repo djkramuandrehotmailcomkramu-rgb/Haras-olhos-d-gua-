@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+- **Volta ao PWA:** o APK (casca Android) foi **abandonado e removido** (instalação com conflitos, impressão e downloads instáveis). O app é o PWA instalado pelo Chrome (⋮ → Instalar app); a impressão e os downloads usam o navegador. Se você ainda tem o APK, desinstale.
+- **GPS mais fiel andando:** o filtro agora é um Kalman de posição + velocidade: não fica "atrasado" ao caminhar (antes o ponto ficava ~3 m para trás e cortava curvas), suaviza o ruído parado e estima velocidade e rumo quando o navegador não informa (a seta do guia usa esse rumo).
+- **Contorno que se cruza:** aviso na tela do campo de sementes quando o desenho de um talhão se cruza (área e divisão ficariam erradas).
+- Ajuda atualizada com o passo a passo de instalação do PWA; testes aleatórios da divisão em vários talhões. 115 testes unitários e 24 ponta a ponta.
+
 ## 1.7.0
 - **Guia das bandeirinhas mais preciso:** o GPS passa por um filtro que pesa cada leitura pela precisão informada (o primeiro sinal ruim, de ±100 m ou mais, deixa de bagunçar a distância); enquanto a precisão estiver pior que 15 m o guia espera ("Aguardando GPS preciso") em vez de mostrar seta e distâncias falsas; o GPS já liga ao abrir o plano.
 - **Seta certa:** a bússola agora compensa a inclinação do celular (andando com ele em pé ou inclinado) e a rotação da tela, e converte o norte magnético em norte verdadeiro (no Brasil a diferença é de 15° a 24°). Andando, a seta usa a direção do GPS; parado, a bússola. A seta gira suave, pelo menor caminho.

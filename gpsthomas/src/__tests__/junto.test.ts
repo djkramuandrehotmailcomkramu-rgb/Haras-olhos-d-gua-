@@ -98,3 +98,39 @@ describe('gerarCampoJunto', () => {
     expect(Math.abs(c[0].diffPercentual)).toBeLessThan(0.1);
   });
 });
+
+describe('dividirAneis: casos aleatórios (não quebra e conserva a área)', () => {
+  let seed = 12345;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  // polígono convexo aleatório (pontos num círculo, em ordem de ângulo) com ~10–80 ha
+  const poli = (cx: number, cy: number): Coord[] => {
+    const n = 5 + Math.floor(rnd() * 6);
+    const raio = 180 + rnd() * 450;
+    // ângulos espaçados com folga: o polígono é sempre simples (sem cruzar arestas), podendo ser côncavo
+    const angs = Array.from({ length: n }, (_, i) => ((i + (rnd() - 0.5) * 0.5) / n) * Math.PI * 2);
+    return angs.map((a) => pt(cx + Math.cos(a) * raio * (0.75 + rnd() * 0.25), cy + Math.sin(a) * raio * (0.75 + rnd() * 0.25)));
+  };
+  it('40 combinações de talhões, ângulos e quantidades de partes', () => {
+    for (let k = 0; k < 40; k++) {
+      const nTal = 1 + Math.floor(rnd() * 3);
+      const aneis = Array.from({ length: nTal }, (_, i) => poli(i * 1500 + rnd() * 400, (rnd() - 0.5) * 900));
+      const total = aneis.reduce((s, a) => s + areaM2(a), 0);
+      const partes = 2 + Math.floor(rnd() * 10);
+      const ang = rnd() * 180;
+      const d = dividirAneis(aneis, { partes, anguloGraus: ang, inverter: rnd() > 0.5 });
+      expect(d.partes).toHaveLength(partes);
+      expect(d.partes.every((p) => Number.isFinite(p.areaM2) && p.areaM2 > 0)).toBe(true);
+      expect(Math.abs(d.partes.reduce((s, p) => s + p.areaM2, 0) - total) / total).toBeLessThan(0.002);
+      for (const p of d.partes) expect(Math.abs(p.areaM2 - total / partes) / (total / partes)).toBeLessThan(0.01);
+    }
+  });
+  it('lista de áreas com a última parte sendo a sobra, em vários talhões', () => {
+    const aneis = [poli(0, 0), poli(1600, 100)];
+    const total = aneis.reduce((s, a) => s + areaM2(a), 0);
+    const cada = Math.min(60000, total / 4);
+    const d = dividirAneis(aneis, { areasM2: [cada, cada, cada, 1], anguloGraus: 77 });
+    expect(d.partes).toHaveLength(4);
+    for (const p of d.partes.slice(0, 3)) expect(Math.abs(p.areaM2 - cada) / cada).toBeLessThan(0.01);
+    expect(Math.abs(d.partes[3].areaM2 - (total - 3 * cada)) / total).toBeLessThan(0.005);
+  });
+});

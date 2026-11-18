@@ -16,7 +16,7 @@ import { Dica } from '../../components/Dica';
 import { novoId, useDados, type BandeiraCampo, type ConfigJunto, type ParteCampo, type PlanoCampo } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
-import { areaM2, comprimentoM } from '../../geo/medidas';
+import { areaM2, comprimentoM, contornoCruzado } from '../../geo/medidas';
 import { anguloLadoMaisLongo } from '../../geo/dividir';
 import { CORES_VARIEDADE, conferirManual, fatorCalibracao, gerarCampo, gerarCampoJunto, textoOrigens, type ConfigTalhao } from '../../geo/campo';
 import { LINHA_AB_PADRAO, lerLatLon, medidasDaLinha, nomeRumo } from '../../geo/rastro';
@@ -258,6 +258,7 @@ export default function NovoCampo() {
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={[tipo.subtitulo, { color: t.texto }]}>{x.nome}</Text>
                     <Text style={[tipo.legenda, { color: t.textoSuave }]}>{x.fazenda} · {formatarArea(total, 'ha')}</Text>
+                    {cfg && contornoCruzado(x.contorno) && <Text style={[tipo.legenda, { color: t.perigo }]}>O contorno deste talhão se cruza: a área e a divisão podem sair erradas. Corrija o desenho.</Text>}
                   </View>
                 </Pressable>
                 {cfg && !modoJunto && (

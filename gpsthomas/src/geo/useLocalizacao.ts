@@ -39,8 +39,9 @@ export function useLocalizacao() {
             coord: est.coord,
             // a precisão mostrada nunca é mais otimista que 2,5 m nem melhor que a metade da informada pelo aparelho
             precisaoM: Math.max(est.precisaoM, bruta != null ? Math.min(bruta * 0.5, 4) : 0, 2.5),
-            velocidade: l.coords.speed != null && isFinite(l.coords.speed) && l.coords.speed >= 0 ? l.coords.speed : null,
-            rumo: l.coords.heading != null && isFinite(l.coords.heading) && l.coords.heading >= 0 ? l.coords.heading : null,
+            // se o navegador não informa velocidade/rumo (comum), usa os estimados pelo filtro
+            velocidade: l.coords.speed != null && isFinite(l.coords.speed) && l.coords.speed >= 0 ? l.coords.speed : est.velMs,
+            rumo: l.coords.heading != null && isFinite(l.coords.heading) && l.coords.heading >= 0 ? l.coords.heading : est.rumoGraus,
             tempoMs: l.timestamp,
           });
         },

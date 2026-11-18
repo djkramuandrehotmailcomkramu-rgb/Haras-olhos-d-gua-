@@ -4,7 +4,6 @@ import { CORES_VARIEDADE, compararComMeta, conferirAreas, textoOrigens, totaisPo
 import { formatarHa } from '../geo/unidades';
 import { formatarNumeroBR, formatarPercentual } from '../geo/numero';
 import type { Coord } from '../geo/medidas';
-import { emAppAndroid, mensagemErro, pluginImpressao, ponteAntiga } from '../nav/appAndroid';
 
 /** Escapa texto do usuário (nomes de talhão, variedades…) para HTML. */
 export const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -132,18 +131,10 @@ ${conferencia}
   return { css: CSS_IMPRESSAO, corpo };
 }
 
-/** Documento HTML completo (usado pela ponte de impressão do app Android). */
-export function documentoHtmlPlano(dados: DadosPdf): string {
-  const { css, corpo } = montarHtmlPlano(dados);
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(dados.plano.nome)}</title><style>${css}#gt-impressao{display:block!important}</style></head><body>${corpo}</body></html>`;
-}
+export type ResultadoImpressao = 'impresso' | 'indisponivel';
 
-export type ResultadoImpressao = 'impresso' | 'apk-antigo' | 'indisponivel';
-
-type Conteudo = { css: string; corpo: string };
-
-/** Coloca o conteúdo na página (invisível na tela) e esconde o resto do app só na hora de imprimir. */
-function injetar({ css, corpo }: Conteudo, titulo: string): () => void {
+/** Coloca o plano na página (invisível na tela) e esconde o resto do app só na hora de imprimir. */
+function injetar({ css, corpo }: { css: string; corpo: string }, titulo: string): () => void {
   document.getElementById('gt-impressao')?.remove();
   document.getElementById('gt-impressao-css')?.remove();
   const st = document.createElement('style');
@@ -159,56 +150,13 @@ function injetar({ css, corpo }: Conteudo, titulo: string): () => void {
   return () => { raiz.remove(); st.remove(); document.title = antes; };
 }
 
-const umQuadro = () => new Promise((r) => requestAnimationFrame(() => r(null)));
-
-/**
- * Abre a impressão do conteúdo. No app Android usa o plugin nativo (imprime a própria página; se falhar, um
- * WebView fora da tela); no navegador mostra só o conteúdo e chama window.print(). Erros são lançados com texto legível.
- */
-async function imprimirConteudo(c: Conteudo, documentoCompleto: string, nome: string): Promise<ResultadoImpressao> {
-  const w = window as any;
-  if (emAppAndroid(w)) {
-    const plugin = pluginImpressao(w);
-    const ponte = ponteAntiga(w);
-    if (!plugin && !ponte) return 'apk-antigo';
-    if (plugin) {
-      // o bloco fica na página até a próxima impressão: o Android desenha o documento só depois que o usuário confirma
-      injetar(c, nome);
-      await umQuadro();
-      try {
-        await plugin.imprimirPagina({ nome });
-        return 'impresso';
-      } catch (e1) {
-        try {
-          await plugin.imprimirHtml({ html: documentoCompleto, nome });
-          return 'impresso';
-        } catch (e2) {
-          throw new Error(`${mensagemErro(e1)} | ${mensagemErro(e2)}`);
-        }
-      }
-    }
-    ponte!.imprimirHtml(documentoCompleto, nome);
-    return 'impresso';
-  }
-  if (typeof w.print !== 'function') return 'indisponivel';
-  const limpar0 = injetar(c, nome);
+/** Abre a impressão do plano: mostra só o plano, chama window.print() e limpa depois. */
+export async function imprimirPlano(dados: DadosPdf): Promise<ResultadoImpressao> {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || typeof window.print !== 'function') return 'indisponivel';
+  const limpar0 = injetar(montarHtmlPlano(dados), dados.plano.nome);
   const limpar = () => { limpar0(); window.removeEventListener('afterprint', limpar); };
   window.addEventListener('afterprint', limpar);
-  await umQuadro(); // dá um quadro para o navegador montar o layout antes de abrir a impressão
-  w.print();
+  await new Promise((r) => requestAnimationFrame(() => r(null))); // dá um quadro para o navegador montar o layout
+  window.print();
   return 'impresso';
-}
-
-/** Abre a impressão do plano. */
-export async function imprimirPlano(dados: DadosPdf): Promise<ResultadoImpressao> {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return 'indisponivel';
-  return imprimirConteudo(montarHtmlPlano(dados), documentoHtmlPlano(dados), dados.plano.nome);
-}
-
-/** Página de teste para conferir a impressão do aparelho (usada em Ajuda → Verificar a instalação). */
-export async function imprimirTeste(): Promise<ResultadoImpressao> {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return 'indisponivel';
-  const corpo = `<div id="gt-impressao"><div class="topo"><div><b>GPSThomas</b><small>Teste de impressão</small></div><div class="dir">${esc(new Date().toLocaleString('pt-BR'))}</div></div><h1>Impressão funcionando</h1><p class="res">Se você está vendo esta página na tela de impressão, o aplicativo consegue imprimir os planos.</p></div>`;
-  const css = CSS_IMPRESSAO;
-  return imprimirConteudo({ css, corpo }, `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Teste</title><style>${css}#gt-impressao{display:block!important}</style></head><body>${corpo}</body></html>`, 'Teste de impressão');
 }

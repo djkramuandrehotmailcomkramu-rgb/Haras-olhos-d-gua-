@@ -14,8 +14,6 @@ import { usePrefs } from '../store/prefs';
 import { useSistema } from '../store/sistema';
 import { useToast } from '../store/toast';
 import { INSTRUCAO_INSTALAR, diagnosticoInstalacao, emStandalone, instalarApp, type ItemDiagnostico } from '../nav/tela';
-import { emAppAndroid, mensagemErro } from '../nav/appAndroid';
-import { imprimirTeste } from '../io/htmlImpressao';
 import { gerarBackup, nomeArquivoBackup } from '../io/backup';
 import { entregarArquivo } from '../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../theme';
@@ -63,12 +61,6 @@ export default function Ajuda() {
   const [verificando, setVerificando] = useState(false);
   const podeInstalar = useSistema((x) => x.podeInstalar);
   const verDiagnostico = async () => { setVerificando(true); setDiag(await diagnosticoInstalacao()); setVerificando(false); };
-  const testarImpressao = async () => {
-    try {
-      const r = await imprimirTeste();
-      mostrar(r === 'impresso' ? 'Pedido de impressão enviado. Se a tela de impressão não abriu, me avise.' : r === 'apk-antigo' ? 'Falta o APK novo (gpsthomas.vercel.app/GPSThomas.apk).' : 'Impressão indisponível aqui.', r === 'impresso' ? 'ok' : 'info');
-    } catch (e) { mostrar(`Falhou: ${mensagemErro(e)}`, 'erro'); }
-  };
 
   const verificar = async () => {
     if (Platform.OS !== 'web') { mostrar('Você está na versão mais recente.', 'ok'); return; }
@@ -125,12 +117,11 @@ export default function Ajuda() {
         </Secao>
         <Secao titulo="Instalar e tirar a barra verde" icone="phone-portrait">
           <P>A barra verde com o endereço no topo aparece quando o GPSThomas é aberto por um <Text style={{ fontFamily: fonte.semi }}>atalho comum</Text> do navegador. Instalado como aplicativo, ele abre em tela inteira, sem a barra.</P>
-          <Item n="1">Remova o atalho antigo do GPSThomas da tela inicial.</Item>
-          <Item n="2">Abra o endereço no Chrome, toque no menu ⋮ e em <Text style={{ fontFamily: fonte.semi }}>Instalar app</Text>. Se aparecer só "Adicionar à tela inicial", o site não está passando nos critérios: toque em Verificar abaixo.</Item>
-          <Item n="3">Abra pelo ícone novo. Para ver o ícone atualizado, é preciso instalar de novo.</Item>
+          <Item n="1">Se houver um atalho ou app antigo do GPSThomas (inclusive o APK), desinstale. Seus dados ficam guardados no aparelho em que você os criou: faça um backup em <Text style={{ fontFamily: fonte.semi }}>Mais</Text> antes.</Item>
+          <Item n="2">Abra <Text style={{ fontFamily: fonte.semi }}>gpsthomas.vercel.app</Text> direto no <Text style={{ fontFamily: fonte.semi }}>Chrome</Text> (não por um link dentro do WhatsApp). Toque no menu ⋮ e em <Text style={{ fontFamily: fonte.semi }}>Instalar app</Text>. Se aparecer só "Adicionar à tela inicial", escolha <Text style={{ fontFamily: fonte.semi }}>Instalar</Text> na janela seguinte; se mesmo assim criar só um atalho, toque em Verificar abaixo.</Item>
+          <Item n="3">Abra pelo ícone novo, sem a barra do navegador. Depois de instalado, as atualizações chegam sozinhas: toque em Atualizar quando o aviso aparecer.</Item>
           <View style={{ gap: 8, marginTop: 4 }}>
             <Botao titulo={verificando ? 'Verificando…' : 'Verificar a instalação'} variante="suave" carregando={verificando} onPress={verDiagnostico} />
-            {emAppAndroid() && <Botao titulo="Testar impressão" variante="suave" onPress={testarImpressao} />}
             {!emStandalone() && <Botao titulo={podeInstalar ? 'Instalar agora' : 'Como instalar'} onPress={async () => { const r = await instalarApp(); if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }} />}
           </View>
           {diag && diag.map((d) => (
@@ -153,7 +144,7 @@ export default function Ajuda() {
           <P>Para medir, espere a precisão ficar verde (até 10 m). Para precisão de centímetros é preciso um receptor GNSS/RTK externo, que o aplicativo web não suporta.</P>
         </Secao>
         <Secao titulo="Tela ligada e segundo plano" icone="phone-portrait">
-          <P>Na versão web (PWA), o navegador pára de enviar o GPS quando a tela apaga. Mantenha a tela ligada durante a caminhada, a navegação e o guia das bandeirinhas. O GPS em segundo plano virá com o aplicativo Android (APK).</P>
+          <P>Na versão web (PWA), o navegador pára de enviar o GPS quando a tela apaga. Mantenha a tela ligada durante a caminhada, a navegação e o guia das bandeirinhas.</P>
         </Secao>
         <Secao titulo="Privacidade e serviços de terceiros" icone="shield-checkmark">
           <P>Seus talhões, medições e planos ficam somente neste aparelho. Nada é enviado para um servidor do GPSThomas.</P>

@@ -25,7 +25,7 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
-  if (url.origin !== location.origin || url.pathname.endsWith('.apk')) return;
+  if (url.origin !== location.origin) return;
   // Aplicativo: rede primeiro (sempre a versão mais nova) e, sem internet, a cópia guardada.
   e.respondWith(
     fetch(req).then((r) => { if (r.ok) { const cp = r.clone(); caches.open(V).then((k) => k.put(req, cp)); } return r; })

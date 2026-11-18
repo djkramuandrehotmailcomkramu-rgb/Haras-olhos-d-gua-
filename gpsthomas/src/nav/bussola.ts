@@ -43,32 +43,27 @@ export function useBussola(ativa: boolean) {
 
   const ouvir = () => {
     parar.current?.();
-    const tratar = (e: any, soAbsoluto: boolean) => {
+    // iOS: `webkitCompassHeading` (já compensado). Android/Chrome: `deviceorientationabsolute` (alpha/beta/gamma em relação ao norte).
+    const tratar = (e: any) => {
       let h: number | null = null;
-      if (typeof e.webkitCompassHeading === 'number') h = (e.webkitCompassHeading + anguloDaTela() + 360) % 360; // iOS
-      else if ((!soAbsoluto || e.absolute) && typeof e.alpha === 'number' && typeof e.beta === 'number' && typeof e.gamma === 'number') {
-        if (!soAbsoluto && !e.absolute) return; // sem referência do norte: não serve
-        h = rumoDaOrientacao(e.alpha, e.beta, e.gamma, anguloDaTela());
-      }
-      if (h == null || !isFinite(h)) return;
+      if (typeof e.webkitCompassHeading === 'number') h = (e.webkitCompassHeading + anguloDaTela() + 360) % 360;
+      else if (e.absolute && typeof e.alpha === 'number' && typeof e.beta === 'number' && typeof e.gamma === 'number') h = rumoDaOrientacao(e.alpha, e.beta, e.gamma, anguloDaTela());
+      if (h == null || !isFinite(h)) return; // sem referência do norte: não serve
       const suave = suavizarCircular(ultimo.current, h, 0.18);
       ultimo.current = suave;
       setDisponivel(true);
       setRumo(suave);
     };
-    const abs = (e: any) => tratar(e, true);
-    const rel = (e: any) => tratar(e, true); // `deviceorientation` só vale quando `absolute` ou no iOS
-    window.addEventListener('deviceorientationabsolute' as any, abs, true);
-    window.addEventListener('deviceorientation' as any, rel, true);
-    parar.current = () => {
-      window.removeEventListener('deviceorientationabsolute' as any, abs, true);
-      window.removeEventListener('deviceorientation' as any, rel, true);
-      parar.current = null;
-    };
+    window.addEventListener('deviceorientationabsolute' as any, tratar, true);
+    window.addEventListener('deviceorientation' as any, tratar, true);
     // se nada chegar em 2,5 s, o aparelho não tem bússola utilizável
     const t = setTimeout(() => setDisponivel((d) => (d === null ? false : d)), 2500);
-    const antes = parar.current;
-    parar.current = () => { clearTimeout(t); antes?.(); };
+    parar.current = () => {
+      clearTimeout(t);
+      window.removeEventListener('deviceorientationabsolute' as any, tratar, true);
+      window.removeEventListener('deviceorientation' as any, tratar, true);
+      parar.current = null;
+    };
   };
 
   useEffect(() => {

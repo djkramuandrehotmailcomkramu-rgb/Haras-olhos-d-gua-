@@ -1,4 +1,4 @@
-import { documentoHtmlPlano, esc, montarHtmlPlano } from '../io/htmlImpressao';
+import { esc, montarHtmlPlano } from '../io/htmlImpressao';
 import { gerarCampoJunto } from '../geo/campo';
 import type { ConfigJunto, PlanoCampo, Talhao } from '../store/dados';
 import type { Coord } from '../geo/medidas';
@@ -49,11 +49,5 @@ describe('impressão do plano (HTML)', () => {
     expect(corpo).not.toContain('teste&quot; <i>');
     expect(corpo).toContain('&lt;script&gt;');
     expect(corpo).toContain('Amendoim &amp; Cia');
-  });
-  it('documento completo para a impressão do Android', () => {
-    const html = documentoHtmlPlano(dados());
-    expect(html.startsWith('<!doctype html>')).toBe(true);
-    expect(html).toContain('<title>Plano &quot;teste&quot; &lt;i&gt;</title>');
-    expect(html).toContain('#gt-impressao{display:block!important}');
   });
 });

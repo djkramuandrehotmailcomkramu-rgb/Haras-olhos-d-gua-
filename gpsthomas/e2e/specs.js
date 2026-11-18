@@ -585,54 +585,6 @@ module.exports = [
     },
   },
   {
-    nome: 'App Android (casca): imprimir pelo plugin, compartilhar PDF/backup e avisos claros',
-    async fn({ browser, url }) {
-      const p = await novaPagina(browser, { url, agenteExtra: 'GPSThomasApp' });
-      await p.addInitScript(() => {
-        window.__calls = []; window.__prints = 0; window.__falharPagina = false;
-        window.print = () => { window.__prints += 1; };
-        window.Capacitor = { isNativePlatform: () => true, Plugins: { Impressao: {
-          imprimirPagina: async (o) => { if (window.__falharPagina) throw new Error('falha da pagina'); window.__calls.push(['pagina', o.nome, !!document.getElementById('gt-impressao')]); },
-          imprimirHtml: async (o) => { window.__calls.push(['html', o.nome, /Plano de campo de sementes/.test(o.html)]); },
-          compartilhar: async (o) => { window.__calls.push(['compartilhar', o.nome, o.mime, atob(o.base64).slice(0, 5)]); },
-        } } };
-      });
-      await criarPlanoPadrao(p, url);
-      check(await p.getByText(/Instale o app para tirar a barra verde/).count() === 0, 'sem aviso de instalar dentro do app');
-      const chamadas = () => p.evaluate(() => window.__calls);
-      await p.getByText('Imprimir plano', { exact: true }).scrollIntoViewIfNeeded();
-      await p.getByText('Imprimir plano', { exact: true }).click(); await p.waitForTimeout(800);
-      let c = await chamadas();
-      check(c.length === 1 && c[0][0] === 'pagina' && c[0][2] === true, `imprime a página com o plano montado (${JSON.stringify(c)})`);
-      check(await p.evaluate(() => window.__prints) === 0, 'não usa window.print() no app');
-      // se imprimir a página falhar, usa o plano B (WebView fora da tela)
-      await p.evaluate(() => { window.__falharPagina = true; window.__calls.length = 0; });
-      await p.getByText('Imprimir plano', { exact: true }).click(); await p.waitForTimeout(800);
-      c = await chamadas();
-      check(c.length === 1 && c[0][0] === 'html' && c[0][2] === true, `plano B com o HTML do plano (${JSON.stringify(c)})`);
-      // PDF e backup pela folha de compartilhar
-      await p.evaluate(() => { window.__calls.length = 0; });
-      await p.getByText('Baixar PDF', { exact: true }).click(); await p.waitForTimeout(2500);
-      c = await chamadas();
-      check(c.length === 1 && c[0][0] === 'compartilhar' && c[0][2] === 'application/pdf' && c[0][3] === '%PDF-' && /\.pdf$/.test(c[0][1]), `PDF vai para o compartilhar (${JSON.stringify(c)})`);
-      await p.evaluate(() => { window.__calls.length = 0; });
-      await p.getByText('Bandeiras (GPX)', { exact: true }).click(); await p.waitForTimeout(600);
-      c = await chamadas();
-      check(c.length === 1 && c[0][0] === 'compartilhar' && /\.gpx$/.test(c[0][1]) && c[0][3] === '<?xml', `GPX vai para o compartilhar (${JSON.stringify(c)})`);
-      // sem o plugin (APK antigo): aviso claro, sem travar
-      await p.evaluate(() => { delete window.Capacitor.Plugins.Impressao; });
-      await p.getByText('Imprimir plano', { exact: true }).click(); await p.waitForTimeout(600);
-      check(await p.getByText(/ainda não tem a impressão nativa/).count() >= 1, 'avisa para baixar o APK novo');
-      // diagnóstico em Ajuda
-      await p.ir('/ajuda');
-      await p.getByText('Instalar e tirar a barra verde').click(); await p.waitForTimeout(500);
-      await p.getByText('Verificar a instalação', { exact: true }).click(); await p.waitForTimeout(800);
-      check(await p.getByText('Aplicativo Android (casca)').count() === 1, 'diagnóstico mostra o app Android');
-      check(await p.getByText('Testar impressão', { exact: true }).count() === 1, 'botão Testar impressão no app');
-      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
-    },
-  },
-  {
     nome: 'Guia preciso: ignora o 1º fixo ruim, seta com bússola calibrada e calibração do GPS',
     async fn({ browser, url }) {
       const p = await novaPagina(browser, { url, gps: { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 400 } });

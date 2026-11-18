@@ -1,7 +1,5 @@
 import { Platform, Share } from 'react-native';
 import { kmlDeKmz } from './formatos';
-import { bytesParaBase64, emAppAndroid, mensagemErro, pluginImpressao } from '../nav/appAndroid';
-import { useToast } from '../store/toast';
 
 /** Baixa (web) ou compartilha (nativo) um arquivo de texto. */
 const limpaNome = (n: string) => {
@@ -11,23 +9,11 @@ const limpaNome = (n: string) => {
 };
 
 /**
- * Entrega um arquivo: no navegador baixa; no app Android abre a folha de compartilhar (salvar em Arquivos, WhatsApp, e-mail...),
- * porque o WebView não trata downloads. Devolve false (com aviso na tela) se não foi possível.
+ * Entrega um arquivo: no navegador/PWA baixa; no app nativo compartilha o texto.
  */
 export async function entregarBytes(nomeOriginal: string, bytes: Uint8Array, mime = 'application/octet-stream'): Promise<boolean> {
   const nome = limpaNome(nomeOriginal);
   if (Platform.OS !== 'web') { await Share.share({ title: nome, message: new TextDecoder().decode(bytes) }); return true; }
-  if (emAppAndroid()) {
-    const plugin = pluginImpressao();
-    if (!plugin) { useToast.getState().mostrar('Para salvar arquivos pelo app, baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima.', 'erro'); return false; }
-    try {
-      await plugin.compartilhar({ nome, mime, base64: bytesParaBase64(bytes) });
-      return true;
-    } catch (e) {
-      useToast.getState().mostrar(`Não foi possível compartilhar o arquivo: ${mensagemErro(e)}`, 'erro');
-      return false;
-    }
-  }
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
   const a = document.createElement('a');
   a.href = url;

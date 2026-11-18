@@ -45,6 +45,27 @@ describe('filtro do GPS', () => {
     }
     expect(Math.sqrt(filtSoma / n)).toBeLessThan(Math.sqrt(brutoSoma / n) * 0.6);
   });
+  it('andando em linha reta não fica atrasado e estima o rumo', () => {
+    const f = new FiltroGps();
+    let somaAlong = 0, n = 0, ult = null;
+    for (let i = 0; i < 80; i++) {
+      const verdadeiro = em(i * 1.4, 0); // 1,4 m/s para o leste
+      const c = em(i * 1.4 + gauss() * 3, gauss() * 3);
+      ult = f.atualizar({ coord: c, precisaoM: 4, tempoMs: i * 1000 })!;
+      if (i >= 25) { somaAlong += (ult.coord[0] - verdadeiro[0]) * KX; n++; }
+    }
+    expect(Math.abs(somaAlong / n)).toBeLessThan(1.2); // sem filtro de velocidade o atraso passava de 3 m
+    expect(Math.abs(ult!.rumoGraus! - 90)).toBeLessThan(20);
+    expect(ult!.velMs).toBeGreaterThan(0.9);
+    expect(ult!.velMs).toBeLessThan(2.2);
+  });
+  it('parado não inventa velocidade nem rumo', () => {
+    const f = new FiltroGps();
+    let e = null;
+    for (let i = 0; i < 60; i++) e = f.atualizar({ coord: em(gauss() * 4, gauss() * 4), precisaoM: 5, tempoMs: i * 1000 })!;
+    expect(e!.velMs).toBeLessThan(0.6);
+    expect(e!.rumoGraus).toBeNull();
+  });
   it('o primeiro fixo ruim (±300 m) deixa de pesar depois de fixos bons', () => {
     const f = new FiltroGps();
     f.atualizar({ coord: em(250, -180), precisaoM: 300, tempoMs: 0 });

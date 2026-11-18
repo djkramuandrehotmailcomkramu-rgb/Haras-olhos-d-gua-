@@ -1,4 +1,4 @@
-import { areaM2, comprimentoM, perimetroM, type Coord } from '../geo/medidas';
+import { areaM2, comprimentoM, contornoCruzado, perimetroM, type Coord } from '../geo/medidas';
 import { converterArea, formatarArea, formatarDistancia } from '../geo/unidades';
 import { aceitarAmostra } from '../geo/filtroGps';
 
@@ -81,5 +81,17 @@ describe('arquivos', () => {
   it('lixo não quebra', () => {
     expect(lerArquivo('abc').poligonos).toHaveLength(0);
     expect(lerArquivo('{"type":').poligonos).toHaveLength(0);
+  });
+});
+
+describe('contorno que se cruza', () => {
+  it('quadrado e polígono côncavo são válidos; "gravata borboleta" é detectada', () => {
+    expect(contornoCruzado(quadrado)).toBe(false);
+    const L: Coord[] = [[0, 0], [2 * grau, 0], [2 * grau, grau], [grau, grau], [grau, 2 * grau], [0, 2 * grau]];
+    expect(contornoCruzado(L)).toBe(false);
+    const gravata: Coord[] = [[0, 0], [grau, grau], [grau, 0], [0, grau]];
+    expect(contornoCruzado(gravata)).toBe(true);
+    expect(contornoCruzado([[0, 0], [grau, 0], [grau, grau]])).toBe(false); // triângulo
+    expect(contornoCruzado([...quadrado, quadrado[0]])).toBe(false); // já fechado
   });
 });

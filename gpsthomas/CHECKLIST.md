@@ -72,7 +72,7 @@ Fontes reduzidas de 4 × 335 KB para 4 × 16 KB. Em celular real o tempo é bem 
 
 ## 9. Limites conhecidos (não são defeitos)
 - GPS de celular erra de 3 a 10 m (em faixa de 400 m, 5 m ≈ 1,2% da área). Precisão de centímetros exige receptor GNSS/RTK externo.
-- No navegador o GPS pára com a tela apagada; GPS em segundo plano só no app Android (APK, ainda não gerado).
+- No navegador o GPS pára com a tela apagada; GPS em segundo plano exigiria um app nativo (tentamos um APK, mas foi abandonado: o PWA é o caminho oficial).
 - Servidores públicos gratuitos (mapas Esri/OSM, busca Nominatim, rotas OSRM) são para uso leve e podem limitar. Para uso intenso, usar servidor próprio/chave (`EXPO_PUBLIC_OSRM_URL`, `EXPO_PUBLIC_NOMINATIM_URL`).
 - Dados só neste aparelho (sem conta/nuvem): use o backup.
 - Sem trânsito em tempo real, pedágio ou radar; rotas só de carro.
