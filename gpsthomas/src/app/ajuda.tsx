@@ -95,6 +95,7 @@ export default function Ajuda() {
           <Item n="2">A área, o perímetro e a precisão do GPS aparecem no topo. Toque no valor para trocar a unidade (hectare, alqueires, m²).</Item>
           <Item n="3">Arraste os pontos para ajustar. Use desfazer e refazer na lateral. Toque em <Text style={{ fontFamily: fonte.semi }}>Salvar</Text> e escolha talhão ou só medição.</Item>
           <Item n="4">Quer ver o mapa limpo? Arraste a alça do painel para baixo.</Item>
+          <Item n="5"><Text style={{ fontFamily: fonte.semi }}>Girar o mapa:</Text> gire com dois dedos para ver o terreno de qualquer lado. A bússola aparece ao lado; toque nela para voltar o norte para cima.</Item>
         </Secao>
         <Secao titulo="Importar o KML da fazenda" icone="download">
           <Item n="1">Em <Text style={{ fontFamily: fonte.semi }}>Mais</Text>, escreva o nome da fazenda e toque em Importar. Aceita KML, KMZ, GeoJSON e GPX.</Item>

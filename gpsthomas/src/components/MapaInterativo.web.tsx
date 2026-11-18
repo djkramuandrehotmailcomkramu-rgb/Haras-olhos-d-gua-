@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import L from 'leaflet';
+import 'leaflet-rotate';
 import 'leaflet/dist/leaflet.css';
 import type { Coord } from '../geo/medidas';
 import type { PropsMapa } from './MapaInterativo.types';
@@ -49,7 +50,7 @@ function centro(pts: Coord[]): Coord {
   return [pts.reduce((s, c) => s + c[0], 0) / n, pts.reduce((s, c) => s + c[1], 0) / n];
 }
 
-const CSS = '.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+const CSS = '.gt-bussola{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(10,17,13,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}.gt-bussola svg{transition:transform .05s linear}.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
 
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
@@ -60,13 +61,35 @@ export function MapaInterativo(props: PropsMapa) {
   const primeiraVez = useRef(true);
   const veic = useRef<{ mk: L.Marker; giro: HTMLDivElement; tipo: Veiculo } | null>(null);
   const ultimaSel = useRef<number | null>(null);
+  const bussola = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!el.current) return;
     const st = document.createElement('style');
     st.textContent = CSS;
     document.head.appendChild(st);
-    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true } as L.MapOptions).setView([-15.78, -47.93], 4);
+    // rotate/touchRotate (leaflet-rotate): gire o mapa com dois dedos (ou Ctrl + arrastar no computador).
+    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true, rotate: true, touchRotate: true, bearing: 0, rotateControl: false, shiftKeyRotate: false } as L.MapOptions).setView([-15.78, -47.93], 4);
+    const mr = m as L.Map & { setBearing: (g: number) => void; getBearing: () => number };
+    (window as any).__gtMapa = m;
+    // Bússola: aparece quando o mapa está girado; tocar volta o norte para cima.
+    const bus = document.createElement('button');
+    bus.type = 'button';
+    bus.setAttribute('aria-label', 'Voltar o norte para cima');
+    bus.className = 'gt-bussola';
+    bus.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L16 12 H8 Z" fill="#E5484D" stroke="#E5484D" stroke-width="1"/><path d="M12 21 L8 12 H16 Z" fill="none" stroke="#fff" stroke-width="1.2"/></svg>';
+    el.current.appendChild(bus);
+    bussola.current = bus;
+    L.DomEvent.disableClickPropagation(bus);
+    bus.addEventListener('click', () => { mr.setBearing(0); });
+    const girou = () => {
+      const g = mr.getBearing();
+      bus.style.opacity = Math.abs(g) > 0.5 && Math.abs(g - 360) > 0.5 ? '1' : '0';
+      bus.style.pointerEvents = bus.style.opacity === '1' ? 'auto' : 'none';
+      (bus.firstElementChild as SVGElement).style.transform = `rotate(${-g}deg)`;
+    };
+    m.on('rotate', girou);
+    girou();
     m.attributionControl.setPrefix(false);
     grupos.current = {
       base: L.layerGroup().addTo(m),
@@ -87,11 +110,15 @@ export function MapaInterativo(props: PropsMapa) {
     ro.observe(el.current);
     return () => {
       ro.disconnect();
+      bus.remove();
       st.remove();
       m.remove();
       mapa.current = null;
     };
   }, []);
+
+  // a bússola fica logo abaixo do painel de cima
+  useEffect(() => { bussola.current?.style.setProperty('top', `${(props.margemTopo ?? 190) + 56}px`); }, [props.margemTopo]);
 
   // camada de fundo
   useEffect(() => {

@@ -2,7 +2,7 @@
   "expo": {
     "name": "GPSThomas",
     "slug": "gpsthomas",
-    "version": "1.3.1",
+    "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-      "versionCode": 131
+      "versionCode": 140
     },
     "web": {
       "bundler": "metro",

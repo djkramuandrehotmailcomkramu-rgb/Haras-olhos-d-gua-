@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+- **Girar o mapa:** gire com dois dedos para ver o terreno de qualquer lado (também funciona dando zoom ao mesmo tempo). Aparece uma **bússola** ao lado do painel; tocar nela volta o norte para cima. Pontos, alça de ajuste e toques continuam exatos com o mapa girado.
+- Atualizações: o aplicativo (inclusive o APK) sempre abre a versão mais nova e avisa "Nova versão disponível — Atualizar"; também há **Ajuda → Verificar atualização**.
+
 ## 1.3.1
 - **APK (casca Android em tela cheia):** projeto `casca/` (Capacitor) que abre o gpsthomas.vercel.app sem barra do navegador e com GPS; o GitHub Actions (`.github/workflows/apk.yml`) compila o APK de graça e o guarda em `public/GPSThomas.apk` (download em `/GPSThomas.apk`). O app reconhece a casca e não mostra mais o aviso "Instale o app".
 

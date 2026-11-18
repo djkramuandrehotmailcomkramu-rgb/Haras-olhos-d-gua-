@@ -457,4 +457,41 @@ module.exports = [
       await ctx.close();
     },
   },
+  {
+    nome: 'Girar o mapa: bússola, pontos no lugar certo e alça funcionando com o mapa girado',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.ir('/');
+      const centroDe = async (loc) => { const b = await loc.boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+      const bussola = p.locator('.gt-bussola');
+      check(await bussola.evaluate((e) => getComputedStyle(e).opacity) === '0', 'bússola escondida com o norte para cima');
+      await p.mouse.click(120, 330); await p.waitForTimeout(250);
+      await p.mouse.click(300, 330); await p.waitForTimeout(250);
+      // gira o mapa (o mesmo que o gesto de dois dedos faz)
+      await p.evaluate(() => window.__gtMapa.setBearing(70)); await p.waitForTimeout(500);
+      check(await bussola.evaluate((e) => getComputedStyle(e).opacity) === '1', 'bússola aparece com o mapa girado');
+      const rumo = await p.evaluate(() => Math.round(window.__gtMapa.getBearing()));
+      check(rumo === 70, `rumo do mapa = ${rumo}`);
+      // novo ponto cai exatamente onde se toca, mesmo girado
+      await p.mouse.click(210, 520); await p.waitForTimeout(400);
+      check(await p.getByText('3 pontos').count() >= 1, '3 pontos marcados com o mapa girado');
+      const v3 = await centroDe(p.locator('.leaflet-marker-icon').filter({ has: p.locator('div[style*="border-radius: 50%"]') }).nth(2));
+      check(Math.hypot(v3.x - 210, v3.y - 520) < 12, `ponto no lugar do toque (${Math.round(v3.x)},${Math.round(v3.y)})`);
+      // seleciona e arrasta pela alça com o mapa girado
+      await p.mouse.click(v3.x, v3.y); await p.waitForTimeout(500);
+      check(await p.locator('.gt-alca').count() === 1, 'alça aparece com o mapa girado');
+      const antes = await p.getByTestId('valor-area').textContent();
+      const a0 = await centroDe(p.locator('.gt-alca'));
+      await p.mouse.move(a0.x, a0.y); await p.mouse.down();
+      await p.mouse.move(a0.x + 25, a0.y - 25, { steps: 6 }); await p.mouse.move(a0.x + 50, a0.y - 50, { steps: 6 }); await p.mouse.up();
+      await p.waitForTimeout(600);
+      const depois = await p.getByTestId('valor-area').textContent();
+      check(antes !== depois, `alça move o ponto com o mapa girado (${antes} -> ${depois})`);
+      // bússola devolve o norte para cima
+      await bussola.click(); await p.waitForTimeout(500);
+      const r2 = await p.evaluate(() => Math.round(window.__gtMapa.getBearing()));
+      check(r2 === 0 || r2 === 360, `norte de volta para cima (${r2})`);
+      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
+    },
+  },
 ];
