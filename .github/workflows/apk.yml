@@ -74,15 +74,120 @@ jobs:
             }
           }
           JAVA
+          cat > $JAVA_DIR/ImpressaoPlugin.java <<'JAVA'
+          package br.com.gpsthomas.app;
+
+          import android.content.Context;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.print.PrintAttributes;
+          import android.print.PrintDocumentAdapter;
+          import android.print.PrintManager;
+          import android.util.Base64;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import androidx.core.content.FileProvider;
+          import com.getcapacitor.Plugin;
+          import com.getcapacitor.PluginCall;
+          import com.getcapacitor.PluginMethod;
+          import com.getcapacitor.annotation.CapacitorPlugin;
+          import java.io.File;
+          import java.io.FileOutputStream;
+
+          @CapacitorPlugin(name = "Impressao")
+          public class ImpressaoPlugin extends Plugin {
+            private static WebView segurando;
+
+            private void abrirImpressao(WebView wv, String nome) {
+              PrintManager pm = (PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+              PrintDocumentAdapter adaptador = wv.createPrintDocumentAdapter(nome);
+              pm.print(nome, adaptador, new PrintAttributes.Builder().build());
+            }
+
+            /** Imprime a própria página do app (o site já deixou só o plano visível com @media print). */
+            @PluginMethod
+            public void imprimirPagina(final PluginCall call) {
+              final String nome = call.getString("nome", "GPSThomas");
+              getActivity().runOnUiThread(new Runnable() {
+                @Override public void run() {
+                  try {
+                    abrirImpressao(getBridge().getWebView(), nome);
+                    call.resolve();
+                  } catch (Exception e) {
+                    call.reject(String.valueOf(e));
+                  }
+                }
+              });
+            }
+
+            /** Plano B: carrega o HTML num WebView fora da tela e imprime. */
+            @PluginMethod
+            public void imprimirHtml(final PluginCall call) {
+              final String nome = call.getString("nome", "GPSThomas");
+              final String html = call.getString("html", "");
+              getActivity().runOnUiThread(new Runnable() {
+                @Override public void run() {
+                  try {
+                    final WebView wv = new WebView(getActivity());
+                    segurando = wv;
+                    wv.setWebViewClient(new WebViewClient() {
+                      @Override public void onPageFinished(WebView view, String url) {
+                        try {
+                          abrirImpressao(view, nome);
+                          call.resolve();
+                        } catch (Exception e) {
+                          call.reject(String.valueOf(e));
+                        }
+                      }
+                    });
+                    wv.loadDataWithBaseURL("https://gpsthomas.vercel.app/", html, "text/html", "UTF-8", null);
+                  } catch (Exception e) {
+                    call.reject(String.valueOf(e));
+                  }
+                }
+              });
+            }
+
+            /** Entrega um arquivo (PDF, backup, KML...) pela folha de compartilhar do Android. */
+            @PluginMethod
+            public void compartilhar(final PluginCall call) {
+              try {
+                String nome = call.getString("nome", "arquivo");
+                String mime = call.getString("mime", "application/octet-stream");
+                String b64 = call.getString("base64", "");
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                File dir = new File(getContext().getCacheDir(), "compartilhar");
+                dir.mkdirs();
+                File arq = new File(dir, nome.replaceAll("[^A-Za-z0-9._-]", "_"));
+                FileOutputStream os = new FileOutputStream(arq);
+                os.write(bytes);
+                os.close();
+                Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", arq);
+                Intent envio = new Intent(Intent.ACTION_SEND);
+                envio.setType(mime);
+                envio.putExtra(Intent.EXTRA_STREAM, uri);
+                envio.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                Intent escolha = Intent.createChooser(envio, nome);
+                escolha.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                getActivity().startActivity(escolha);
+                call.resolve();
+              } catch (Exception e) {
+                call.reject(String.valueOf(e));
+              }
+            }
+          }
+          JAVA
           cat > $JAVA_DIR/MainActivity.java <<'JAVA'
           package br.com.gpsthomas.app;
 
+          import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
             @Override
-            public void onStart() {
-              super.onStart();
+            public void onCreate(Bundle savedInstanceState) {
+              registerPlugin(ImpressaoPlugin.class);
+              super.onCreate(savedInstanceState);
               getBridge().getWebView().addJavascriptInterface(new ImpressaoJs(this), "AndroidPrint");
             }
           }

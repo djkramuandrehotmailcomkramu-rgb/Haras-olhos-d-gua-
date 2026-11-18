@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { situacaoApp } from './appAndroid';
 
 const web = () => Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -61,6 +62,12 @@ export async function diagnosticoInstalacao(): Promise<ItemDiagnostico[]> {
   if (!web()) return [];
   const itens: ItemDiagnostico[] = [];
   const add = (id: string, ok: boolean, titulo: string, detalhe: string) => itens.push({ id, ok, titulo, detalhe });
+  const app = situacaoApp();
+  if (app.app) {
+    add('app', true, 'Aplicativo Android (casca)', 'Você está usando o app instalado pelo APK.');
+    add('plugin', app.plugin, 'Impressão e arquivos do Android', app.plugin ? 'Plugin nativo encontrado: imprimir e compartilhar arquivos devem funcionar.' : app.ponteAntiga ? 'Só a ponte antiga foi encontrada. Baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima.' : 'Plugin nativo não encontrado. Baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima.');
+    return itens;
+  }
   add('https', location.protocol === 'https:' || location.hostname === 'localhost', 'Endereço seguro (https)', location.origin);
 
   let manifest: any = null;

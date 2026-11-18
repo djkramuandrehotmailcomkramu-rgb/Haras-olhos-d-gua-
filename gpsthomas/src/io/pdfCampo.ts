@@ -1,4 +1,5 @@
 import type { jsPDF } from 'jspdf';
+import { entregarBytes } from './arquivos';
 import type { PlanoCampo } from '../store/dados';
 import { CORES_VARIEDADE, compararComMeta, conferirAreas } from '../geo/campo';
 import { formatarHa } from '../geo/unidades';
@@ -257,7 +258,7 @@ export const nomeArquivoPdf = (nome: string) =>
   `${nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'campo-de-sementes'}.pdf`;
 
 /** Gera o PDF e baixa (web) ou devolve os bytes (para compartilhar no app nativo). */
-export async function baixarPdfCampo(dados: DadosPdf): Promise<void> {
+export async function baixarPdfCampo(dados: DadosPdf): Promise<boolean> {
   const doc = await montarPdfCampo(dados);
-  doc.save(nomeArquivoPdf(dados.plano.nome));
+  return entregarBytes(nomeArquivoPdf(dados.plano.nome), new Uint8Array(doc.output('arraybuffer')), 'application/pdf');
 }

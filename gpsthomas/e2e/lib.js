@@ -54,9 +54,10 @@ async function abrirNavegador() {
 }
 
 /** Página de celular com GPS simulado e mapas bloqueados (sem internet externa). */
-async function novaPagina(browser, { url, largura, altura, esquema = 'light', onboarding = true, gps = { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 4 } } = {}) {
+async function novaPagina(browser, { url, largura, altura, esquema = 'light', onboarding = true, agenteExtra = '', gps = { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 4 } } = {}) {
   const ctx = await browser.newContext({
     ...devices['Pixel 7'],
+    ...(agenteExtra ? { userAgent: `${devices['Pixel 7'].userAgent} ${agenteExtra}` } : {}),
     ...(largura ? { viewport: { width: largura, height: altura ?? 800 } } : {}),
     colorScheme: esquema, geolocation: gps, permissions: ['geolocation'], acceptDownloads: true,
   });

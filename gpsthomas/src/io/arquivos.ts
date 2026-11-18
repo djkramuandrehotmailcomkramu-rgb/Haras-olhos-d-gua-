@@ -1,5 +1,7 @@
 import { Platform, Share } from 'react-native';
 import { kmlDeKmz } from './formatos';
+import { bytesParaBase64, emAppAndroid, mensagemErro, pluginImpressao } from '../nav/appAndroid';
+import { useToast } from '../store/toast';
 
 /** Baixa (web) ou compartilha (nativo) um arquivo de texto. */
 const limpaNome = (n: string) => {
@@ -8,20 +10,38 @@ const limpaNome = (n: string) => {
   return base + (i > 0 ? n.slice(i) : '');
 };
 
-export async function entregarArquivo(nomeOriginal: string, conteudo: string, mime = 'application/octet-stream'): Promise<void> {
+/**
+ * Entrega um arquivo: no navegador baixa; no app Android abre a folha de compartilhar (salvar em Arquivos, WhatsApp, e-mail...),
+ * porque o WebView não trata downloads. Devolve false (com aviso na tela) se não foi possível.
+ */
+export async function entregarBytes(nomeOriginal: string, bytes: Uint8Array, mime = 'application/octet-stream'): Promise<boolean> {
   const nome = limpaNome(nomeOriginal);
-  if (Platform.OS === 'web') {
-    const url = URL.createObjectURL(new Blob([conteudo], { type: mime }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nome;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    return;
+  if (Platform.OS !== 'web') { await Share.share({ title: nome, message: new TextDecoder().decode(bytes) }); return true; }
+  if (emAppAndroid()) {
+    const plugin = pluginImpressao();
+    if (!plugin) { useToast.getState().mostrar('Para salvar arquivos pelo app, baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima.', 'erro'); return false; }
+    try {
+      await plugin.compartilhar({ nome, mime, base64: bytesParaBase64(bytes) });
+      return true;
+    } catch (e) {
+      useToast.getState().mostrar(`Não foi possível compartilhar o arquivo: ${mensagemErro(e)}`, 'erro');
+      return false;
+    }
   }
-  await Share.share({ title: nome, message: conteudo });
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
+}
+
+export async function entregarArquivo(nomeOriginal: string, conteudo: string, mime = 'application/octet-stream'): Promise<void> {
+  if (Platform.OS !== 'web') { await Share.share({ title: limpaNome(nomeOriginal), message: conteudo }); return; }
+  await entregarBytes(nomeOriginal, new TextEncoder().encode(conteudo), mime);
 }
 
 /** Abre o seletor de arquivo (web) e devolve o texto. */

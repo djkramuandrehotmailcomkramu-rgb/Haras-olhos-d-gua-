@@ -14,6 +14,8 @@ import { usePrefs } from '../store/prefs';
 import { useSistema } from '../store/sistema';
 import { useToast } from '../store/toast';
 import { INSTRUCAO_INSTALAR, diagnosticoInstalacao, emStandalone, instalarApp, type ItemDiagnostico } from '../nav/tela';
+import { emAppAndroid, mensagemErro } from '../nav/appAndroid';
+import { imprimirTeste } from '../io/htmlImpressao';
 import { gerarBackup, nomeArquivoBackup } from '../io/backup';
 import { entregarArquivo } from '../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../theme';
@@ -61,6 +63,12 @@ export default function Ajuda() {
   const [verificando, setVerificando] = useState(false);
   const podeInstalar = useSistema((x) => x.podeInstalar);
   const verDiagnostico = async () => { setVerificando(true); setDiag(await diagnosticoInstalacao()); setVerificando(false); };
+  const testarImpressao = async () => {
+    try {
+      const r = await imprimirTeste();
+      mostrar(r === 'impresso' ? 'Pedido de impressão enviado. Se a tela de impressão não abriu, me avise.' : r === 'apk-antigo' ? 'Falta o APK novo (gpsthomas.vercel.app/GPSThomas.apk).' : 'Impressão indisponível aqui.', r === 'impresso' ? 'ok' : 'info');
+    } catch (e) { mostrar(`Falhou: ${mensagemErro(e)}`, 'erro'); }
+  };
 
   const verificar = async () => {
     if (Platform.OS !== 'web') { mostrar('Você está na versão mais recente.', 'ok'); return; }
@@ -116,6 +124,7 @@ export default function Ajuda() {
           <Item n="3">Abra pelo ícone novo. Para ver o ícone atualizado, é preciso instalar de novo.</Item>
           <View style={{ gap: 8, marginTop: 4 }}>
             <Botao titulo={verificando ? 'Verificando…' : 'Verificar a instalação'} variante="suave" carregando={verificando} onPress={verDiagnostico} />
+            {emAppAndroid() && <Botao titulo="Testar impressão" variante="suave" onPress={testarImpressao} />}
             {!emStandalone() && <Botao titulo={podeInstalar ? 'Instalar agora' : 'Como instalar'} onPress={async () => { const r = await instalarApp(); if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }} />}
           </View>
           {diag && diag.map((d) => (

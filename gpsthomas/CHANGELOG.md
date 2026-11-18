@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1
+- **Correção no app Android (APK):** "Imprimir plano" e "Baixar PDF" não funcionavam dentro do app. Agora a casca tem um plugin nativo (imprimir a página do plano e abrir a folha de compartilhar do Android para PDF, backup, KML, GeoJSON, GPX e CSV). A marca do app no navegador também foi corrigida (some o aviso "Instale o app" dentro do APK).
+- **Ajuda → Verificar a instalação** mostra se o app Android e o plugin foram encontrados e ganhou **Testar impressão**.
+- Erros de impressão/compartilhamento aparecem na tela com o motivo. É preciso **baixar o APK novo** (`/GPSThomas.apk`) e instalar por cima.
+
 ## 1.6.0
 - **Imprimir plano:** o botão "Gerar PDF" virou **"Imprimir plano"** e abre direto a impressão (ou "Salvar como PDF") com o plano completo: mapa com a linha AB, partes, totais por variedade, conferência e bandeirinhas com link do Google Maps. "Baixar PDF" continua disponível.
 - **App Android (APK):** nova ponte de impressão nativa; é preciso **baixar o APK novo** (`/GPSThomas.apk`) e instalar por cima para imprimir pelo app. No Chrome já funciona.

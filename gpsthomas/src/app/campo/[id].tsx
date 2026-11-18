@@ -30,6 +30,7 @@ import { rumoEntre } from '../../nav/movimento';
 import { paraCSV2, paraGeoJSONCampo, paraKMLCampo, pontosExport } from '../../io/campo';
 import { baixarPdfCampo, type DadosPdf } from '../../io/pdfCampo';
 import { imprimirPlano } from '../../io/htmlImpressao';
+import { mensagemErro } from '../../nav/appAndroid';
 import { entregarArquivo } from '../../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../../theme';
 import type { Coord } from '../../geo/medidas';
@@ -162,8 +163,7 @@ export default function CampoTela() {
     if (!dados) return;
     setGerandoPdf(true);
     try {
-      await baixarPdfCampo(dados);
-      mostrar('PDF gerado', 'ok');
+      if (await baixarPdfCampo(dados)) mostrar('PDF gerado', 'ok');
     } catch { mostrar('Não foi possível gerar o PDF.', 'erro'); }
     finally { setGerandoPdf(false); }
   };
@@ -174,9 +174,9 @@ export default function CampoTela() {
     if (!dados) return;
     try {
       const r = await imprimirPlano(dados);
-      if (r === 'apk-antigo') mostrar('Para imprimir pelo app, baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima. Enquanto isso, use "Baixar PDF".', 'info');
+      if (r === 'apk-antigo') mostrar('Este app ainda não tem a impressão nativa: baixe o APK novo (gpsthomas.vercel.app/GPSThomas.apk) e instale por cima.', 'info');
       else if (r === 'indisponivel') mostrar('Impressão indisponível aqui. Use "Baixar PDF".', 'info');
-    } catch { mostrar('Não foi possível abrir a impressão.', 'erro'); }
+    } catch (e) { mostrar(`Não foi possível abrir a impressão: ${mensagemErro(e)}`, 'erro'); }
   };
 
   const iniciarGuia = async () => {
