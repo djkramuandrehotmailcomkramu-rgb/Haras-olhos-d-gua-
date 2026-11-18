@@ -117,6 +117,12 @@ export default function Ajuda() {
           <Item n="5">Toque em Imprimir plano para abrir direto a impressão (ou salvar como PDF); "Baixar PDF" guarda o arquivo. Exporte KML/GPX para a máquina.</Item>
           <Item n="6"><Text style={{ fontFamily: fonte.semi }}>Talhões juntos:</Text> marque dois ou mais talhões e ligue "Plantar os talhões juntos". Digite os pontos A e B da linha do monitor (rastro reto) e os hectares de cada parte (ex.: 16): as faixas atravessam todos os talhões, paralelas à linha, e o que sobra vira uma parte extra.</Item>
         </Secao>
+        <Secao titulo="Guia das bandeirinhas: precisão e calibração" icone="compass">
+          <P>O app suaviza o GPS e ignora os primeiros sinais ruins. Enquanto a precisão estiver pior que 15 m, ele mostra "Aguardando GPS preciso" e não aponta a seta. Abra o plano e espere o GPS ficar em ±8 m ou menos antes de caminhar.</P>
+          <Item n="1"><Text style={{ fontFamily: fonte.semi }}>Calibrar bússola:</Text> a bússola do celular aponta o norte magnético (no Brasil, uns 15° a 24° a oeste do norte verdadeiro). O app aprende esse desvio sozinho quando você anda em linha reta; toque em Calibrar bússola e ande uns 10 passos largos sem parar. Se ainda errar, faça um "8" no ar com o celular.</Item>
+          <Item n="2"><Text style={{ fontFamily: fonte.semi }}>Calibrar GPS:</Text> fique sobre um ponto que você conhece bem (por exemplo o ponto A da linha do monitor) e toque nele: o app corrige o GPS por essa diferença durante 3 horas. Só use pontos de uma fonte melhor que o celular.</Item>
+          <Item n="3">Andando, a seta usa a direção do GPS; parado, a bússola. O "Chegou" só aparece com 3 leituras boas seguidas.</Item>
+        </Secao>
         <Secao titulo="Instalar e tirar a barra verde" icone="phone-portrait">
           <P>A barra verde com o endereço no topo aparece quando o GPSThomas é aberto por um <Text style={{ fontFamily: fonte.semi }}>atalho comum</Text> do navegador. Instalado como aplicativo, ele abre em tela inteira, sem a barra.</P>
           <Item n="1">Remova o atalho antigo do GPSThomas da tela inicial.</Item>

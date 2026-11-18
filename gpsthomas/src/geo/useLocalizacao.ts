@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import type { Coord } from './medidas';
+import { FiltroGps } from '../nav/filtroGps';
 
 export type Posicao = { coord: Coord; precisaoM: number | null; velocidade: number | null; rumo: number | null; tempoMs: number };
 
@@ -11,6 +12,7 @@ export function useLocalizacao() {
   const [ligado, setLigado] = useState(false);
   const sub = useRef<Location.LocationSubscription | null>(null);
   const tentando = useRef(false);
+  const filtro = useRef(new FiltroGps());
 
   const ligar = useCallback(async () => {
     if (sub.current || tentando.current) return;
@@ -25,9 +27,18 @@ export function useLocalizacao() {
       sub.current = await Location.watchPositionAsync(
         { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 1, timeInterval: 1000 },
         (l) => {
-          setPos({
+          const bruta = l.coords.accuracy ?? null;
+          const est = filtro.current.atualizar({
             coord: [l.coords.longitude, l.coords.latitude],
-            precisaoM: l.coords.accuracy ?? null,
+            precisaoM: bruta,
+            tempoMs: l.timestamp,
+            velocidadeMs: l.coords.speed != null && isFinite(l.coords.speed) ? l.coords.speed : null,
+          });
+          if (!est) return;
+          setPos({
+            coord: est.coord,
+            // a precisão mostrada nunca é mais otimista que 2,5 m nem melhor que a metade da informada pelo aparelho
+            precisaoM: Math.max(est.precisaoM, bruta != null ? Math.min(bruta * 0.5, 4) : 0, 2.5),
             velocidade: l.coords.speed != null && isFinite(l.coords.speed) && l.coords.speed >= 0 ? l.coords.speed : null,
             rumo: l.coords.heading != null && isFinite(l.coords.heading) && l.coords.heading >= 0 ? l.coords.heading : null,
             tempoMs: l.timestamp,
@@ -45,6 +56,7 @@ export function useLocalizacao() {
   const desligar = useCallback(() => {
     sub.current?.remove();
     sub.current = null;
+    filtro.current.reiniciar();
     setLigado(false);
   }, []);
 

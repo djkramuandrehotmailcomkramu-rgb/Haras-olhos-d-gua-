@@ -75,3 +75,33 @@ export function ordenarVisita<T extends { coord: Coord }>(pontos: T[], inicio: C
 export function degrauDeAviso(distM: number): 0 | 50 | 20 | 10 {
   return distM <= 10 ? 10 : distM <= 20 ? 20 : distM <= 50 ? 50 : 0;
 }
+
+/* ------------------------------------------------------------------ fonte do rumo e "Chegou" estável */
+
+export type FonteRumo = 'gps' | 'bussola' | 'ultimo' | null;
+
+/**
+ * Para onde você está virado: o rumo do GPS vale andando (≥ 1 m/s); parado, a bússola (já com o desvio aplicado).
+ */
+export function escolherRumo(o: { gpsRumo: number | null; gpsVelMs: number | null; bussolaVerdadeira: number | null; ultimo: number | null }): { rumo: number | null; fonte: FonteRumo } {
+  if (o.gpsRumo != null && (o.gpsVelMs ?? 0) >= 1.0) return { rumo: o.gpsRumo, fonte: 'gps' };
+  if (o.bussolaVerdadeira != null) return { rumo: o.bussolaVerdadeira, fonte: 'bussola' };
+  if (o.ultimo != null) return { rumo: o.ultimo, fonte: 'ultimo' };
+  return { rumo: null, fonte: null };
+}
+
+export const PRECISAO_MAX_GUIA_M = 15;
+export const PRECISAO_CHEGADA_M = 8;
+
+export type EstadoChegada = { dentro: boolean; seguidos: number };
+
+/**
+ * "Chegou" com histerese: entra quando está a ≤ 3 m com precisão boa por 3 leituras seguidas; só sai acima de 5 m.
+ * Evita piscar com o ruído do GPS.
+ */
+export function atualizarChegada(e: EstadoChegada, distM: number, precisaoM: number | null): EstadoChegada {
+  if (e.dentro) return distM > 5 ? { dentro: false, seguidos: 0 } : e;
+  const bom = distM <= 3 && (precisaoM == null || precisaoM <= PRECISAO_CHEGADA_M);
+  const seguidos = bom ? e.seguidos + 1 : 0;
+  return { dentro: seguidos >= 3, seguidos };
+}

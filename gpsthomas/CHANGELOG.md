@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0
+- **Guia das bandeirinhas mais preciso:** o GPS passa por um filtro que pesa cada leitura pela precisão informada (o primeiro sinal ruim, de ±100 m ou mais, deixa de bagunçar a distância); enquanto a precisão estiver pior que 15 m o guia espera ("Aguardando GPS preciso") em vez de mostrar seta e distâncias falsas; o GPS já liga ao abrir o plano.
+- **Seta certa:** a bússola agora compensa a inclinação do celular (andando com ele em pé ou inclinado) e a rotação da tela, e converte o norte magnético em norte verdadeiro (no Brasil a diferença é de 15° a 24°). Andando, a seta usa a direção do GPS; parado, a bússola. A seta gira suave, pelo menor caminho.
+- **Calibrar bússola:** o app aprende o desvio andando em linha reta (botão para fazer na hora).
+- **Calibrar GPS:** ajuste por ponto conhecido (ponto A/B da linha do monitor, última bandeira ou coordenadas digitadas), válido por 3 horas.
+- **"Chegou" estável:** só depois de 3 leituras boas seguidas; sai acima de 5 m.
+- Testes: 114 unitários e 25 ponta a ponta.
+
 ## 1.6.2
 - **APK:** novo identificador do app (`br.com.gpsthomas.campo`) para instalar sem "conflito com pacote existente", e **chave de assinatura fixa**: de agora em diante todo APK novo instala por cima do anterior sem desinstalar (o conflito acontecia porque cada APK era assinado com uma chave diferente). O app antigo (se ainda existir em algum espaço do celular) pode ser removido depois.
 

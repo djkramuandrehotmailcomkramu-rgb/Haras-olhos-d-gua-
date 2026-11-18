@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { UnidadeArea } from '../geo/unidades';
 import type { Coord } from '../geo/medidas';
 import type { Veiculo } from '../components/veiculos';
+import type { DeslocamentoGps } from '../nav/calibracao';
 
 export type Recente = { nome: string; sub: string; coord: Coord };
 
@@ -31,6 +32,13 @@ type Prefs = {
   concluirOnboarding: () => void;
   definirUnidadeArea: (u: UnidadeArea) => void;
   definirCamada: (c: Camada) => void;
+  /** desvio da bússola (graus) aprendido andando; null = usa a declinação aproximada */
+  desvioBussolaGraus: number | null;
+  desvioBussolaFirme: boolean;
+  definirDesvioBussola: (g: number | null, firme: boolean) => void;
+  /** ajuste do GPS por ponto conhecido (guia das bandeirinhas) */
+  calibracaoGps: DeslocamentoGps | null;
+  definirCalibracaoGps: (d: DeslocamentoGps | null) => void;
 };
 
 export const usePrefs = create<Prefs>()(
@@ -58,6 +66,11 @@ export const usePrefs = create<Prefs>()(
       concluirOnboarding: () => set({ onboardingVisto: true }),
       definirUnidadeArea: (unidadeArea) => set({ unidadeArea }),
       definirCamada: (camada) => set({ camada }),
+      desvioBussolaGraus: null,
+      desvioBussolaFirme: false,
+      definirDesvioBussola: (desvioBussolaGraus, desvioBussolaFirme) => set({ desvioBussolaGraus, desvioBussolaFirme }),
+      calibracaoGps: null,
+      definirCalibracaoGps: (calibracaoGps) => set({ calibracaoGps }),
     }),
     {
       name: 'gpsthomas-prefs',

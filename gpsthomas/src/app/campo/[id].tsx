@@ -3,7 +3,7 @@ import { Alert, Platform, Pressable, Text, View, useWindowDimensions } from 'rea
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInDown, FadeInUp, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapaInterativo } from '../../components/MapaInterativo';
 import { Cartao } from '../../components/Cartao';
@@ -23,7 +23,10 @@ import { CORES_VARIEDADE, compararComMeta, conferirAreas, distribuirVariedades, 
 import { formatarHa } from '../../geo/unidades';
 import { formatarPercentual, lerNumeroBR, paraCampoBR } from '../../geo/numero';
 import { Dica } from '../../components/Dica';
-import { desvioLateral, degrauDeAviso, guiaAtePonto, ordenarVisita, textoDesvio, textoGiro } from '../../nav/guiaPonto';
+import { PRECISAO_MAX_GUIA_M, atualizarChegada, desvioLateral, degrauDeAviso, escolherRumo, guiaAtePonto, ordenarVisita, textoDesvio, textoGiro, type EstadoChegada } from '../../nav/guiaPonto';
+import { AprendizDesvio, aplicarDeslocamento, calcularDeslocamento, declinacaoAproximada, deslocamentoAtivo, rumoVerdadeiro, textoDeslocamento } from '../../nav/calibracao';
+import { qualidadeGps } from '../../nav/filtroGps';
+import { lerLatLon } from '../../geo/rastro';
 import { useBussola } from '../../nav/bussola';
 import { falar, manterTelaLigada, pararVoz } from '../../nav/voz';
 import { rumoEntre } from '../../nav/movimento';
@@ -44,7 +47,7 @@ export default function CampoTela() {
   const plano = useDados((s) => s.campos.find((c) => c.id === id));
   const talhoes = useDados((s) => s.talhoes);
   const { atualizarCampo, removerCampo } = useDados();
-  const { camada, vozLigada, painelRecolhido, definirPainel } = usePrefs();
+  const { camada, vozLigada, painelRecolhido, definirPainel, desvioBussolaGraus, definirDesvioBussola, calibracaoGps, definirCalibracaoGps } = usePrefs();
   const irPara = useUi((x) => x.irPara);
   const { height: alturaTela } = useWindowDimensions();
   const mostrar = useToast((s) => s.mostrar);
@@ -58,6 +61,11 @@ export default function CampoTela() {
   const [alvoManual, setAlvoManual] = useState<string | null>(null);
   const [mapaCheio, setMapaCheio] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [calibrandoBussola, setCalibrandoBussola] = useState(false);
+  const [calibGpsAberto, setCalibGpsAberto] = useState(false);
+  const [coordTxt, setCoordTxt] = useState({ lat: '', lon: '' });
+  const [chegada, setChegada] = useState<EstadoChegada>({ dentro: false, seguidos: 0 });
+  const aprendiz = useRef(new AprendizDesvio());
   const [verTodas, setVerTodas] = useState(false);
   const [metaTxt, setMetaTxt] = useState('');
   const scrollY = useSharedValue(0);
@@ -103,19 +111,50 @@ export default function CampoTela() {
     return ordenarVisita(lista, ult)[0] ?? null;
   }, [plano, pendentes, pulados, alvoManual, gps.pos ? 1 : 0]);
 
-  // Guia: distância, rumo, desvio lateral
+  // Posição usada pelo guia: já filtrada e com o ajuste de calibração do GPS (se houver)
+  const posGuia = useMemo(() => (gps.pos ? { ...gps.pos, coord: aplicarDeslocamento(gps.pos.coord, calibracaoGps) } : null), [gps.pos, calibracaoGps]);
+  const declinacao = useMemo(() => declinacaoAproximada(gps.pos?.coord ?? plano?.bandeiras[0]?.coord ?? [-47.9, -15.8]), [gps.pos ? 1 : 0, plano?.id]);
+  const desvioBussola = desvioBussolaGraus ?? declinacao;
+
+  // Aprende o desvio da bússola andando: o GPS dá o rumo verdadeiro e a bússola o magnético
   useEffect(() => {
     const p = gps.pos;
-    if (!p) return;
-    if (p.rumo != null) ultimoRumo.current = p.rumo;
-  }, [gps.pos]);
+    if (!p || !guiando) return;
+    const est = aprendiz.current.adicionar(p.rumo, p.velocidade, bussola.rumo);
+    if (est == null) return;
+    const am = aprendiz.current.amostras;
+    if (am >= 6 && aprendiz.current.confianca() >= 0.6 && am % 3 === 0) definirDesvioBussola(est, true);
+    if (calibrandoBussola && am >= 10) {
+      definirDesvioBussola(est, true);
+      setCalibrandoBussola(false);
+      mostrar(`Bússola ajustada (${Math.round(est > 180 ? est - 360 : est)}°)`, 'ok');
+    }
+  }, [gps.pos, guiando]);
 
-  const rumoVirado = bussola.rumo ?? gps.pos?.rumo ?? ultimoRumo.current;
-  const guia = alvo && gps.pos ? guiaAtePonto(gps.pos.coord, alvo.coord, rumoVirado) : null;
-  const colocadoAnterior = alvo && plano ? [...plano.bandeiras].reverse().find((b) => b.colocada && b.linha === alvo.linha) : null;
-  const desvio = alvo && gps.pos && colocadoAnterior ? desvioLateral(gps.pos.coord, colocadoAnterior.coord, alvo.coord) : null;
+  const bussolaVerdadeira = bussola.rumo != null ? rumoVerdadeiro(bussola.rumo, desvioBussola) : null;
+  const { rumo: rumoVirado, fonte: fonteRumo } = escolherRumo({ gpsRumo: gps.pos?.rumo ?? null, gpsVelMs: gps.pos?.velocidade ?? null, bussolaVerdadeira, ultimo: ultimoRumo.current });
+  useEffect(() => { if (fonteRumo === 'gps' && rumoVirado != null) ultimoRumo.current = rumoVirado; }, [rumoVirado, fonteRumo]);
   const precisao = gps.pos?.precisaoM ?? null;
-  const nessePonto = !!guia && guia.distanciaM <= 3;
+  const precisaoOk = precisao != null && precisao <= PRECISAO_MAX_GUIA_M;
+  const guia = alvo && posGuia ? guiaAtePonto(posGuia.coord, alvo.coord, precisaoOk ? rumoVirado : null) : null;
+  const colocadoAnterior = alvo && plano ? [...plano.bandeiras].reverse().find((b) => b.colocada && b.linha === alvo.linha) : null;
+  const desvio = alvo && posGuia && colocadoAnterior ? desvioLateral(posGuia.coord, colocadoAnterior.coord, alvo.coord) : null;
+  // "Chegou" estável: 3 leituras boas seguidas; só sai acima de 5 m
+  useEffect(() => { if (guia) setChegada((c) => atualizarChegada(c, guia.distanciaM, precisao)); }, [guia?.distanciaM, precisao]);
+  useEffect(() => { setChegada({ dentro: false, seguidos: 0 }); }, [alvo?.id]);
+  const nessePonto = chegada.dentro && !!guia && guia.distanciaM <= 5;
+
+  // Já deixa o GPS ligado ao abrir o plano (se o aparelho já deu permissão) para ele estabilizar antes do guia
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const st = await (navigator as any).permissions?.query({ name: 'geolocation' });
+        if (vivo && st?.state === 'granted') gps.ligar();
+      } catch {}
+    })();
+    return () => { vivo = false; };
+  }, [plano?.id]);
 
   // Voz, vibração e "Chegou"
   useEffect(() => {
@@ -140,15 +179,30 @@ export default function CampoTela() {
     atualizarCampo(plano.id, { bandeiras: plano.bandeiras.map((b) => (b.id === idB ? { ...b, colocada } : b)) });
   };
 
+  /** Calibra o GPS: o ponto conhecido deve ser onde você está AGORA; o app guarda a diferença e a aplica ao guia. */
+  const aplicarCalibracao = (conhecido: Coord) => {
+    if (!gps.pos) { mostrar('Espere o GPS achar sua posição.', 'info'); return; }
+    if ((gps.pos.precisaoM ?? 99) > PRECISAO_MAX_GUIA_M) { mostrar(`Espere o GPS melhorar (até ±${PRECISAO_MAX_GUIA_M} m) para calibrar.`, 'info'); return; }
+    const d = calcularDeslocamento(conhecido, gps.pos.coord);
+    if (Math.hypot(d.dxM, d.dyM) > 60) { mostrar('Esse ponto está a mais de 60 m de você. Vá até ele antes de calibrar.', 'erro'); return; }
+    definirCalibracaoGps(d);
+    setCalibGpsAberto(false);
+    mostrar(`GPS ajustado em ${textoDeslocamento(d)}`, 'ok');
+  };
+  const referenciasCalibracao = [
+    ...(plano?.junto?.linhaAB ? [{ nome: `Ponto A da linha ${plano.junto.linhaAB.nome}`, coord: plano.junto.linhaAB.a }, { nome: `Ponto B da linha ${plano.junto.linhaAB.nome}`, coord: plano.junto.linhaAB.b }] : []),
+    ...(() => { const u = plano ? [...plano.bandeiras].reverse().find((x) => x.colocada) : null; return u ? [{ nome: `Última bandeira colocada (${u.rotulo})`, coord: u.coord }] : []; })(),
+  ];
+
   const bandeiraSel = plano?.bandeiras.find((b) => b.id === selecionada) ?? null;
-  const distDe = (c: Coord) => (gps.pos ? guiaAtePonto(gps.pos.coord, c, null).distanciaM : null);
+  const distDe = (c: Coord) => (posGuia ? guiaAtePonto(posGuia.coord, c, null).distanciaM : null);
   const guiarAte = async (idB: string) => {
     setSelecionada(null);
     setAlvoManual(idB);
     setPulados([]);
     const b = plano?.bandeiras.find((x) => x.id === idB);
     if (!guiando) await iniciarGuia();
-    if (b) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [b.coord, ...(gps.pos ? [gps.pos.coord] : [])] });
+    if (b) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [b.coord, ...(posGuia ? [posGuia.coord] : [])] });
   };
 
   const dadosImpressao = (): DadosPdf | null => {
@@ -183,7 +237,7 @@ export default function CampoTela() {
     await gps.ligar();
     setGuiando(true);
     manterTelaLigada(true);
-    if (alvo) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [alvo.coord, ...(gps.pos ? [gps.pos.coord] : [])] });
+    if (alvo) setComando({ n: Date.now(), tipo: 'ajustar', pontos: [alvo.coord, ...(posGuia ? [posGuia.coord] : [])] });
     if (vozLigada) falar('Guia das bandeirinhas iniciado.');
   };
   const sairGuia = () => { setGuiando(false); pararVoz(); manterTelaLigada(false); };
@@ -235,7 +289,7 @@ export default function CampoTela() {
       rascunho={[]}
       poligono
       camada={camada}
-      posicao={gps.pos ? { coord: gps.pos.coord, precisaoM: gps.pos.precisaoM } : null}
+      posicao={posGuia ? { coord: posGuia.coord, precisaoM: posGuia.precisaoM } : null}
       comando={comando ?? { n: 1, tipo: 'ajustar', pontos: plano.partes.flatMap((p) => p.pedacos.flat()) }}
       onAdicionar={() => {}}
       onMover={() => {}}
@@ -243,7 +297,7 @@ export default function CampoTela() {
       parcelas={parcelas}
       rastro={plano.junto?.linhaAB && plano.junto.usarLinhaAB ? plano.junto.linhaAB : null}
       bandeiras={plano.bandeiras.map((b) => ({ id: b.id, coord: b.coord, estado: b.colocada ? 'ok' : guiando && alvo?.id === b.id ? 'atual' : 'pendente', rotulo: b.rotulo }))}
-      linhaGuia={guiando && alvo && gps.pos ? [gps.pos.coord, alvo.coord] : null}
+      linhaGuia={guiando && alvo && posGuia ? [posGuia.coord, alvo.coord] : null}
       onBandeira={(idB) => { Haptics.selectionAsync(); setSelecionada(idB); }}
     />
   );
@@ -258,16 +312,14 @@ export default function CampoTela() {
         <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', top: ins.top + 10, left: 14, right: 14, zIndex: 10, gap: 8 }}>
           <View style={{ backgroundColor: nessePonto ? t.ok : t.primaria, borderRadius: raio.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-              {nessePonto ? <Ionicons name="flag" size={34} color="#fff" /> : giro == null ? <Ionicons name="walk" size={36} color="#fff" /> : (
-                <View style={{ transform: [{ rotate: `${giro}deg` }] }}><Ionicons name="arrow-up" size={42} color="#fff" /></View>
-              )}
+              {nessePonto ? <Ionicons name="flag" size={34} color="#fff" /> : giro == null ? <Ionicons name="walk" size={36} color="#fff" /> : <SetaGuia giro={giro} />}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: fonte.negrito, fontSize: 34, color: '#fff', fontVariant: ['tabular-nums'] }} accessibilityLabel="Distância até o ponto">
-                {guia ? `${guia.distanciaM < 100 ? guia.distanciaM.toFixed(1).replace('.', ',') : Math.round(guia.distanciaM)} m` : '—'}
+                {guia ? `${precisaoOk ? '' : '~'}${guia.distanciaM < 100 ? guia.distanciaM.toFixed(1).replace('.', ',') : Math.round(guia.distanciaM)} m` : '—'}
               </Text>
               <Text numberOfLines={2} style={{ fontFamily: fonte.semi, fontSize: 15.5, color: '#fff', opacity: 0.95 }}>
-                {!gps.pos ? 'Buscando sinal de GPS…' : nessePonto ? 'Chegou! Coloque a bandeirinha' : textoGiro(giro)}
+                {!gps.pos ? 'Buscando sinal de GPS…' : !precisaoOk ? `Aguardando GPS preciso (±${Math.round(precisao ?? 0)} m)` : nessePonto ? 'Chegou! Coloque a bandeirinha' : textoGiro(giro)}
               </Text>
             </View>
           </View>
@@ -282,11 +334,33 @@ export default function CampoTela() {
               </View>
             </Vidro>
           )}
+          <Vidro raioBorda={raio.md}>
+            <View style={{ padding: 10, gap: 8 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                <Text accessibilityLabel="Situação do GPS" style={{ fontFamily: fonte.semi, fontSize: 12.5, color: precisao == null ? t.textoSuave : precisao <= 8 ? t.ok : precisao <= 15 ? t.atencao : t.perigo }}>
+                  {precisao == null ? 'GPS buscando…' : `GPS ±${Math.round(precisao)} m · ${{ pronto: 'pronto', estabilizando: 'estabilizando', procurando: 'procurando' }[qualidadeGps(precisao)]}`}
+                </Text>
+                <Text style={{ fontFamily: fonte.regular, fontSize: 12.5, color: t.textoSuave }}>
+                  · {fonteRumo === 'gps' ? 'direção pelo GPS (andando)' : fonteRumo === 'bussola' ? `bússola ${Math.round(desvioBussola > 180 ? desvioBussola - 360 : desvioBussola)}°${desvioBussolaGraus != null ? ' calibrada' : ' estimada'}` : bussola.disponivel === false ? 'sem bússola: ande alguns passos' : 'direção: ande alguns passos'}
+                </Text>
+                {deslocamentoAtivo(calibracaoGps) && <Text style={{ fontFamily: fonte.regular, fontSize: 12.5, color: t.textoSuave }}>· ajuste do GPS {textoDeslocamento(calibracaoGps!)}</Text>}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Botao titulo="Calibrar bússola" variante="suave" style={{ flex: 1 }} onPress={() => { aprendiz.current.reiniciar(); setCalibrandoBussola(true); }} />
+                <Botao titulo="Calibrar GPS" variante="suave" style={{ flex: 1 }} onPress={() => setCalibGpsAberto(true)} />
+              </View>
+              {calibrandoBussola && (
+                <Text style={{ fontFamily: fonte.semi, fontSize: 13.5, color: t.texto }}>
+                  Ande em linha reta por uns 10 passos largos, sem parar e sem mexer no celular ({Math.min(10, aprendiz.current.amostras)}/10). Se a seta ainda errar, faça um "8" no ar com o celular.
+                </Text>
+              )}
+            </View>
+          </Vidro>
           {precisao != null && precisao > 8 && (
             <Vidro raioBorda={raio.md}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10 }}>
                 <Ionicons name="warning" size={18} color={t.atencao} />
-                <Text style={{ fontFamily: fonte.semi, fontSize: 13, color: t.texto, flex: 1 }}>GPS com precisão de ±{Math.round(precisao)} m. Espere melhorar antes de cravar a bandeira.</Text>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 13, color: t.texto, flex: 1 }}>{precisao > PRECISAO_MAX_GUIA_M ? `GPS fraco (±${Math.round(precisao)} m). Saia de baixo de árvores e construções e espere estabilizar: a seta volta quando passar de ${PRECISAO_MAX_GUIA_M} m.` : `GPS com precisão de ±${Math.round(precisao)} m. Espere melhorar antes de cravar a bandeira.`}</Text>
               </View>
             </Vidro>
           )}
@@ -299,6 +373,26 @@ export default function CampoTela() {
             </Vidro>
           )}
         </Animated.View>
+
+        {calibGpsAberto && (
+          <View style={{ position: 'absolute', left: 14, right: 14, top: ins.top + 90, zIndex: 40 }}>
+            <Cartao style={{ gap: 10 }}>
+              <Text style={[tipo.subtitulo, { color: t.texto }]}>Calibrar o GPS</Text>
+              <Text style={[tipo.corpo, { color: t.textoSuave }]}>Fique parado sobre um ponto cuja posição você conhece bem (de uma fonte melhor que o celular, como o ponto A da linha do monitor) e toque nele. O app corrige o GPS por essa diferença durante 3 horas.</Text>
+              {referenciasCalibracao.map((r) => (
+                <Botao key={r.nome} titulo={r.nome} variante="suave" onPress={() => aplicarCalibracao(r.coord)} />
+              ))}
+              <Text style={[tipo.legenda, { color: t.textoSuave }]}>OU DIGITE AS COORDENADAS DO PONTO</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><Campo rotulo="" value={coordTxt.lat} onChangeText={(v) => setCoordTxt((c) => ({ ...c, lat: v }))} placeholder="Latitude" keyboardType="numbers-and-punctuation" compacto accessibilityLabel="Latitude do ponto conhecido" /></View>
+                <View style={{ flex: 1 }}><Campo rotulo="" value={coordTxt.lon} onChangeText={(v) => setCoordTxt((c) => ({ ...c, lon: v }))} placeholder="Longitude" keyboardType="numbers-and-punctuation" compacto accessibilityLabel="Longitude do ponto conhecido" /></View>
+              </View>
+              <Botao titulo="Usar estas coordenadas" variante="suave" onPress={() => { const c = lerLatLon(coordTxt.lat, coordTxt.lon); if (!c) mostrar('Coordenadas inválidas (ex.: -16.282406 e -46.134161).', 'erro'); else aplicarCalibracao(c); }} />
+              {deslocamentoAtivo(calibracaoGps) && <Botao titulo="Remover o ajuste do GPS" variante="fantasma" onPress={() => { definirCalibracaoGps(null); setCalibGpsAberto(false); mostrar('Ajuste do GPS removido', 'ok'); }} />}
+              <Botao titulo="Fechar" variante="fantasma" onPress={() => setCalibGpsAberto(false)} />
+            </Cartao>
+          </View>
+        )}
 
         <Recolhivel recolhido={painelRecolhido} style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(ins.bottom, 12) + 16, zIndex: 10 }}>
           <Vidro>
@@ -524,4 +618,17 @@ export default function CampoTela() {
       />
     </View>
   );
+}
+
+/** Seta de direção: gira pelo menor arco, com animação curta (não dá "voltas" ao passar do norte). */
+function SetaGuia({ giro }: { giro: number }) {
+  const acum = useRef(giro);
+  const alvo = useSharedValue(giro);
+  useEffect(() => {
+    const d = ((giro - acum.current + 540) % 360) - 180;
+    acum.current += d;
+    alvo.value = withTiming(acum.current, { duration: 220 });
+  }, [giro]);
+  const st = useAnimatedStyle(() => ({ transform: [{ rotate: `${alvo.value}deg` }] }));
+  return <Animated.View style={st}><Ionicons name="arrow-up" size={42} color="#fff" /></Animated.View>;
 }

@@ -158,9 +158,12 @@ module.exports = [
       const dist = parseFloat(txt.replace(/\./g, '').replace(',', '.'));
       check(Math.abs(dist - esperado) < 25, `distância ${txt} ~ ${esperado.toFixed(0)} m`);
       // chegar ao ponto
-      for (const f of [0.7, 0.97, 1]) {
-        const lat = BASE[1] + 5 / KY + (alvo[1] - (BASE[1] + 5 / KY)) * f, lon = BASE[0] + (alvo[0] - BASE[0]) * f;
-        await p.ctx.setGeolocation({ latitude: lat, longitude: lon, accuracy: 4 }); await p.waitForTimeout(1300);
+      // saltos enormes (como numa simulação) são tratados como fixos ruins até se repetirem; depois o filtro aceita a nova posição
+      const passos = [0.7, 0.97, 1, 1, 1, 1, 1, 1, 1, 1];
+      for (let i = 0; i < passos.length; i++) {
+        const f = passos[i];
+        const lat = BASE[1] + 5 / KY + (alvo[1] - (BASE[1] + 5 / KY)) * f + i * 1e-8, lon = BASE[0] + (alvo[0] - BASE[0]) * f;
+        await p.ctx.setGeolocation({ latitude: lat, longitude: lon, accuracy: 4 }); await p.waitForTimeout(1100);
       }
       check(await p.getByText(/Chegou! Coloque/).count() >= 1, 'avisou que chegou');
       await p.getByText('Bandeira colocada ✓').click(); await p.waitForTimeout(700);
@@ -626,6 +629,50 @@ module.exports = [
       await p.getByText('Verificar a instalação', { exact: true }).click(); await p.waitForTimeout(800);
       check(await p.getByText('Aplicativo Android (casca)').count() === 1, 'diagnóstico mostra o app Android');
       check(await p.getByText('Testar impressão', { exact: true }).count() === 1, 'botão Testar impressão no app');
+      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
+    },
+  },
+  {
+    nome: 'Guia preciso: ignora o 1º fixo ruim, seta com bússola calibrada e calibração do GPS',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url, gps: { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 400 } });
+      await p.addInitScript(() => { try { delete window.DeviceOrientationEvent.requestPermission; } catch {} }); // como no Android: sem pedido de permissão da bússola
+      await criarPlanoPadrao(p, url);
+      await p.getByText(/Andropogon .* divisa 3 · ponto 2/).first().scrollIntoViewIfNeeded();
+      await p.getByText(/Andropogon .* divisa 3 · ponto 2/).first().click(); await p.waitForTimeout(800);
+      await p.getByText('Guiar até esta bandeira').click(); await p.waitForTimeout(1800);
+      check(await p.getByText(/Aguardando GPS preciso/).count() >= 1, 'com o fixo de ±400 m o guia espera (sem seta nem "Chegou")');
+      const alvo = await p.evaluate(() => JSON.parse(localStorage.getItem('gpsthomas-dados')).state.campos[0].bandeiras.find((b) => /divisa 3 · ponto 2/.test(b.rotulo)).coord);
+      const lat0 = BASE[1] + 5 / KY;
+      for (let i = 0; i < 5; i++) { await p.ctx.setGeolocation({ latitude: lat0 + i * 1e-8, longitude: BASE[0], accuracy: 5 }); await p.waitForTimeout(1100); }
+      check(await p.getByText(/Aguardando GPS preciso/).count() === 0, 'depois de fixos bons o guia libera');
+      check(await p.getByLabel('Situação do GPS').count() === 1, 'mostra a situação do GPS');
+      const chip = await p.getByLabel('Situação do GPS').textContent();
+      check(/GPS ±\d+ m · (pronto|estabilizando)/.test(chip), `situação: ${chip}`);
+      // bússola: leitura magnética que, com a declinação, aponta exatamente para o alvo => "Siga em frente"
+      const dx = (alvo[0] - BASE[0]) * KX, dy = (alvo[1] - lat0) * KY;
+      const rumoAlvo = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+      const mandar = async (rumoMag, n = 70) => p.evaluate(([h, n2]) => {
+        for (let i = 0; i < n2; i++) { const e = new Event('deviceorientationabsolute'); Object.assign(e, { alpha: (360 - h) % 360, beta: 75, gamma: 0, absolute: true }); window.dispatchEvent(e); }
+      }, [rumoMag, n]);
+      await mandar(0, 3); await p.waitForTimeout(400);
+      const txtDesvio = await p.getByText(/bússola -?\d+°/).first().textContent();
+      const decl = parseInt(/bússola (-?\d+)°/.exec(txtDesvio)[1], 10);
+      await mandar(((rumoAlvo - decl) % 360 + 360) % 360);
+      await p.waitForTimeout(500);
+      check(await p.getByText('Siga em frente').count() >= 1, 'bússola alinhada ao alvo => "Siga em frente"');
+      await mandar(((rumoAlvo - decl + 90) % 360 + 360) % 360);
+      await p.waitForTimeout(500);
+      check(await p.getByText(/Vire .*à esquerda/).count() >= 1, 'virado 90° para a direita do alvo => "Vire à esquerda"');
+      // calibrar o GPS por ponto conhecido: 5 m ao norte
+      const d0 = parseFloat((await p.getByLabel('Distância até o ponto').textContent()).replace('~', '').replace(/\./g, '').replace(',', '.'));
+      await p.getByText('Calibrar GPS', { exact: true }).click(); await p.waitForTimeout(400);
+      await p.getByLabel('Latitude do ponto conhecido').fill(String(lat0 + 5 / KY));
+      await p.getByLabel('Longitude do ponto conhecido').fill(String(BASE[0]));
+      await p.getByText('Usar estas coordenadas').click(); await p.waitForTimeout(900);
+      check(await p.getByText(/ajuste do GPS 5,0 m a norte/).count() >= 1, 'mostra o ajuste do GPS aplicado (5,0 m ao norte)');
+      const d1 = parseFloat((await p.getByLabel('Distância até o ponto').textContent()).replace('~', '').replace(/\./g, '').replace(',', '.'));
+      check(Math.abs(d1 - d0) > 0.5, `a distância muda com o ajuste (${d0} -> ${d1})`);
       check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
     },
   },
