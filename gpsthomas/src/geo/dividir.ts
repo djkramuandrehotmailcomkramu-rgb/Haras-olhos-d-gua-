@@ -13,12 +13,16 @@ export type Parte = {
   /** distância do início (m) até a faixa, ao longo da direção de corte */
   deM: number;
   ateM: number;
+  /** de qual contorno (índice) vem cada pedaço de área, quando o campo junta vários talhões */
+  origens?: { anel: number; areaM2: number }[];
 };
 
 export type Divisao = {
   partes: Parte[];
   /** linhas de corte (divisas entre partes vizinhas), do lado a lado do talhão */
   cortes: Coord[][];
+  /** para cada corte: qual divisa (1, 2…) e qual contorno atravessa */
+  cortesInfo?: { corte: number; anel: number }[];
   /** direção das divisas, em graus (0 = norte, sentido horário, 0–180) */
   anguloGraus: number;
   areaTotalM2: number;
@@ -83,30 +87,86 @@ function faixa(d0: number, d1: number, normal: XY, tang: XY, meio: XY, raio: num
   return [[p(d0, -raio), p(d1, -raio), p(d1, raio), p(d0, raio), p(d0, -raio)]];
 }
 
+/** Área (plana) de um anel com projeção <= d, por recorte contra um semiplano (O(n)). */
+function areaAteAnel(xy: Anel, d: number, normal: XY, dMin: number, dMax: number, total: number): number {
+  if (d <= dMin) return 0;
+  if (d >= dMax) return total;
+  const proj1 = (p: XY) => p[0] * normal[0] + p[1] * normal[1];
+  const n = xy.length - 1; // o anel repete o primeiro ponto no fim
+  let soma = 0;
+  let ant: XY = xy[n - 1];
+  let antDentro = proj1(ant) <= d;
+  let ultimo: XY | null = null, primeiro: XY | null = null;
+  const emite = (q: XY) => {
+    if (ultimo) soma += ultimo[0] * q[1] - q[0] * ultimo[1]; else primeiro = q;
+    ultimo = q;
+  };
+  for (let i = 0; i < n; i++) {
+    const cur = xy[i];
+    const curDentro = proj1(cur) <= d;
+    if (curDentro !== antDentro) {
+      const a = proj1(ant), b = proj1(cur);
+      const f = (d - a) / (b - a);
+      emite([ant[0] + (cur[0] - ant[0]) * f, ant[1] + (cur[1] - ant[1]) * f]);
+    }
+    if (curDentro) emite(cur);
+    ant = cur;
+    antDentro = curDentro;
+  }
+  if (ultimo && primeiro) soma += (ultimo as XY)[0] * (primeiro as XY)[1] - (primeiro as XY)[0] * (ultimo as XY)[1];
+  return Math.abs(soma) / 2;
+}
+
+/** Ângulo (0–180) do lado mais longo entre vários contornos. */
+function anguloLadoMaisLongoDe(contornos: Coord[][]): number {
+  let melhor = { len: -1, ang: 0 };
+  for (const c of contornos) {
+    const anel = fecharAnel(c);
+    const proj = projecao(anel[0]);
+    for (let i = 0; i < anel.length - 1; i++) {
+      const a = proj.para(anel[i]);
+      const b = proj.para(anel[i + 1]);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len > melhor.len) melhor = { len, ang: (Math.atan2(b[0] - a[0], b[1] - a[1]) / RAD + 360) % 180 };
+    }
+  }
+  return melhor.ang;
+}
+
 /**
  * Divide um talhão em partes com divisas paralelas, cada uma com a área desejada.
  * Funciona também em talhões côncavos (a parte pode ficar em mais de um pedaço).
  */
 export function dividirEmFaixas(contorno: Coord[], op: OpcoesDivisao): Divisao {
-  const anel = fecharAnel(contorno);
-  const proj = projecao(anel[0]);
-  const xy: Anel = anel.map(proj.para);
-  const poli: Poligono = [xy];
-  const total = areaPlana([poli]);
+  return dividirAneis([contorno], op);
+}
 
-  const ang = op.anguloGraus != null ? ((op.anguloGraus % 180) + 180) % 180 : anguloLadoMaisLongo(contorno);
+/**
+ * Divide VÁRIOS contornos como se fossem um só campo: as faixas paralelas atravessam todos eles e cada
+ * parte pode ter pedaços em mais de um talhão (`origens` diz quanto de cada um).
+ */
+export function dividirAneis(contornos: Coord[][], op: OpcoesDivisao): Divisao {
+  const aneis = contornos.map(fecharAnel);
+  const proj = projecao(aneis[0][0]);
+  const xys: Anel[] = aneis.map((a) => a.map(proj.para));
+  const areaAnel = xys.map((xy) => areaPlana([[xy]]));
+  const total = areaAnel.reduce((s, a) => s + a, 0);
+
+  const ang = op.anguloGraus != null ? ((op.anguloGraus % 180) + 180) % 180 : anguloLadoMaisLongoDe(contornos);
   // direção das divisas (tangente) e perpendicular (normal, ao longo da qual as faixas se empilham)
   const tang: XY = [Math.sin(ang * RAD), Math.cos(ang * RAD)];
   const normal: XY = op.inverter ? [tang[1], -tang[0]] : [-tang[1], tang[0]];
+  const proj1 = (p: XY) => p[0] * normal[0] + p[1] * normal[1];
 
-  const xs = xy.map((p) => p[0] * normal[0] + p[1] * normal[1]);
-  const dMin = Math.min(...xs);
-  const dMax = Math.max(...xs);
-  const raio = Math.hypot(Math.max(...xy.map((p) => Math.abs(p[0]))), Math.max(...xy.map((p) => Math.abs(p[1])))) * 2 + 100;
+  const extremos = xys.map((xy) => { const v = xy.map(proj1); return { min: Math.min(...v), max: Math.max(...v) }; });
+  const dMin = Math.min(...extremos.map((e) => e.min));
+  const dMax = Math.max(...extremos.map((e) => e.max));
+  const todos = xys.flat();
+  const raio = Math.hypot(Math.max(...todos.map((p) => Math.abs(p[0]))), Math.max(...todos.map((p) => Math.abs(p[1])))) * 2 + 100;
   const meio: XY = [0, 0];
 
-  // Áreas-alvo em m² reais (geodésicos). Com lista, a última parte é o que sobra do talhão.
-  const totalReal = areaM2(contorno);
+  // Áreas-alvo em m² reais (geodésicos). Com lista, a última parte é o que sobra do campo.
+  const totalReal = contornos.reduce((s, c) => s + areaM2(c), 0);
   const escala = total / (totalReal || 1); // área plana / área real (≈ 1)
   let alvosReal: number[];
   if (op.areasM2 && op.areasM2.length) {
@@ -121,36 +181,8 @@ export function dividirEmFaixas(contorno: Coord[], op: OpcoesDivisao): Divisao {
   }
   const alvosN = alvosReal.map((a) => a * escala);
 
-  // Área do talhão com projeção <= d, por recorte contra um semiplano (O(n)).
-  // Sutherland–Hodgman gera arestas degeneradas em polígonos côncavos, mas a área com sinal sai correta.
-  const proj1 = (p: XY) => p[0] * normal[0] + p[1] * normal[1];
-  const areaAte = (d: number): number => {
-    if (d <= dMin) return 0;
-    if (d >= dMax) return total;
-    const n = xy.length - 1; // o anel repete o primeiro ponto no fim
-    let soma = 0;
-    let ant: XY = xy[n - 1];
-    let antDentro = proj1(ant) <= d;
-    let ultimo: XY | null = null, primeiro: XY | null = null;
-    const emite = (q: XY) => {
-      if (ultimo) soma += ultimo[0] * q[1] - q[0] * ultimo[1]; else primeiro = q;
-      ultimo = q;
-    };
-    for (let i = 0; i < n; i++) {
-      const cur = xy[i];
-      const curDentro = proj1(cur) <= d;
-      if (curDentro !== antDentro) {
-        const a = proj1(ant), b = proj1(cur);
-        const f = (d - a) / (b - a);
-        emite([ant[0] + (cur[0] - ant[0]) * f, ant[1] + (cur[1] - ant[1]) * f]);
-      }
-      if (curDentro) emite(cur);
-      ant = cur;
-      antDentro = curDentro;
-    }
-    if (ultimo && primeiro) soma += (ultimo as XY)[0] * (primeiro as XY)[1] - (primeiro as XY)[0] * (ultimo as XY)[1];
-    return Math.abs(soma) / 2;
-  };
+  // Área do campo com projeção <= d (soma dos anéis)
+  const areaAte = (d: number): number => xys.reduce((s, xy, k) => s + areaAteAnel(xy, d, normal, extremos[k].min, extremos[k].max, areaAnel[k]), 0);
 
   // posição de cada corte por busca binária da área acumulada
   const cortesD: number[] = [dMin];
@@ -172,25 +204,37 @@ export function dividirEmFaixas(contorno: Coord[], op: OpcoesDivisao): Divisao {
   for (let i = 0; i < alvosN.length; i++) {
     const d0 = cortesD[i] + (i > 0 ? corredor / 2 : 0);
     const d1 = cortesD[i + 1] - (i < alvosN.length - 1 ? corredor / 2 : 0);
-    const r = polygonClipping.intersection(poli, faixa(d0 - (i === 0 ? 1 : 0), d1 + (i === alvosN.length - 1 ? 1 : 0), normal, tang, meio, raio)) as Poligono[];
-    const pedacos = r.map((pg) => pg[0].map(proj.de) as Coord[]);
-    partes.push({ indice: i, pedacos, areaM2: pedacos.reduce((s, pc) => s + areaM2(pc), 0), deM: cortesD[i] - dMin, ateM: cortesD[i + 1] - dMin });
+    const fx = faixa(d0 - (i === 0 ? 1 : 0), d1 + (i === alvosN.length - 1 ? 1 : 0), normal, tang, meio, raio);
+    const pedacos: Coord[][] = [];
+    const origens: { anel: number; areaM2: number }[] = [];
+    xys.forEach((xy, k) => {
+      const r = polygonClipping.intersection([xy], fx) as Poligono[];
+      const pcs = r.map((pg) => pg[0].map(proj.de) as Coord[]);
+      pedacos.push(...pcs);
+      const a = pcs.reduce((s, pc) => s + areaM2(pc), 0);
+      if (pcs.length) origens.push({ anel: k, areaM2: a });
+    });
+    partes.push({ indice: i, pedacos, areaM2: pedacos.reduce((s, pc) => s + areaM2(pc), 0), deM: cortesD[i] - dMin, ateM: cortesD[i + 1] - dMin, origens });
   }
 
-  // linhas de corte: onde a reta atravessa o talhão (pode ter mais de um trecho em côncavos)
+  // linhas de corte: onde a reta atravessa cada contorno (pode ter mais de um trecho em côncavos)
   const cortes: Coord[][] = [];
+  const cortesInfo: { corte: number; anel: number }[] = [];
   for (let i = 1; i < cortesD.length - 1; i++) {
     const d = cortesD[i];
-    const fina = polygonClipping.intersection(poli, faixa(d - 0.02, d + 0.02, normal, tang, meio, raio)) as Poligono[];
-    for (const pg of fina) {
-      const t = pg[0].map((p) => p[0] * tang[0] + p[1] * tang[1]);
-      const tMin = Math.min(...t), tMax = Math.max(...t);
-      const pt = (tt: number): Coord => proj.de([normal[0] * d + tang[0] * tt, normal[1] * d + tang[1] * tt]);
-      cortes.push([pt(tMin), pt(tMax)]);
-    }
+    const fina = faixa(d - 0.02, d + 0.02, normal, tang, meio, raio);
+    xys.forEach((xy, k) => {
+      for (const pg of polygonClipping.intersection([xy], fina) as Poligono[]) {
+        const t = pg[0].map((p) => p[0] * tang[0] + p[1] * tang[1]);
+        const tMin = Math.min(...t), tMax = Math.max(...t);
+        const pt = (tt: number): Coord => proj.de([normal[0] * d + tang[0] * tt, normal[1] * d + tang[1] * tt]);
+        cortes.push([pt(tMin), pt(tMax)]);
+        cortesInfo.push({ corte: i, anel: k });
+      }
+    });
   }
 
-  return { partes, cortes, anguloGraus: ang, areaTotalM2: areaM2(contorno) };
+  return { partes, cortes, cortesInfo, anguloGraus: ang, areaTotalM2: totalReal };
 }
 
 export type Bandeira = { id: string; coord: Coord; rotulo: string; colocada: boolean };

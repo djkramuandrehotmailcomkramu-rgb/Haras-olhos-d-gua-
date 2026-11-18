@@ -34,6 +34,8 @@ export type PropsMapa = {
   parcelas?: ParcelaMapa[];
   /** Bandeirinhas a colocar (cinza = pendente, âmbar = próxima, verde = colocada). */
   bandeiras?: BandeiraMapa[];
+  /** Rastro reto (linha AB do monitor): desenhado estendido pelo campo, com os pontos A e B. */
+  rastro?: { a: Coord; b: Coord; nome?: string } | null;
   /** Linha entre você e o ponto-alvo. */
   linhaGuia?: [Coord, Coord] | null;
   /** Toque numa bandeirinha. */

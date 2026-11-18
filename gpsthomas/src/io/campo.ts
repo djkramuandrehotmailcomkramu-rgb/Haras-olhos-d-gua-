@@ -14,7 +14,15 @@ export function paraKMLCampo(plano: PlanoCampo, n: NomeTalhao): string {
     ),
   );
   const bandeiras = plano.bandeiras.map((b) => `<Placemark><name>${esc(b.rotulo)}</name><Point><coordinates>${b.coord[0]},${b.coord[1]},0</coordinates></Point></Placemark>`);
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(plano.nome)}</name>\n${[...partes, ...bandeiras].join('\n')}\n</Document></kml>\n`;
+  const ab = plano.junto?.linhaAB;
+  const rastro = ab
+    ? [
+        `<Placemark><name>${esc(`Rastro ${ab.nome} (A-B)`)}</name><LineString><coordinates>${coords([ab.a, ab.b])}</coordinates></LineString></Placemark>`,
+        `<Placemark><name>${esc(`${ab.nome} - A`)}</name><Point><coordinates>${ab.a[0]},${ab.a[1]},0</coordinates></Point></Placemark>`,
+        `<Placemark><name>${esc(`${ab.nome} - B`)}</name><Point><coordinates>${ab.b[0]},${ab.b[1]},0</coordinates></Point></Placemark>`,
+      ]
+    : [];
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${esc(plano.nome)}</name>\n${[...partes, ...bandeiras, ...rastro].join('\n')}\n</Document></kml>\n`;
 }
 
 export function paraGeoJSONCampo(plano: PlanoCampo, n: NomeTalhao): string {
@@ -26,11 +34,15 @@ export function paraGeoJSONCampo(plano: PlanoCampo, n: NomeTalhao): string {
     })),
   );
   plano.bandeiras.forEach((b) => feats.push({ type: 'Feature', properties: { nome: b.rotulo, colocada: b.colocada }, geometry: { type: 'Point', coordinates: b.coord } }));
+  const ab = plano.junto?.linhaAB;
+  if (ab) feats.push({ type: 'Feature', properties: { nome: `Rastro ${ab.nome} (A-B)` }, geometry: { type: 'LineString', coordinates: [ab.a, ab.b] } });
   return JSON.stringify({ type: 'FeatureCollection', features: feats }, null, 2);
 }
 
 export function pontosExport(plano: PlanoCampo): string {
-  const w = plano.bandeiras.map((b) => `<wpt lat="${b.coord[1]}" lon="${b.coord[0]}"><name>${esc(b.rotulo)}</name></wpt>`).join('\n');
+  const ab = plano.junto?.linhaAB;
+  const extra = ab ? [[`${ab.nome} - A`, ab.a], [`${ab.nome} - B`, ab.b]] as [string, [number, number]][] : [];
+  const w = [...plano.bandeiras.map((b) => ({ n: b.rotulo, c: b.coord })), ...extra.map(([n, c]) => ({ n, c }))].map((b) => `<wpt lat="${b.c[1]}" lon="${b.c[0]}"><name>${esc(b.n)}</name></wpt>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="GPSThomas" xmlns="http://www.topografix.com/GPX/1/1">\n${w}\n</gpx>\n`;
 }
 

@@ -1,7 +1,8 @@
-import { dividirEmFaixas, pontosDeDivisa } from './dividir';
+import { dividirAneis, dividirEmFaixas, pontosDeDivisa } from './dividir';
+import { anguloDaLinha } from './rastro';
 import { areaM2 } from './medidas';
 import { formatarNumeroBR } from './numero';
-import type { BandeiraCampo, ConfigCampo, ParteCampo, PlanoCampo, Talhao } from '../store/dados';
+import type { BandeiraCampo, ConfigCampo, ConfigJunto, ParteCampo, PlanoCampo, Talhao } from '../store/dados';
 
 export const CORES_VARIEDADE = ['#3FB063', '#F2B73D', '#5B9BFF', '#E5484D', '#B07CFF', '#FF8A5B', '#2EC4B6', '#C28A55', '#E86AB5', '#8FA39A', '#7DD3FC', '#FDE047'];
 
@@ -70,6 +71,63 @@ export function gerarCampo(talhoes: Talhao[], config: ConfigCampo[], corredorM: 
   return { partes, bandeiras, divisas };
 }
 
+export type PartesJunto = {
+  /** áreas-alvo em m² (a última é o que sobra do campo) — null quando as partes são todas iguais */
+  areasM2: number[] | null;
+  partes: number;
+  /** área de cada parte "cheia" (m² reais) */
+  cadaM2: number;
+  /** o que sobra depois das partes cheias (m²); 0 se a sobra foi repartida ou não houve */
+  sobraM2: number;
+  /** a última parte é uma parte de sobra menor que as outras */
+  temSobra: boolean;
+};
+
+/** Quantas partes de X ha cabem no campo e o que sobra. `totalM2` é a área medida (real). */
+export function planejarPartesJunto(totalM2: number, j: Pick<ConfigJunto, 'haPorParte' | 'areaInformadaHa' | 'sobra'>): PartesJunto {
+  if (!(j.haPorParte > 0)) throw new Error('Informe os hectares de cada parte (maior que zero).');
+  const k = fatorCalibracao(totalM2, j.areaInformadaHa);
+  const cadaM2 = j.haPorParte * 10000 * k;
+  const n = Math.floor(totalM2 / cadaM2 + 1e-9);
+  if (n < 1) throw new Error(`O campo tem ${formatarNumeroBR(totalM2 / 10000)} ha: menos que uma parte de ${formatarNumeroBR(j.haPorParte)} ha.`);
+  const resto = totalM2 - n * cadaM2;
+  if (j.sobra === 'dividir') return { areasM2: null, partes: n, cadaM2: totalM2 / n, sobraM2: 0, temSobra: false };
+  if (resto < 500) return { areasM2: [...Array.from({ length: n - 1 }, () => cadaM2), 1], partes: n, cadaM2, sobraM2: 0, temSobra: false };
+  return { areasM2: [...Array.from({ length: n }, () => cadaM2), 1], partes: n + 1, cadaM2, sobraM2: resto, temSobra: true };
+}
+
+/** Direção das divisas do campo junto: a da linha AB, a escolhida à mão ou (undefined) o lado mais longo. */
+export const anguloJunto = (j: ConfigJunto): number | undefined =>
+  j.usarLinhaAB && j.linhaAB ? anguloDaLinha(j.linhaAB.a, j.linhaAB.b) : j.anguloGraus ?? undefined;
+
+/** Divide vários talhões como um só campo (faixas paralelas que atravessam todos) e gera partes, divisas e bandeirinhas. */
+export function gerarCampoJunto(talhoes: Talhao[], junto: ConfigJunto, corredorM: number, espacamentoM: number) {
+  const ts = junto.talhaoIds.map((id) => talhoes.find((x) => x.id === id)).filter((x): x is Talhao => !!x);
+  if (ts.length === 0) throw new Error('Marque pelo menos um talhão.');
+  const total = ts.reduce((s, x) => s + areaM2(x.contorno), 0);
+  const plano = planejarPartesJunto(total, junto);
+  const d = dividirAneis(ts.map((x) => x.contorno), {
+    areasM2: plano.areasM2 ?? undefined, partes: plano.partes, anguloGraus: anguloJunto(junto), inverter: junto.inverter, corredorM,
+  });
+  const partes: ParteCampo[] = d.partes.map((p) => ({
+    talhaoId: 'junto', indice: p.indice, pedacos: p.pedacos, areaM2: p.areaM2, variedade: '',
+    origens: (p.origens ?? []).map((o) => ({ talhaoId: ts[o.anel].id, areaM2: o.areaM2 })),
+  }));
+  const divisas: PlanoCampo['divisas'] = d.cortes.map((c, i) => ({ id: i + 1, talhaoId: ts[d.cortesInfo?.[i]?.anel ?? 0].id, pontos: c }));
+  const bandeiras: BandeiraCampo[] = pontosDeDivisa(d.cortes, { espacamentoM, prefixo: 'J' }).map((b) => {
+    const m = /J(\d+)-(\d+)/.exec(b.id);
+    const i = Number(m?.[1] ?? 1) - 1;
+    const info = d.cortesInfo?.[i];
+    return { id: b.id, coord: b.coord, rotulo: `${ts[info?.anel ?? 0].nome} · divisa ${info?.corte ?? i + 1} · ponto ${m?.[2] ?? 1}`, colocada: false, linha: i + 1 };
+  });
+  return { partes, bandeiras, divisas, resumo: plano, totalM2: total, anguloGraus: d.anguloGraus };
+}
+
+/** Texto das origens de uma parte do campo junto ("Andropgno 12,1 ha + Amendoim 3,9 ha"). */
+export function textoOrigens(p: ParteCampo, nomeDe: (id: string) => string): string {
+  return (p.origens ?? []).map((o) => `${nomeDe(o.talhaoId)} ${formatarNumeroBR(o.areaM2 / 10000)} ha`).join(' + ');
+}
+
 /** Distribui as variedades nas partes em ordem; as partes que sobram repetem a última variedade. */
 export function distribuirVariedades(partes: ParteCampo[], variedades: string[]): ParteCampo[] {
   if (variedades.length === 0) return partes.map((p) => ({ ...p, variedade: '' }));
@@ -99,6 +157,14 @@ export type ConferenciaTalhao = { talhaoId: string; medidaM2: number; partesM2: 
 
 /** Confere se a soma das partes fecha com a área do talhão (descontando o corredor, que é esperado). */
 export function conferirAreas(plano: PlanoCampo, talhoes: Talhao[]): ConferenciaTalhao[] {
+  if (plano.junto) {
+    const medidaM2 = plano.junto.talhaoIds.reduce((s, id) => { const t = talhoes.find((x) => x.id === id); return s + (t ? areaM2(t.contorno) : 0); }, 0);
+    const partesM2 = plano.partes.reduce((s, p) => s + p.areaM2, 0);
+    const compr = plano.divisas.reduce((s, d) => s + Math.hypot((d.pontos[1][0] - d.pontos[0][0]) * 111319.49 * Math.cos((d.pontos[0][1] * Math.PI) / 180), (d.pontos[1][1] - d.pontos[0][1]) * 111319.49), 0);
+    const corredorEsperadoM2 = compr * (plano.corredorM || 0);
+    const diffPercentual = medidaM2 ? ((partesM2 + corredorEsperadoM2 - medidaM2) / medidaM2) * 100 : 0;
+    return [{ talhaoId: 'junto', medidaM2, partesM2, diffPercentual, corredorEsperadoM2, alerta: Math.abs(diffPercentual) > 0.5 }];
+  }
   return plano.config.map((cfg) => {
     const t = talhoes.find((x) => x.id === cfg.talhaoId);
     const medidaM2 = t ? areaM2(t.contorno) : 0;

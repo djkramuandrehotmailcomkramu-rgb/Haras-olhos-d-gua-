@@ -27,6 +27,22 @@ describe('backup e restauração', () => {
     expect(useDados.getState().medicoes).toHaveLength(1);
     expect(usePrefs.getState().unidadeArea).toBe('alqPaulista');
   });
+  it('campo de sementes "juntos" (junto, origens e linha AB) sobrevive ao backup', () => {
+    const plano = {
+      id: 'p1', nome: 'Juntos', criadoEm: 1, config: [{ talhaoId: 'a', partes: 0, anguloGraus: null, inverter: false }], corredorM: 0, espacamentoM: 0, variedades: ['V1'], metaHa: 16,
+      partes: [{ talhaoId: 'junto', indice: 0, pedacos: [sq], areaM2: 160000, variedade: 'V1', origens: [{ talhaoId: 'a', areaM2: 100000 }, { talhaoId: 'm', areaM2: 60000 }] }],
+      bandeiras: [], divisas: [],
+      junto: { talhaoIds: ['a', 'm'], haPorParte: 16, areaInformadaHa: 164, anguloGraus: null, linhaAB: { nome: 'TRABALHO', a: [-46.13416156, -16.282406] as [number, number], b: [-46.14329233, -16.28437727] as [number, number] }, usarLinhaAB: true, inverter: false, sobra: 'extra' as const },
+    };
+    useDados.setState({ campos: [plano] });
+    const txt = JSON.stringify(gerarBackup());
+    useDados.setState({ campos: [] });
+    expect(restaurarBackup(txt).ok).toBe(true);
+    const c = useDados.getState().campos[0];
+    expect(c.junto?.linhaAB?.nome).toBe('TRABALHO');
+    expect(c.junto?.haPorParte).toBe(16);
+    expect(c.partes[0].origens).toHaveLength(2);
+  });
   it('rejeita arquivo que não é JSON, de outro app ou com coordenada impossível', () => {
     expect(restaurarBackup('isto não é json')).toMatchObject({ ok: false });
     expect(restaurarBackup('{"app":"Outro"}')).toMatchObject({ ok: false });

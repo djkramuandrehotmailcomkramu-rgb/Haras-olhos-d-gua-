@@ -307,6 +307,20 @@ export function MapaInterativo(props: PropsMapa) {
         L.marker(paraLL(centro(todos)), { icon: L.divIcon({ html: rot, className: '', iconSize: [0, 0] }), interactive: false }).addTo(g.campo);
       }
     }
+    if (props.rastro) {
+      const { a: pa, b: pb } = props.rastro;
+      const kx = Math.cos((pa[1] * Math.PI) / 180) * 111319.49, ky = 111319.49;
+      const dx = (pb[0] - pa[0]) * kx, dy = (pb[1] - pa[1]) * ky, len = Math.hypot(dx, dy) || 1;
+      const ponta = (c: Coord, sinal: number): Coord => [c[0] + ((dx / len) * 1200 * sinal) / kx, c[1] + ((dy / len) * 1200 * sinal) / ky];
+      L.polyline([ponta(pa, -1), ponta(pb, 1)].map(paraLL), { color: '#F2B73D', weight: 1.5, dashArray: '8 8', opacity: 0.75, interactive: false }).addTo(g.campo);
+      L.polyline([pa, pb].map(paraLL), { color: '#F2B73D', weight: 3, interactive: false }).addTo(g.campo);
+      ([['A', pa], ['B', pb]] as [string, Coord][]).forEach(([letra, c]) => {
+        const el2 = document.createElement('div');
+        el2.textContent = letra;
+        el2.style.cssText = 'width:24px;height:24px;border-radius:50%;background:#F2B73D;color:#2B1D00;border:2px solid #fff;font:600 12px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
+        L.marker(paraLL(c), { icon: L.divIcon({ html: el2, className: '', iconSize: [0, 0] }), interactive: false, zIndexOffset: 800 }).addTo(g.campo);
+      });
+    }
     if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 3, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
     for (const b of props.bandeiras ?? []) {
       const cor = b.estado === 'ok' ? '#3FB063' : b.estado === 'atual' ? '#F2B73D' : '#9AA7A0';
@@ -321,7 +335,7 @@ export function MapaInterativo(props: PropsMapa) {
       const mkb = L.marker(paraLL(b.coord), { icon: L.divIcon({ html: caixa, className: '', iconSize: [48, 48], iconAnchor: [4 + tam * (5 / 24), 48 - 6] }), interactive: true, zIndexOffset: grande ? 900 : 0, keyboard: false }).addTo(g.campo);
       mkb.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onBandeira?.(b.id); });
     }
-  }, [props.parcelas, props.bandeiras, props.linhaGuia]);
+  }, [props.parcelas, props.bandeiras, props.linhaGuia, props.rastro]);
 
   // rotas e destino
   useEffect(() => {

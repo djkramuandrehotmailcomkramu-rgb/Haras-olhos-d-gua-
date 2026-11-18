@@ -19,7 +19,7 @@ import { useDados, useUi, type Comando } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { useLocalizacao } from '../../geo/useLocalizacao';
-import { CORES_VARIEDADE, compararComMeta, conferirAreas, distribuirVariedades, totaisPorVariedade } from '../../geo/campo';
+import { CORES_VARIEDADE, compararComMeta, conferirAreas, distribuirVariedades, textoOrigens, totaisPorVariedade } from '../../geo/campo';
 import { formatarHa } from '../../geo/unidades';
 import { formatarPercentual, lerNumeroBR, paraCampoBR } from '../../geo/numero';
 import { Dica } from '../../components/Dica';
@@ -155,7 +155,7 @@ export default function CampoTela() {
     setGerandoPdf(true);
     try {
       const fazenda = talhoes.find((x) => x.id === plano.config[0]?.talhaoId)?.fazenda;
-      await baixarPdfCampo({ plano, nomeTalhao: (idT) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão', fazenda, talhoes });
+      await baixarPdfCampo({ plano, nomeTalhao: (idT) => (idT === 'junto' && plano.junto ? plano.junto.talhaoIds.map((i) => talhoes.find((x) => x.id === i)?.nome ?? 'Talhão').join(' + ') : talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão'), fazenda, talhoes });
       mostrar('PDF gerado', 'ok');
     } catch { mostrar('Não foi possível gerar o PDF.', 'erro'); }
     finally { setGerandoPdf(false); }
@@ -223,6 +223,7 @@ export default function CampoTela() {
       onMover={() => {}}
       onTalhao={() => {}}
       parcelas={parcelas}
+      rastro={plano.junto?.linhaAB && plano.junto.usarLinhaAB ? plano.junto.linhaAB : null}
       bandeiras={plano.bandeiras.map((b) => ({ id: b.id, coord: b.coord, estado: b.colocada ? 'ok' : guiando && alvo?.id === b.id ? 'atual' : 'pendente', rotulo: b.rotulo }))}
       linhaGuia={guiando && alvo && gps.pos ? [gps.pos.coord, alvo.coord] : null}
       onBandeira={(idB) => { Haptics.selectionAsync(); setSelecionada(idB); }}
@@ -331,7 +332,7 @@ export default function CampoTela() {
   /* ---------------- MODO PLANO ---------------- */
   const totais = totaisPorVariedade(plano.partes);
   const conferencia = conferirAreas(plano, talhoes);
-  const nomeTalhao = (idT: string) => talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão';
+  const nomeTalhao = (idT: string) => (idT === 'junto' && plano.junto ? plano.junto.talhaoIds.map((i) => talhoes.find((x) => x.id === i)?.nome ?? 'Talhão').join(' + ') : talhoes.find((x) => x.id === idT)?.nome ?? 'Talhão');
   const exp = (ext: 'kml' | 'geojson' | 'csv' | 'gpx') => {
     const nome = `${plano.nome}.${ext}`;
     if (ext === 'kml') entregarArquivo(nome, paraKMLCampo(plano, nomeTalhao), 'application/vnd.google-earth.kml+xml');
@@ -390,8 +391,8 @@ export default function CampoTela() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: p.variedade ? corDe(p.variedade) : '#8FA39A' }} />
                 <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={{ fontFamily: fonte.semi, fontSize: 15.5, color: t.texto }}>{nomeTalhao(p.talhaoId)} · parte {p.indice + 1}</Text>
-                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>{p.variedade || 'Sem variedade'}</Text>
+                  <Text numberOfLines={1} style={{ fontFamily: fonte.semi, fontSize: 15.5, color: t.texto }}>{plano.junto ? `Parte ${p.indice + 1}` : `${nomeTalhao(p.talhaoId)} · parte ${p.indice + 1}`}</Text>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>{p.variedade || 'Sem variedade'}{plano.junto && p.origens?.length ? ` · ${textoOrigens(p, nomeTalhao)}` : ''}</Text>
                 </View>
                 <Text style={{ fontFamily: fonte.negrito, fontSize: 17, color: t.primaria }}>{ha(p.areaM2)}</Text>
               </View>

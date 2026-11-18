@@ -494,4 +494,54 @@ module.exports = [
       check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
     },
   },
+  {
+    nome: 'Campo de sementes juntos: rastro AB, partes de 16 ha, PDF e reabrir para ajustar',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await importarKml(p, url);
+      await p.ir('/campo/novo');
+      await doCard(p, 'Andropogon 92 ha').click();
+      await doCard(p, 'Amendoim 72 ha').click();
+      await p.getByLabel('Plantar os talhões juntos como um só campo').click(); await p.waitForTimeout(800);
+      check(await p.getByText(/Direção \d+° \(OSO\)/).count() >= 1, 'mostra a direção da linha AB (OSO)');
+      check(await p.getByLabel('Ponto A, latitude').inputValue() === '-16.282406', 'linha AB do monitor já preenchida');
+      // vírgula decimal também vale
+      await p.getByLabel('Ponto B, latitude').fill('-16,28437727'); await p.waitForTimeout(300);
+      check(await p.getByText(/Direção \d+° \(OSO\)/).count() >= 1, 'aceita vírgula nos decimais');
+      check(await p.getByText(/Parte 11:/).count() === 1, 'prévia com 11 partes (10 de 16 ha + sobra)');
+      await p.getByText('Criar plano').click(); await p.waitForTimeout(1800);
+      const c = (await estado(p)).campos[0];
+      check(c.junto && c.junto.usarLinhaAB === true && c.junto.haPorParte === 16, 'plano guarda a configuração "juntos"');
+      check(c.partes.length === 11, `11 partes (${c.partes.length})`);
+      for (let i = 0; i < 10; i++) check(Math.abs(c.partes[i].areaM2 / 10000 - 16) < 0.05, `parte ${i + 1} com 16 ha (${(c.partes[i].areaM2 / 10000).toFixed(3)})`);
+      const sobra = c.partes[10].areaM2 / 10000;
+      check(sobra > 3 && sobra < 5, `sobra de ~4 ha (${sobra.toFixed(2)})`);
+      check(c.partes.every((q) => q.talhaoId === 'junto' && q.origens.length >= 1), 'cada parte sabe de quais talhões vem');
+      check(c.partes.some((q) => q.origens.length === 2), 'há partes que atravessam os dois talhões');
+      check(c.metaHa === 16, 'meta por variedade = 16 ha');
+      check(c.bandeiras.length === c.divisas.length * 2, `bandeirinhas nas pontas de cada divisa (${c.bandeiras.length})`);
+      // tela do plano e PDF
+      check(await p.getByText(/Sem variedade · Andropogon 92 ha [\d,]+ ha \+ Amendoim 72 ha/).count() >= 1, 'partes listadas com a origem');
+      await p.getByText('Gerar PDF do plano').scrollIntoViewIfNeeded();
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Gerar PDF do plano').click()]);
+      const arq = path.join(SAIDA, 'plano-junto.pdf');
+      await dl.saveAs(arq);
+      check(fs.readFileSync(arq).slice(0, 5).toString() === '%PDF-', 'PDF gerado');
+      try {
+        const txt = execFileSync('pdftotext', ['-layout', arq, '-'], { encoding: 'utf8' });
+        check(/talhoes juntos, partes de 16 ha/.test(txt), 'PDF informa o plantio juntos');
+        check(/Andropogon 92 ha \+ Amendoim 72 ha/.test(txt), 'PDF lista os dois talhões');
+      } catch (e) { if (e instanceof Error && e.name === 'Falha') throw e; }
+      // reabrir para ajustar mantém a configuração
+      await p.getByText('Ajustar hectares').first().scrollIntoViewIfNeeded();
+      await p.getByText('Ajustar hectares').first().click(); await p.waitForTimeout(1200);
+      check(await p.getByLabel('Hectares de cada parte').inputValue() === '16', 'reabre com 16 ha por parte');
+      await p.getByLabel('Hectares de cada parte').fill('20'); await p.waitForTimeout(600);
+      check(await p.getByText(/Parte 9:/).count() === 1 && await p.getByText(/Parte 10:/).count() === 0, 'prévia com partes de 20 ha (8 + sobra)');
+      await p.getByText('Salvar alterações').click(); await p.waitForTimeout(1500);
+      const c2 = (await estado(p)).campos[0];
+      check(c2.partes.length === 9 && Math.abs(c2.partes[0].areaM2 / 10000 - 20) < 0.05, `plano reajustado (${c2.partes.length} partes)`);
+      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
+    },
+  },
 ];

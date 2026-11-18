@@ -13,12 +13,13 @@ import { Botao } from '../../components/Botao';
 import { Campo } from '../../components/Campo';
 import { Fichas } from '../../components/Fichas';
 import { Dica } from '../../components/Dica';
-import { novoId, useDados, type BandeiraCampo, type ParteCampo, type PlanoCampo } from '../../store/dados';
+import { novoId, useDados, type BandeiraCampo, type ConfigJunto, type ParteCampo, type PlanoCampo } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { areaM2, comprimentoM } from '../../geo/medidas';
 import { anguloLadoMaisLongo } from '../../geo/dividir';
-import { CORES_VARIEDADE, conferirManual, fatorCalibracao, gerarCampo, type ConfigTalhao } from '../../geo/campo';
+import { CORES_VARIEDADE, conferirManual, fatorCalibracao, gerarCampo, gerarCampoJunto, textoOrigens, type ConfigTalhao } from '../../geo/campo';
+import { LINHA_AB_PADRAO, lerLatLon, medidasDaLinha, nomeRumo } from '../../geo/rastro';
 import { formatarNumeroBR, lerNumeroBR, paraCampoBR } from '../../geo/numero';
 import { formatarArea, formatarHa, formatarHaSemUnidade } from '../../geo/unidades';
 import { fonte, raio, tipo, useTema } from '../../theme';
@@ -26,6 +27,8 @@ import { fonte, raio, tipo, useTema } from '../../theme';
 const CORREDORES = ['Sem corredor', '3 m', '6 m'];
 const ESPACOS = ['Só nas pontas', 'A cada 100 m', 'A cada 200 m'];
 const MODOS = ['Partes iguais', 'Digitar hectares'];
+const DIRECOES = ['Pela linha AB', 'Lado mais longo'];
+const SOBRAS = ['Parte de sobra no fim', 'Dividir a sobra'];
 
 type Digitado = { textos: string[]; informada: string };
 
@@ -61,6 +64,31 @@ export default function NovoCampo() {
   const [espaco, setEspaco] = useState(rotuloEspaco(planoEditado?.espacamentoM ?? 0));
   const [haCada, setHaCada] = useState('16');
   const ultimaPrevia = useRef<ReturnType<typeof gerarCampo> | null>(null);
+
+  // ----- plantio dos talhões juntos (um só campo, faixas paralelas ao rastro AB) -----
+  const j0 = planoEditado?.junto;
+  const [modoJunto, setModoJunto] = useState(!!j0);
+  const [haParte, setHaParte] = useState(paraCampoBR(j0?.haPorParte ?? 16));
+  const [infTotal, setInfTotal] = useState(j0?.areaInformadaHa ? paraCampoBR(j0.areaInformadaHa) : '');
+  const [nomeAB, setNomeAB] = useState((j0?.linhaAB ?? LINHA_AB_PADRAO).nome);
+  const [ab, setAb] = useState(() => {
+    const l = j0?.linhaAB ?? LINHA_AB_PADRAO;
+    return { aLat: String(l.a[1]), aLon: String(l.a[0]), bLat: String(l.b[1]), bLon: String(l.b[0]) };
+  });
+  const [usarAB, setUsarAB] = useState(j0 ? j0.usarLinhaAB : true);
+  const [invJ, setInvJ] = useState(j0?.inverter ?? false);
+  const [sobra, setSobra] = useState<'extra' | 'dividir'>(j0?.sobra ?? 'extra');
+  const linhaAB = useMemo(() => {
+    const a = lerLatLon(ab.aLat, ab.aLon), b = lerLatLon(ab.bLat, ab.bLon);
+    return a && b && (a[0] !== b[0] || a[1] !== b[1]) ? { nome: nomeAB.trim() || 'AB', a, b } : null;
+  }, [ab, nomeAB]);
+  const configJunto = useMemo<ConfigJunto | null>(
+    () => (modoJunto ? {
+      talhaoIds: config.map((c) => c.talhaoId), haPorParte: lerNumeroBR(haParte) ?? 0, areaInformadaHa: lerNumeroBR(infTotal),
+      anguloGraus: null, linhaAB, usarLinhaAB: usarAB && !!linhaAB, inverter: invJ, sobra,
+    } : null),
+    [modoJunto, config, haParte, infTotal, linhaAB, usarAB, invJ, sobra],
+  );
 
   const corredorM = corredor === '3 m' ? 3 : corredor === '6 m' ? 6 : 0;
   const espacamentoM = espaco === 'A cada 100 m' ? 100 : espaco === 'A cada 200 m' ? 200 : 0;
@@ -112,11 +140,12 @@ export default function NovoCampo() {
 
   const { previa, erro } = useMemo(() => {
     try {
+      if (configJunto) return { previa: configJunto.talhaoIds.length ? gerarCampoJunto(talhoes, configJunto, corredorM, espacamentoM) : null, erro: null as string | null };
       return { previa: configEfetiva.length ? gerarCampo(talhoes, configEfetiva, corredorM, espacamentoM) : null, erro: null as string | null };
     } catch (e: any) {
       return { previa: null, erro: (e?.message as string) ?? 'Não foi possível dividir.' };
     }
-  }, [talhoes, configEfetiva, corredorM, espacamentoM]);
+  }, [talhoes, configEfetiva, configJunto, corredorM, espacamentoM]);
   if (previa) ultimaPrevia.current = previa;
   const mostrada = previa ?? (erro ? ultimaPrevia.current : null);
 
@@ -151,8 +180,11 @@ export default function NovoCampo() {
     }
     const plano: PlanoCampo = {
       id: planoEditado?.id ?? novoId(), nome: nome.trim() || 'Campo de sementes', criadoEm: planoEditado?.criadoEm ?? Date.now(),
-      config: configEfetiva.map((c) => (c.modo === 'manual' ? { ...c, areasHa: c.areasHa } : { ...c, areasHa: undefined, areaInformadaHa: undefined })),
-      corredorM, espacamentoM, variedades: planoEditado?.variedades ?? [], metaHa: planoEditado?.metaHa ?? null,
+      config: configJunto
+        ? configJunto.talhaoIds.map((id) => ({ talhaoId: id, partes: 0, anguloGraus: null, inverter: false, modo: 'iguais' as const }))
+        : configEfetiva.map((c) => (c.modo === 'manual' ? { ...c, areasHa: c.areasHa } : { ...c, areasHa: undefined, areaInformadaHa: undefined })),
+      junto: configJunto ?? undefined,
+      corredorM, espacamentoM, variedades: planoEditado?.variedades ?? [], metaHa: configJunto ? configJunto.haPorParte : planoEditado?.metaHa ?? null,
       partes, bandeiras, divisas: previa.divisas,
     };
     salvarCampo(plano);
@@ -160,7 +192,8 @@ export default function NovoCampo() {
     router.replace(`/campo/${plano.id}`);
   };
 
-  const totalPartes = configEfetiva.reduce((s, c) => s + c.partes, 0);
+  const totalPartes = configJunto ? (mostrada?.partes.length ?? 0) : configEfetiva.reduce((s, c) => s + c.partes, 0);
+  const medidasAB = linhaAB ? medidasDaLinha(linhaAB.a, linhaAB.b) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.fundo }}>
@@ -177,6 +210,7 @@ export default function NovoCampo() {
             onMover={() => {}}
             onTalhao={() => {}}
             parcelas={parcelasMapa}
+            rastro={modoJunto && linhaAB ? linhaAB : null}
             bandeiras={(mostrada?.bandeiras ?? []).map((b) => ({ id: b.id, coord: b.coord, estado: 'pendente' as const, rotulo: b.rotulo }))}
           />
         </Paralaxe>
@@ -226,7 +260,7 @@ export default function NovoCampo() {
                     <Text style={[tipo.legenda, { color: t.textoSuave }]}>{x.fazenda} · {formatarArea(total, 'ha')}</Text>
                   </View>
                 </Pressable>
-                {cfg && (
+                {cfg && !modoJunto && (
                   <View style={{ gap: 12 }}>
                     <Fichas opcoes={MODOS} valor={manual ? MODOS[1] : MODOS[0]} onChange={(v) => trocarModo(x.id, v === MODOS[1] ? 'manual' : 'iguais')} />
 
@@ -322,6 +356,56 @@ export default function NovoCampo() {
             );
           })}
 
+          {(config.length >= 2 || modoJunto) && (
+            <Cartao style={{ gap: 12, borderWidth: modoJunto ? 1.5 : 0, borderColor: t.primaria }}>
+              <Pressable onPress={() => { Haptics.selectionAsync(); setModoJunto((v) => !v); }} accessibilityRole="switch" aria-checked={modoJunto} accessibilityLabel="Plantar os talhões juntos como um só campo" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
+                <Ionicons name={modoJunto ? 'toggle' : 'toggle-outline'} size={32} color={modoJunto ? t.primaria : t.textoSuave} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[tipo.subtitulo, { color: t.texto }]}>Plantar os talhões juntos</Text>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>Trata os talhões marcados como um só campo: as faixas atravessam todos e seguem o rastro reto.</Text>
+                </View>
+              </Pressable>
+
+              {modoJunto && (
+                <View style={{ gap: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[tipo.legenda, { color: t.textoSuave }]}>RASTRO RETO (LINHA AB DO MONITOR)</Text>
+                    <Dica texto="Digite as coordenadas do ponto A e do ponto B como aparecem no monitor (ex.: -16.28240600 e -46.13416156). As divisas ficam paralelas a essa linha, então cada faixa tem passadas inteiras com a mesma variedade." />
+                  </View>
+                  <Campo rotulo="Nome da linha" value={nomeAB} onChangeText={setNomeAB} compacto accessibilityLabel="Nome da linha AB" />
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>PONTO A · LATITUDE E LONGITUDE</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}><Campo rotulo="" value={ab.aLat} onChangeText={(v) => setAb((c) => ({ ...c, aLat: v }))} keyboardType="numbers-and-punctuation" placeholder="A · latitude" compacto accessibilityLabel="Ponto A, latitude" /></View>
+                    <View style={{ flex: 1 }}><Campo rotulo="" value={ab.aLon} onChangeText={(v) => setAb((c) => ({ ...c, aLon: v }))} keyboardType="numbers-and-punctuation" placeholder="A · longitude" compacto accessibilityLabel="Ponto A, longitude" /></View>
+                  </View>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>PONTO B · LATITUDE E LONGITUDE</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}><Campo rotulo="" value={ab.bLat} onChangeText={(v) => setAb((c) => ({ ...c, bLat: v }))} keyboardType="numbers-and-punctuation" placeholder="B · latitude" compacto accessibilityLabel="Ponto B, latitude" /></View>
+                    <View style={{ flex: 1 }}><Campo rotulo="" value={ab.bLon} onChangeText={(v) => setAb((c) => ({ ...c, bLon: v }))} keyboardType="numbers-and-punctuation" placeholder="B · longitude" compacto accessibilityLabel="Ponto B, longitude" /></View>
+                  </View>
+                  <Text style={[tipo.corpo, { color: linhaAB ? t.textoSuave : t.perigo }]}>
+                    {medidasAB ? `Direção ${Math.round(medidasAB.rumo)}° (${nomeRumo(medidasAB.rumo)}) · ${Math.round(medidasAB.metros).toLocaleString('pt-BR')} m de A até B` : 'Informe latitude e longitude de A e B (ponto ou vírgula nos decimais).'}
+                  </Text>
+
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>DIREÇÃO DAS DIVISAS</Text>
+                  <Fichas opcoes={DIRECOES} valor={usarAB && linhaAB ? DIRECOES[0] : DIRECOES[1]} onChange={(v) => setUsarAB(v === DIRECOES[0])} />
+
+                  <Campo rotulo="Hectares de cada parte" value={haParte} onChangeText={setHaParte} keyboardType="decimal-pad" placeholder="16" compacto accessibilityLabel="Hectares de cada parte" />
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                      <Text style={[tipo.legenda, { color: t.textoSuave }]}>ÁREA TOTAL INFORMADA (OPCIONAL)</Text>
+                      <Dica texto="Se você sabe que a soma dos talhões é outra (ex.: 164 ha), informe aqui e as partes serão ajustadas proporcionalmente à área medida pelo contorno. É uma aproximação." />
+                    </View>
+                    <Campo rotulo="" value={infTotal} onChangeText={setInfTotal} keyboardType="decimal-pad" placeholder={`Medido: ${formatarHaSemUnidade(config.reduce((a, c) => a + (talhaoDe(c.talhaoId) ? areaM2(talhaoDe(c.talhaoId)!.contorno) : 0), 0))}`} compacto accessibilityLabel="Área total informada em hectares" />
+                  </View>
+                  <Text style={[tipo.legenda, { color: t.textoSuave }]}>O QUE SOBRA DEPOIS DAS PARTES DE {haParte || '16'} HA</Text>
+                  <Fichas opcoes={SOBRAS} valor={sobra === 'extra' ? SOBRAS[0] : SOBRAS[1]} onChange={(v) => setSobra(v === SOBRAS[0] ? 'extra' : 'dividir')} />
+                  <Botao titulo={invJ ? 'Começar do outro lado ✓' : 'Começar do outro lado'} variante={invJ ? 'primario' : 'suave'} onPress={() => setInvJ((v) => !v)} />
+                </View>
+              )}
+            </Cartao>
+          )}
+
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={[tipo.legenda, { color: t.textoSuave }]}>CORREDOR ENTRE AS PARTES</Text>
             <Dica texto="Faixa vazia entre uma variedade e outra para não misturar semente. Ela é descontada da área, então as partes ficam um pouco menores." />
@@ -342,7 +426,12 @@ export default function NovoCampo() {
             <Revelar>
               <Cartao style={{ gap: 6 }}>
                 <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.texto }}>{totalPartes} partes · {mostrada.divisas.length} divisas · {mostrada.bandeiras.length} bandeirinhas</Text>
-                {configEfetiva.map((c) => {
+                {configJunto && mostrada.partes.map((p, i) => (
+                  <Text key={i} style={[tipo.corpo, { color: t.textoSuave }]}>
+                    Parte {i + 1}: {formatarHaSemUnidade(p.areaM2)} ha{p.origens && p.origens.length > 1 ? ` (${textoOrigens(p, (id) => talhaoDe(id)?.nome ?? 'Talhão')})` : p.origens?.length === 1 ? ` (${talhaoDe(p.origens[0].talhaoId)?.nome ?? ''})` : ''}
+                  </Text>
+                ))}
+                {!configJunto && configEfetiva.map((c) => {
                   const ps = mostrada.partes.filter((p) => p.talhaoId === c.talhaoId);
                   return (
                     <Text key={c.talhaoId} style={[tipo.corpo, { color: t.textoSuave }]}>

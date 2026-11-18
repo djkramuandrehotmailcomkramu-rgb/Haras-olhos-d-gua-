@@ -29,6 +29,8 @@ export type ParteCampo = {
   pedacos: Coord[][];
   areaM2: number;
   variedade: string;
+  /** campo "juntos": quanto da parte vem de cada talhão */
+  origens?: { talhaoId: string; areaM2: number }[];
 };
 
 export type BandeiraCampo = { id: string; coord: Coord; rotulo: string; colocada: boolean; linha: number };
@@ -46,7 +48,26 @@ export type ConfigCampo = {
   areaInformadaHa?: number | null;
 };
 
+/** Vários talhões plantados juntos, como se fossem um só campo, com faixas paralelas ao rastro AB. */
+export type ConfigJunto = {
+  talhaoIds: string[];
+  /** hectares de cada parte (ex.: 16) */
+  haPorParte: number;
+  /** área total informada (ex.: 164) para calibrar os hectares; opcional */
+  areaInformadaHa?: number | null;
+  /** direção das divisas (0–180); null = acompanha o lado mais longo */
+  anguloGraus: number | null;
+  /** rastro reto (linha AB) do monitor; quando existe, é ele que dá a direção das divisas */
+  linhaAB?: { nome: string; a: Coord; b: Coord } | null;
+  usarLinhaAB: boolean;
+  inverter: boolean;
+  /** 'extra': o que sobra vira uma última parte; 'dividir': a sobra é repartida entre todas as partes */
+  sobra: 'extra' | 'dividir';
+};
+
 export type PlanoCampo = {
+  /** plantio dos talhões juntos (um só campo) */
+  junto?: ConfigJunto;
   id: string;
   nome: string;
   criadoEm: number;

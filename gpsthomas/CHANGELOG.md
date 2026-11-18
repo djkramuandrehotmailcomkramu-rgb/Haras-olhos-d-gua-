@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+- **Campo de sementes com talhões juntos:** marque dois ou mais talhões (ex.: Andropgno e Amendoim) e ligue **"Plantar os talhões juntos"**: eles viram **um só campo**, dividido em partes iguais de X ha (ex.: 16 ha). As faixas atravessam todos os talhões e cada parte mostra quanto vem de cada um.
+- **Rastro reto (linha AB do monitor):** digite os pontos A e B (ponto ou vírgula nos decimais); as divisas ficam **paralelas à linha**. A linha aparece no mapa (com A e B), no PDF e nas exportações (KML, GeoJSON, GPX).
+- O que sobra depois das partes cheias vira uma **parte de sobra** (ou é repartido entre todas); área total informada opcional para calibrar; meta por variedade já preenchida com os hectares da parte.
+- "Ajustar hectares" reabre o plano com tudo preenchido; backup e restauração guardam a configuração. Testes: 92 unitários e 22 ponta a ponta.
+
 ## 1.4.0
 - **Girar o mapa:** gire com dois dedos para ver o terreno de qualquer lado (também funciona dando zoom ao mesmo tempo). Aparece uma **bússola** ao lado do painel; tocar nela volta o norte para cima. Pontos, alça de ajuste e toques continuam exatos com o mapa girado.
 - Atualizações: o aplicativo (inclusive o APK) sempre abre a versão mais nova e avisa "Nova versão disponível — Atualizar"; também há **Ajuda → Verificar atualização**.

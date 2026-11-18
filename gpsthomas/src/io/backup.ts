@@ -24,7 +24,12 @@ const campo = z.object({
     modo: z.enum(['iguais', 'manual']).optional(), areasHa: z.array(z.number()).optional(), areaInformadaHa: z.number().nullable().optional(),
   })),
   corredorM: z.number(), espacamentoM: z.number(), variedades: z.array(z.string()), metaHa: z.number().nullable().optional(),
-  partes: z.array(z.object({ talhaoId: z.string(), indice: z.number(), pedacos: z.array(anel), areaM2: z.number(), variedade: z.string() })),
+  partes: z.array(z.object({ talhaoId: z.string(), indice: z.number(), pedacos: z.array(anel), areaM2: z.number(), variedade: z.string(), origens: z.array(z.object({ talhaoId: z.string(), areaM2: z.number() })).optional() })),
+  junto: z.object({
+    talhaoIds: z.array(z.string()), haPorParte: z.number(), areaInformadaHa: z.number().nullable().optional(),
+    anguloGraus: z.number().nullable(), linhaAB: z.object({ nome: z.string(), a: coord, b: coord }).nullable().optional(),
+    usarLinhaAB: z.boolean(), inverter: z.boolean(), sobra: z.enum(['extra', 'dividir']),
+  }).optional(),
   bandeiras: z.array(z.object({ id: z.string(), coord, rotulo: z.string(), colocada: z.boolean(), linha: z.number() })),
   divisas: z.array(z.object({ id: z.number(), talhaoId: z.string(), pontos: anel })),
 });

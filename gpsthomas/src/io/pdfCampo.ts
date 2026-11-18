@@ -57,7 +57,7 @@ export async function montarPdfCampo({ plano, nomeTalhao, fazenda, talhoes }: Da
   doc.setTextColor(...preto).setFont('helvetica', 'bold').setFontSize(16).text(limpo(plano.nome), M, 36);
   const totalHa = plano.partes.reduce((s, p) => s + p.areaM2, 0);
   doc.setFont('helvetica', 'normal').setFontSize(10).setTextColor(...cinza).text(
-    limpo(`${plano.partes.length} partes - ${plano.divisas.length} divisas - ${plano.bandeiras.length} bandeirinhas - ${ha(totalHa)} no total${plano.corredorM ? ` - corredor de ${plano.corredorM} m` : ''}`),
+    limpo(`${plano.partes.length} partes - ${plano.divisas.length} divisas - ${plano.bandeiras.length} bandeirinhas - ${ha(totalHa)} no total${plano.corredorM ? ` - corredor de ${plano.corredorM} m` : ''}${plano.junto ? ` - talhoes juntos, partes de ${plano.junto.haPorParte} ha${plano.junto.linhaAB && plano.junto.usarLinhaAB ? `, faixas paralelas ao rastro ${plano.junto.linhaAB.nome}` : ''}` : ''}`),
     M, 42,
   );
 
@@ -105,6 +105,31 @@ export async function montarPdfCampo({ plano, nomeTalhao, fazenda, talhoes }: Da
       doc.setFillColor(229, 72, 77).setDrawColor(255, 255, 255).setLineWidth(0.3).circle(x, y, 1.9, 'FD');
       doc.setTextColor(255, 255, 255).setFont('helvetica', 'bold').setFontSize(5.5).text(String(i + 1), x, y + 0.7, { align: 'center' });
     });
+
+    // rastro AB (campo junto): trecho da reta que cabe no quadro, com os pontos A e B quando estão dentro dele
+    const ab = plano.junto?.linhaAB;
+    if (ab) {
+      const pa = paraPdf(ab.a), pb = paraPdf(ab.b);
+      const dx = pb[0] - pa[0], dy = pb[1] - pa[1];
+      let t0 = -50, t1 = 50;
+      const recorta = (p0: number, d: number, mn: number, mx: number) => {
+        if (Math.abs(d) < 1e-9) return p0 >= mn && p0 <= mx;
+        let u0 = (mn - p0) / d, u1 = (mx - p0) / d;
+        if (u0 > u1) [u0, u1] = [u1, u0];
+        t0 = Math.max(t0, u0); t1 = Math.min(t1, u1);
+        return t0 <= t1;
+      };
+      if (recorta(pa[0], dx, caixa.x + 1, caixa.x + caixa.w - 1) && recorta(pa[1], dy, caixa.y + 1, caixa.y + caixa.h - 1)) {
+        doc.setDrawColor(217, 154, 0).setLineWidth(0.6).setLineDashPattern([2.2, 1.6], 0);
+        doc.line(pa[0] + dx * t0, pa[1] + dy * t0, pa[0] + dx * t1, pa[1] + dy * t1);
+        doc.setLineDashPattern([], 0);
+      }
+      ([['A', pa], ['B', pb]] as [string, [number, number]][]).forEach(([letra, q]) => {
+        if (q[0] < caixa.x + 3 || q[0] > caixa.x + caixa.w - 3 || q[1] < caixa.y + 3 || q[1] > caixa.y + caixa.h - 3) return;
+        doc.setFillColor(242, 183, 61).setDrawColor(255, 255, 255).setLineWidth(0.3).circle(q[0], q[1], 2.3, 'FD');
+        doc.setTextColor(43, 29, 0).setFont('helvetica', 'bold').setFontSize(6.5).text(letra, q[0], q[1] + 0.9, { align: 'center' });
+      });
+    }
 
     // seta do norte
     const nx = caixa.x + caixa.w - 9, ny = caixa.y + 14;
