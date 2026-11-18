@@ -21,7 +21,7 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     cartaoSuave: '#E8EDE6',
     texto: '#13201A',
     textoSuave: '#5B6B61',
-    linha: 'rgba(19,32,26,0.10)',
+    linha: 'rgba(19,32,26,0.08)',
     primaria: '#1F7A3E',
     primariaSuave: 'rgba(31,122,62,0.12)',
     sobrePrimaria: '#FFFFFF',
@@ -37,7 +37,7 @@ export const paletas: Record<'claro' | 'escuro', Paleta> = {
     cartaoSuave: '#1D2A22',
     texto: '#EEF4EF',
     textoSuave: '#93A59A',
-    linha: 'rgba(238,244,239,0.12)',
+    linha: 'rgba(238,244,239,0.10)',
     primaria: '#3FB063',
     primariaSuave: 'rgba(63,176,99,0.18)',
     sobrePrimaria: '#06210F',
@@ -57,20 +57,21 @@ export function useTema(): Paleta {
 }
 
 export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const raio = { sm: 10, md: 16, lg: 22, xl: 30, pilula: 999 };
+export const raio = { sm: 10, md: 16, lg: 24, xl: 32, pilula: 999 };
 
 export const fonte = {
   regular: 'Inter_400Regular',
   media: 'Inter_500Medium',
-  semi: 'Inter_600SemiBold',
-  negrito: 'Inter_700Bold',
+  // Visual mais fino: os pesos "semi" e "negrito" usam um degrau mais leve (só há 400/500/600 carregados).
+  semi: 'Inter_500Medium',
+  negrito: 'Inter_600SemiBold',
 };
 
 export const tipo = {
-  tituloGrande: { fontFamily: fonte.negrito, fontSize: 34, letterSpacing: -0.8 },
+  tituloGrande: { fontFamily: fonte.negrito, fontSize: 34, letterSpacing: -1 },
   titulo: { fontFamily: fonte.negrito, fontSize: 22, letterSpacing: -0.4 },
   subtitulo: { fontFamily: fonte.semi, fontSize: 17, letterSpacing: -0.2 },
   corpo: { fontFamily: fonte.regular, fontSize: 15 },
   legenda: { fontFamily: fonte.media, fontSize: 12.5, letterSpacing: 0.2 },
-  numeroGrande: { fontFamily: fonte.negrito, fontSize: 40, letterSpacing: -1, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
+  numeroGrande: { fontFamily: fonte.media, fontSize: 40, letterSpacing: -1.2, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
 };

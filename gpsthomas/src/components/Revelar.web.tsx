@@ -14,7 +14,7 @@ export function Revelar({ children, atraso = 0, style }: { children: ReactNode; 
     const io = new IntersectionObserver(
       (es) => {
         if (es.some((e) => e.isIntersecting)) {
-          p.value = withDelay(atraso, withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
+          p.value = withDelay(atraso, withTiming(1, { duration: 560, easing: Easing.bezier(0.22, 1, 0.36, 1) }));
           io.disconnect();
         }
       },
@@ -26,7 +26,7 @@ export function Revelar({ children, atraso = 0, style }: { children: ReactNode; 
 
   const st = useAnimatedStyle(() => ({
     opacity: p.value,
-    transform: [{ translateY: (1 - p.value) * 16 }, { scale: 0.985 + 0.015 * p.value }],
+    transform: [{ translateY: (1 - p.value) * 12 }, { scale: 0.985 + 0.015 * p.value }],
   }));
 
   return (

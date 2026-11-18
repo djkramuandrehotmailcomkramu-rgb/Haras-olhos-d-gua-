@@ -33,12 +33,12 @@ export default function RaizLayout() {
     <ErroGlobal>
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: cor }}>
       <StatusBar style={escuro ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 260, contentStyle: { backgroundColor: cor } }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 320, contentStyle: { backgroundColor: cor } }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="talhao/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
-        <Stack.Screen name="campo/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
-        <Stack.Screen name="campo/novo" options={{ animation: 'slide_from_bottom', animationDuration: 320 }} />
-        <Stack.Screen name="ajuda" options={{ animation: 'slide_from_right', animationDuration: 300 }} />
+        <Stack.Screen name="talhao/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
+        <Stack.Screen name="campo/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
+        <Stack.Screen name="campo/novo" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
+        <Stack.Screen name="ajuda" options={{ animation: 'slide_from_right', animationDuration: 360 }} />
       </Stack>
       <Toast />
       <AvisoSistema />

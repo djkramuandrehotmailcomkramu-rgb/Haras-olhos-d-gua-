@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+- **Visual mais fino e moderno:** fontes um degrau mais leves em todo o app, ícones só de contorno (inclusive na barra de abas), bordas de 0,5 px em vez de sombras pesadas, cartões e botões mais baixos e arredondados, sombras suaves.
+- **Mapa mais delicado:** linhas dos talhões, parcelas e rotas mais finas, pontos com borda leve (a área de toque continua grande).
+- **Mais fluido:** animações de botões, indicador da barra de abas, entrada dos cartões e troca de telas com mola mais suave; cores e bordas mudam com transição.
+
 ## 1.2.0
 - **Instalação do atalho corrigida na raiz:** o projeto na Vercel estava com *Deployment Protection* (login) e respondia 401 ao manifest, ao service worker e aos ícones, então o Chrome criava só um atalho comum (com a barra verde). Agora há **Ajuda → "Verificar a instalação"**, que testa HTTPS, manifest, ícones, service worker e modo de exibição e explica qualquer falha (inclusive site protegido por login).
 - **Ícone novo** (símbolo maior, sombra no chão, degradê verde-soja), com arquivos versionados `icon-v2-*` para o Android não reaproveitar o ícone antigo; versões maskable e monocromática; `id` do manifest novo (reinstale o app).

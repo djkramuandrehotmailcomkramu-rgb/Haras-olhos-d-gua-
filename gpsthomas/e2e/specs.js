@@ -233,7 +233,8 @@ module.exports = [
     async fn({ browser, url }) {
       const p = await novaPagina(browser, { url });
       await p.ir('/ajuda');
-      check(await p.getByText('Versão 1.2.0').count() === 1, 'mostra a versão 1.2.0');
+      const V = require('../package.json').version;
+      check(await p.getByText('Versão ' + V).count() === 1, 'mostra a versão ' + V);
       await p.getByText('Campo de sementes').first().click(); await p.waitForTimeout(400);
       check(await p.getByText(/Digitar hectares/).count() >= 1, 'guia explica hectares digitados');
     },

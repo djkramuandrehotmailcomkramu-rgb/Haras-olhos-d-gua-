@@ -508,7 +508,7 @@ export default function RotasTela() {
               const excesso = lim != null && kmh > lim + 5;
               return (
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-                  <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: excesso ? t.perigo : t.cartao, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: excesso ? '#fff' : t.linha, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }} accessibilityLabel={`Velocidade ${formatarKmh(kmh)} quilômetros por hora`}>
+                  <View style={{ width: 84, height: 84, borderRadius: 42, backgroundColor: excesso ? t.perigo : t.cartao, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: excesso ? '#fff' : t.linha, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }} accessibilityLabel={`Velocidade ${formatarKmh(kmh)} quilômetros por hora`}>
                     <Text style={{ fontFamily: fonte.negrito, fontSize: 32, lineHeight: 34, color: excesso ? '#fff' : t.texto, fontVariant: ['tabular-nums'] }}>{formatarKmh(kmh)}</Text>
                     <Text style={{ fontFamily: fonte.semi, fontSize: 11, color: excesso ? '#fff' : t.textoSuave }}>km/h</Text>
                   </View>

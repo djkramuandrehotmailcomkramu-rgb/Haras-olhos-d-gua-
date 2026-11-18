@@ -38,7 +38,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
 
   const alvo = useSharedValue(state.index);
   alvo.value = state.index;
-  const pos = useDerivedValue(() => withSpring(alvo.value, { damping: 20, stiffness: 240, mass: 0.8 }));
+  const pos = useDerivedValue(() => withSpring(alvo.value, { damping: 22, stiffness: 190, mass: 0.9 }));
   const indicador = useAnimatedStyle(() => ({ transform: [{ translateX: pos.value * larguraAba }] }));
 
   return (
@@ -54,7 +54,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
           {state.routes.map((rota, i) => {
             const foco = state.index === i;
             const rotulo = (descriptors[rota.key].options.title ?? rota.name) as string;
-            const [fora, dentro] = ICONES[rota.name] ?? ICONES.index;
+            const [fora] = ICONES[rota.name] ?? ICONES.index;
             return (
               <Pressable
                 key={rota.key}
@@ -68,7 +68,7 @@ export function BarraAbas({ state, descriptors, emitter, navigateToTab }: Bottom
                   if (!foco && !ev.defaultPrevented) navigateToTab(rota.key);
                 }}
               >
-                <Ionicons name={foco ? dentro : fora} size={23} color={foco ? t.primariaTexto : t.textoSuave} />
+                <Ionicons name={fora} size={22} color={foco ? t.primariaTexto : t.textoSuave} />
                 <Text style={[s.rot, { color: foco ? t.primariaTexto : t.textoSuave }]}>{rotulo}</Text>
               </Pressable>
             );
@@ -83,5 +83,5 @@ const s = StyleSheet.create({
   raiz: { position: 'absolute', left: 16, right: 16 },
   linha: { flexDirection: 'row', padding: PAD },
   aba: { flex: 1, alignItems: 'center', paddingVertical: 8, gap: 2 },
-  rot: { fontFamily: fonte.semi, fontSize: 11 },
+  rot: { fontFamily: fonte.media, fontSize: 10.5 },
 });

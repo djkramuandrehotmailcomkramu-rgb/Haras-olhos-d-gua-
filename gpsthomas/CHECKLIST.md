@@ -1,4 +1,4 @@
-# GPSThomas 1.2.0: checklist de entrega
+# GPSThomas 1.3.0: checklist de entrega
 
 Resultado de cada item na versão 1.0.0. `[x]` = verificado automaticamente aqui; `[~]` = verificado só em parte; `[ ]` = não dá para verificar neste ambiente (precisa do seu aparelho ou de serviço externo).
 

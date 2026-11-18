@@ -27,7 +27,7 @@ function pino(primeiro: boolean, selecionado: boolean): L.DivIcon {
   caixa.style.cssText = 'width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;';
   const d = selecionado ? 26 : primeiro ? 24 : 18;
   const c = document.createElement('div');
-  c.style.cssText = `width:${d}px;height:${d}px;border-radius:50%;background:${selecionado ? AMBAR : '#fff'};border:4px solid ${selecionado ? '#fff' : VERDE};box-shadow:0 2px 8px rgba(0,0,0,.5)${selecionado ? ',0 0 0 7px rgba(242,183,61,.35)' : ''};box-sizing:border-box;`;
+  c.style.cssText = `width:${d}px;height:${d}px;border-radius:50%;background:${selecionado ? AMBAR : '#fff'};border:2.5px solid ${selecionado ? '#fff' : VERDE};box-shadow:0 1px 6px rgba(0,0,0,.45)${selecionado ? ',0 0 0 7px rgba(242,183,61,.35)' : ''};box-sizing:border-box;`;
   caixa.appendChild(c);
   return L.divIcon({ html: caixa, className: '', iconSize: [44, 44], iconAnchor: [22, 22] });
 }
@@ -38,7 +38,7 @@ function iconeAlca(): L.DivIcon {
   caixa.className = 'gt-alca';
   caixa.style.cssText = 'width:64px;height:64px;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;';
   const c = document.createElement('div');
-  c.style.cssText = `width:50px;height:50px;border-radius:50%;background:${AMBAR};border:3px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;`;
+  c.style.cssText = `width:50px;height:50px;border-radius:50%;background:${AMBAR};border:2px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;`;
   c.innerHTML = '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#2B1D00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>';
   caixa.appendChild(c);
   return L.divIcon({ html: caixa, className: '', iconSize: [64, 64], iconAnchor: [32, 32] });
@@ -110,9 +110,9 @@ export function MapaInterativo(props: PropsMapa) {
     g.talhoes.clearLayers();
     for (const t of props.talhoes) {
       if (t.contorno.length < 3) continue;
-      L.polygon(t.contorno.map(paraLL), { color: AMBAR, weight: 3, fillColor: AMBAR, fillOpacity: 0.18, interactive: false }).addTo(g.talhoes);
+      L.polygon(t.contorno.map(paraLL), { color: AMBAR, weight: 2, fillColor: AMBAR, fillOpacity: 0.16, interactive: false }).addTo(g.talhoes);
       const rot = document.createElement('div');
-      rot.style.cssText = 'background:rgba(10,17,13,.82);color:#fff;border-radius:12px;padding:5px 10px;font:600 12px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:center;cursor:pointer;transform:translate(-50%,-50%);';
+      rot.style.cssText = 'background:rgba(10,17,13,.82);color:#fff;border-radius:12px;padding:5px 10px;font:500 12px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:center;cursor:pointer;transform:translate(-50%,-50%);';
       const n = document.createElement('div');
       n.textContent = t.nome;
       const r = document.createElement('div');
@@ -144,8 +144,8 @@ export function MapaInterativo(props: PropsMapa) {
     if (sel == null) ultimaSel.current = null;
     let forma: L.Path & { setLatLngs: (l: L.LatLngExpression[]) => unknown };
     const ll = pts.map(paraLL);
-    if (props.poligono && pts.length >= 3) forma = L.polygon(ll, { color: VERDE, weight: 4, fillColor: VERDE, fillOpacity: 0.25, interactive: false });
-    else forma = L.polyline(ll, { color: VERDE, weight: 4, interactive: false });
+    if (props.poligono && pts.length >= 3) forma = L.polygon(ll, { color: VERDE, weight: 2.5, fillColor: VERDE, fillOpacity: 0.22, interactive: false });
+    else forma = L.polyline(ll, { color: VERDE, weight: 3, interactive: false });
     forma.addTo(g.rascunho);
     let marcadorSel: L.Marker | null = null;
     pts.forEach((c, i) => {
@@ -183,7 +183,7 @@ export function MapaInterativo(props: PropsMapa) {
       const dx = ponto.x > tam.x - 130 ? -78 : 78;
       const dy = ponto.y + 78 > tam.y - base - 16 ? -78 : 78;
       const posAlca = m.containerPointToLatLng([ponto.x + dx, ponto.y + dy]);
-      const ligacao = L.polyline([ll[sel], posAlca], { color: '#fff', weight: 2.5, dashArray: '2 6', opacity: 0.95, interactive: false }).addTo(g.rascunho);
+      const ligacao = L.polyline([ll[sel], posAlca], { color: '#fff', weight: 1.75, dashArray: '2 6', opacity: 0.95, interactive: false }).addTo(g.rascunho);
       const alca = L.marker(posAlca, { icon: iconeAlca(), draggable: true, autoPan: false, keyboard: false, zIndexOffset: 1000 }).addTo(g.rascunho);
       let alcaIni = L.point(0, 0);
       let pontoIni = L.point(0, 0);
@@ -213,7 +213,7 @@ export function MapaInterativo(props: PropsMapa) {
     const f = props.fantasma;
     const pts = props.rascunho;
     if (!f || pts.length === 0) return;
-    const opc = { color: '#fff', weight: 3, dashArray: '4 7', opacity: 0.95, interactive: false } as L.PolylineOptions;
+    const opc = { color: '#fff', weight: 2, dashArray: '4 7', opacity: 0.95, interactive: false } as L.PolylineOptions;
     L.polyline([paraLL(pts[pts.length - 1]), paraLL(f)], opc).addTo(g.fantasma);
     if (props.poligono && pts.length >= 2) L.polyline([paraLL(f), paraLL(pts[0])], { ...opc, opacity: 0.55 }).addTo(g.fantasma);
   }, [props.fantasma, props.rascunho, props.poligono]);
@@ -231,7 +231,7 @@ export function MapaInterativo(props: PropsMapa) {
     const p = props.posicao;
     if (!p || props.veiculo) return;
     if (p.precisaoM) L.circle(paraLL(p.coord), { radius: p.precisaoM, color: '#3B82F6', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(g.pos);
-    L.circleMarker(paraLL(p.coord), { radius: 8, color: '#fff', weight: 3, fillColor: '#3B82F6', fillOpacity: 1, interactive: false }).addTo(g.pos);
+    L.circleMarker(paraLL(p.coord), { radius: 7, color: '#fff', weight: 2.5, fillColor: '#3B82F6', fillOpacity: 1, interactive: false }).addTo(g.pos);
   }, [props.posicao, !!props.veiculo]);
 
   // veículo (ícone que gira com o rumo)
@@ -268,19 +268,19 @@ export function MapaInterativo(props: PropsMapa) {
     for (const pc of props.parcelas ?? []) {
       for (const anel of pc.pedacos) {
         if (anel.length < 3) continue;
-        L.polygon(anel.map(paraLL), { color: pc.cor, weight: 2.5, fillColor: pc.cor, fillOpacity: props.linhaGuia ? 0.2 : 0.38, interactive: false }).addTo(g.campo);
+        L.polygon(anel.map(paraLL), { color: pc.cor, weight: 1.75, fillColor: pc.cor, fillOpacity: props.linhaGuia ? 0.2 : 0.38, interactive: false }).addTo(g.campo);
       }
       const todos = pc.pedacos.flat();
       if (todos.length) {
         const rot = document.createElement('div');
-        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:600 11.5px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
+        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:500 11.5px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
         const a = document.createElement('div'); a.textContent = pc.rotulo;
         rot.appendChild(a);
         if (pc.sub) { const b = document.createElement('div'); b.textContent = pc.sub; b.style.cssText = 'font-weight:500;opacity:.8;font-size:10.5px;'; rot.appendChild(b); }
         L.marker(paraLL(centro(todos)), { icon: L.divIcon({ html: rot, className: '', iconSize: [0, 0] }), interactive: false }).addTo(g.campo);
       }
     }
-    if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 4, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
+    if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 3, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
     for (const b of props.bandeiras ?? []) {
       const cor = b.estado === 'ok' ? '#3FB063' : b.estado === 'atual' ? '#F2B73D' : '#9AA7A0';
       const grande = b.estado === 'atual';
@@ -306,16 +306,16 @@ export function MapaInterativo(props: PropsMapa) {
     for (const i of ordem) {
       const ativa = i === (props.rotaAtiva ?? 0);
       const ll = rotas[i].map(paraLL);
-      L.polyline(ll, { color: '#fff', weight: ativa ? 11 : 9, opacity: 0.95, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
-      const linha = L.polyline(ll, { color: ativa ? '#2F7DF6' : '#8A97A6', weight: ativa ? 7 : 6, lineCap: 'round', lineJoin: 'round', interactive: !ativa }).addTo(g.rotas);
+      L.polyline(ll, { color: '#fff', weight: ativa ? 9 : 7.5, opacity: 0.95, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
+      const linha = L.polyline(ll, { color: ativa ? '#2F7DF6' : '#8A97A6', weight: ativa ? 5 : 4.5, lineCap: 'round', lineJoin: 'round', interactive: !ativa }).addTo(g.rotas);
       if (ativa && props.progressoIdx && props.progressoIdx > 0) {
-        L.polyline(rotas[i].slice(0, props.progressoIdx + 1).map(paraLL), { color: '#8A97A6', weight: 7, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
+        L.polyline(rotas[i].slice(0, props.progressoIdx + 1).map(paraLL), { color: '#8A97A6', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(g.rotas);
       }
       if (!ativa) linha.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onRota?.(i); });
     }
     if (props.destino) {
       const el2 = document.createElement('div');
-      el2.style.cssText = 'width:30px;height:30px;border-radius:50% 50% 50% 0;background:#E5484D;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.5);box-sizing:border-box;';
+      el2.style.cssText = 'width:30px;height:30px;border-radius:50% 50% 50% 0;background:#E5484D;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.5);box-sizing:border-box;';
       L.marker(paraLL(props.destino), { icon: L.divIcon({ html: el2, className: '', iconSize: [30, 30], iconAnchor: [15, 30] }), interactive: false }).addTo(g.rotas);
     }
   }, [props.rotas, props.rotaAtiva, props.destino, props.progressoIdx]);

@@ -400,14 +400,14 @@ export default function MapaTela() {
               titulo={caminhando ? 'Pausar' : pontos.length ? 'Continuar' : 'Iniciar'}
               tamanho="g"
               variante={caminhando ? 'perigo' : 'primario'}
-              icone={<Ionicons name={caminhando ? 'pause' : 'play'} size={20} color={caminhando ? '#fff' : t.sobrePrimaria} />}
+              icone={<Ionicons name={caminhando ? 'pause-outline' : 'play-outline'} size={20} color={caminhando ? '#fff' : t.sobrePrimaria} />}
               onPress={alternarCaminhada}
               style={{ flex: 1 }}
             />
           ) : mira ? (
             <Botao titulo="Marcar no centro" tamanho="g" desabilitado={!centro} icone={<MaterialCommunityIcons name="crosshairs-gps" size={20} color={t.sobrePrimaria} />} onPress={marcarNoCentro} style={{ flex: 1.4 }} />
           ) : (
-            <Botao titulo="Ponto aqui" tamanho="g" variante="suave" icone={<Ionicons name="navigate" size={19} color={t.primaria} />} onPress={marcarAqui} style={{ flex: 1 }} />
+            <Botao titulo="Ponto aqui" tamanho="g" variante="suave" icone={<Ionicons name="navigate-outline" size={19} color={t.primaria} />} onPress={marcarAqui} style={{ flex: 1 }} />
           )}
           <Botao titulo="Salvar" tamanho="g" desabilitado={!podeSalvar} icone={<Ionicons name="checkmark" size={21} color={t.sobrePrimaria} />} onPress={() => { setCaminhando(false); setSalvando(true); }} style={{ flex: 1 }} />
         </View>

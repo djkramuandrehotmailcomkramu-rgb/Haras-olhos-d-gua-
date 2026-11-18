@@ -16,9 +16,9 @@ export function Segmentos({ opcoes, valor, onChange }: { opcoes: string[]; valor
             accessibilityLabel={o}
             accessibilityState={{ selected: ativo }}
             onPress={() => { Haptics.selectionAsync(); onChange(o); }}
-            style={{ flex: 1, height: 40, borderRadius: raio.pilula, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? t.primaria : t.cartaoSuave }}
+            style={{ flex: 1, height: 38, borderRadius: raio.pilula, alignItems: 'center', justifyContent: 'center', backgroundColor: ativo ? t.primaria : t.cartaoSuave }}
           >
-            <Text style={{ fontFamily: fonte.semi, fontSize: 14, color: ativo ? t.sobrePrimaria : t.texto }}>{o}</Text>
+            <Text style={{ fontFamily: fonte.media, fontSize: 14, color: ativo ? t.sobrePrimaria : t.texto }}>{o}</Text>
           </Pressable>
         );
       })}

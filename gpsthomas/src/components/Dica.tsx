@@ -14,7 +14,7 @@ export function Dica({ texto }: { texto: string }) {
         <Text style={{ fontFamily: fonte.negrito, fontSize: 12.5, color: aberta ? t.sobrePrimaria : t.textoSuave }}>?</Text>
       </Pressable>
       {aberta && (
-        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={{ position: 'absolute', top: 28, left: 0, width: 270, padding: 12, borderRadius: raio.md, backgroundColor: t.cartao, borderWidth: 1, borderColor: t.linha, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
+        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(120)} style={{ position: 'absolute', top: 28, left: 0, width: 270, padding: 12, borderRadius: raio.md, backgroundColor: t.cartao, borderWidth: 0.5, borderColor: t.linha, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>
           <Text style={{ fontFamily: fonte.regular, fontSize: 13.5, lineHeight: 19, color: t.texto }}>{texto}</Text>
         </Animated.View>
       )}

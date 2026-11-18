@@ -56,7 +56,7 @@ export function FolhaBandeira({ visivel, rotulo, colocada, distanciaM, ehAlvo, o
           <View style={{ alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: t.linha }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colocada ? t.primariaSuave : 'rgba(242,183,61,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="flag" size={22} color={colocada ? t.ok : t.atencao} />
+              <Ionicons name="flag-outline" size={22} color={colocada ? t.ok : t.atencao} />
             </View>
             <View style={{ flex: 1 }}>
               <Text numberOfLines={2} style={[tipo.subtitulo, { color: t.texto }]}>{rotulo}</Text>
@@ -64,9 +64,9 @@ export function FolhaBandeira({ visivel, rotulo, colocada, distanciaM, ehAlvo, o
             </View>
           </View>
           {!colocada && (
-            <Botao titulo={ehAlvo ? 'Continuar guiando até esta' : 'Guiar até esta bandeira'} tamanho="g" icone={<Ionicons name="walk" size={20} color={t.sobrePrimaria} />} onPress={onGuiar} />
+            <Botao titulo={ehAlvo ? 'Continuar guiando até esta' : 'Guiar até esta bandeira'} tamanho="g" icone={<Ionicons name="walk-outline" size={20} color={t.sobrePrimaria} />} onPress={onGuiar} />
           )}
-          <Botao titulo="Rota por estrada até aqui" variante="suave" icone={<Ionicons name="car" size={19} color={t.primaria} />} onPress={onRota} />
+          <Botao titulo="Rota por estrada até aqui" variante="suave" icone={<Ionicons name="car-outline" size={19} color={t.primaria} />} onPress={onRota} />
           <Botao titulo={colocada ? 'Marcar como pendente' : 'Marcar como colocada'} variante="fantasma" onPress={onAlternar} />
           <Pressable onPress={onFechar} style={{ alignItems: 'center', paddingVertical: 6 }}>
             <Text style={{ fontFamily: fonte.semi, fontSize: 15, color: t.textoSuave }}>Fechar</Text>
