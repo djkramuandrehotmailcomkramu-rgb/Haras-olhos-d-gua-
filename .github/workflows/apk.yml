@@ -201,10 +201,12 @@ jobs:
       - name: Compilar o APK
         working-directory: gpsthomas/casca/android
         run: ./gradlew assembleDebug --no-daemon
-      - name: Guardar o APK
+      - name: Assinar com a chave fixa e guardar o APK
         run: |
-          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA256|Owner' || true
-          cp android/app/build/outputs/apk/debug/app-debug.apk ../public/GPSThomas.apk
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          echo "apksigner: $APKSIGNER"
+          $APKSIGNER sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey --out ../public/GPSThomas.apk android/app/build/outputs/apk/debug/app-debug.apk
+          $APKSIGNER verify --print-certs ../public/GPSThomas.apk | grep -E "SHA-256|DN" || true
           ls -l ../public/GPSThomas.apk
       - uses: actions/upload-artifact@v4
         with:
