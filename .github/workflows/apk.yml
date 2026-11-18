@@ -34,11 +34,14 @@ jobs:
           npx cap add android
           npx @capacitor/assets generate --android --iconBackgroundColor '#0F4A27'
           npx cap sync android
+          # Chave de assinatura fixa: todo APK novo é assinado igual e instala por cima do anterior
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
           # Ponte de impressão: o site envia o HTML do plano e o Android abre a impressão do sistema
-          JAVA_DIR=android/app/src/main/java/br/com/gpsthomas/app
+          JAVA_DIR=android/app/src/main/java/br/com/gpsthomas/campo
           mkdir -p $JAVA_DIR
           cat > $JAVA_DIR/ImpressaoJs.java <<'JAVA'
-          package br.com.gpsthomas.app;
+          package br.com.gpsthomas.campo;
 
           import android.app.Activity;
           import android.content.Context;
@@ -75,7 +78,7 @@ jobs:
           }
           JAVA
           cat > $JAVA_DIR/ImpressaoPlugin.java <<'JAVA'
-          package br.com.gpsthomas.app;
+          package br.com.gpsthomas.campo;
 
           import android.content.Context;
           import android.content.Intent;
@@ -178,7 +181,7 @@ jobs:
           }
           JAVA
           cat > $JAVA_DIR/MainActivity.java <<'JAVA'
-          package br.com.gpsthomas.app;
+          package br.com.gpsthomas.campo;
 
           import android.os.Bundle;
           import com.getcapacitor.BridgeActivity;
@@ -200,6 +203,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon
       - name: Guardar o APK
         run: |
+          keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'SHA256|Owner' || true
           cp android/app/build/outputs/apk/debug/app-debug.apk ../public/GPSThomas.apk
           ls -l ../public/GPSThomas.apk
       - uses: actions/upload-artifact@v4

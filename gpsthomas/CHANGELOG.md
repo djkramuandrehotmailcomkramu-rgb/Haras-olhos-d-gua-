@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.2
+- **APK:** novo identificador do app (`br.com.gpsthomas.campo`) para instalar sem "conflito com pacote existente", e **chave de assinatura fixa**: de agora em diante todo APK novo instala por cima do anterior sem desinstalar (o conflito acontecia porque cada APK era assinado com uma chave diferente). O app antigo (se ainda existir em algum espaço do celular) pode ser removido depois.
+
 ## 1.6.1
 - **Correção no app Android (APK):** "Imprimir plano" e "Baixar PDF" não funcionavam dentro do app. Agora a casca tem um plugin nativo (imprimir a página do plano e abrir a folha de compartilhar do Android para PDF, backup, KML, GeoJSON, GPX e CSV). A marca do app no navegador também foi corrigida (some o aviso "Instale o app" dentro do APK).
 - **Ajuda → Verificar a instalação** mostra se o app Android e o plugin foram encontrados e ganhou **Testar impressão**.
