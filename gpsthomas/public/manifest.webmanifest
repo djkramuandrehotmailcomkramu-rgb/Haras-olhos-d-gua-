@@ -15,25 +15,31 @@
   ],
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icon-v2-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icon-v2-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-512.png",
+      "src": "/icon-v2-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    },
+    {
+      "src": "/icon-v2-monochrome-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "monochrome"
     }
   ],
-  "id": "/",
+  "id": "/?app=gpsthomas",
   "shortcuts": [
     {
       "name": "Medir área",
@@ -41,8 +47,9 @@
       "url": "/",
       "icons": [
         {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
+          "src": "/icon-v2-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     },
@@ -52,8 +59,9 @@
       "url": "/rotas",
       "icons": [
         {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
+          "src": "/icon-v2-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     },
@@ -63,8 +71,9 @@
       "url": "/talhoes",
       "icons": [
         {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
+          "src": "/icon-v2-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     }

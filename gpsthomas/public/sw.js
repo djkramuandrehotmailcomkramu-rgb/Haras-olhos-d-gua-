@@ -1,4 +1,4 @@
-const V = 'gpsthomas-v4';
+const V = 'gpsthomas-v5';
 const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
 
 // Não pula a espera sozinho: o app mostra "Nova versão disponível" e o usuário decide quando atualizar.

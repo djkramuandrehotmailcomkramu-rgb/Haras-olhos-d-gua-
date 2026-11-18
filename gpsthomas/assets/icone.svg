@@ -21,7 +21,8 @@
            <path d="M-40 880 C 220 760, 420 980, 700 860 S 960 760, 1100 820"/>
            <path d="M-40 640 C 220 520, 420 740, 700 620 S 960 520, 1100 580"/>
          </g>
-  <g transform="translate(512 512) scale(1) translate(-512 -512)">
+  <ellipse cx="512" cy="1000" rx="620" ry="300" fill="#000" fill-opacity=".16"/>
+  <g transform="translate(512 512) scale(1.07) translate(-512 -512)">
     <g filter="url(#sombra)">
       <path d="M246 396 L520 262 L784 352 L812 640 L586 770 L284 700 Z" fill="#FFFFFF" fill-opacity="0.2" stroke="#FFFFFF" stroke-width="40" stroke-linejoin="round"/>
       <g fill="#FFFFFF">

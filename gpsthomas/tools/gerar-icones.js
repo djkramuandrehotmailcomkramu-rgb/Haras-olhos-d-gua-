@@ -41,7 +41,8 @@ function svg({ fundo, escala = 1, mono = false }) {
     </filter>
   </defs>
   ${bg}
-  <g transform="translate(512 512) scale(${escala}) translate(-512 -512)">
+  ${fundo === 'nenhum' ? '' : '<ellipse cx="512" cy="1000" rx="620" ry="300" fill="#000" fill-opacity=".16"/>'}
+  <g transform="translate(512 512) scale(${escala * 1.07}) translate(-512 -512)">
     <g filter="${mono ? '' : 'url(#sombra)'}">
       <path d="M246 396 L520 262 L784 352 L812 640 L586 770 L284 700 Z" fill="${campoFill}" fill-opacity="${campoOp}" stroke="${branco}" stroke-width="40" stroke-linejoin="round"/>
       <g fill="${branco}">
@@ -66,10 +67,12 @@ const saidas = [
   ['assets/android-icon-background.png', 1024, { fundo: 'quadrado', escala: 0.0001 }, false],
   ['assets/android-icon-monochrome.png', 1024, { fundo: 'nenhum', escala: 0.82, mono: true }, true],
   ['assets/favicon.png', 96, { fundo: 'arredondado', escala: 1 }, true],
-  ['public/icon-192.png', 192, { fundo: 'arredondado', escala: 1 }, true],
-  ['public/icon-512.png', 512, { fundo: 'arredondado', escala: 1 }, true],
-  ['public/icon-maskable-512.png', 512, { fundo: 'quadrado', escala: 0.82 }, false],
-  ['public/apple-touch-icon.png', 180, { fundo: 'quadrado', escala: 1 }, false],
+  // web: nomes com versão (v2) para o celular trocar o ícone antigo
+  ['public/icon-v2-192.png', 192, { fundo: 'arredondado', escala: 1 }, true],
+  ['public/icon-v2-512.png', 512, { fundo: 'arredondado', escala: 1 }, true],
+  ['public/icon-v2-maskable-512.png', 512, { fundo: 'quadrado', escala: 0.8 }, false],
+  ['public/icon-v2-monochrome-512.png', 512, { fundo: 'nenhum', escala: 0.8, mono: true }, true],
+  ['public/apple-touch-icon-v2.png', 180, { fundo: 'quadrado', escala: 1 }, false],
 ];
 
 (async () => {

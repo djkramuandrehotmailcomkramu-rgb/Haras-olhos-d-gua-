@@ -233,7 +233,7 @@ module.exports = [
     async fn({ browser, url }) {
       const p = await novaPagina(browser, { url });
       await p.ir('/ajuda');
-      check(await p.getByText('Versão 1.1.0').count() === 1, 'mostra a versão 1.1.0');
+      check(await p.getByText('Versão 1.2.0').count() === 1, 'mostra a versão 1.2.0');
       await p.getByText('Campo de sementes').first().click(); await p.waitForTimeout(400);
       check(await p.getByText(/Digitar hectares/).count() >= 1, 'guia explica hectares digitados');
     },
@@ -258,7 +258,7 @@ module.exports = [
       const href = await p.evaluate(() => document.querySelector('link[rel=manifest]')?.getAttribute('href'));
       check(href === '/manifest.webmanifest', `link do manifest (${href})`);
       const m = await p.evaluate(async () => (await fetch('/manifest.webmanifest')).json());
-      check(m.display === 'standalone' && m.start_url === '/' && m.id === '/', 'manifest standalone com id');
+      check(m.display === 'standalone' && m.start_url === '/' && m.id === '/?app=gpsthomas', 'manifest standalone com id');
       check(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.sizes === '512x512') && m.icons.some((i) => i.purpose === 'maskable'), 'ícones 192, 512 e maskable');
       for (const ic of m.icons) {
         const st = await p.evaluate(async (u) => (await fetch(u)).status, ic.src);
@@ -408,6 +408,52 @@ module.exports = [
       const antes = await p.evaluate(() => window.__chamouFs);
       await p.getByLabel('Recolher painel').click(); await p.waitForTimeout(500);
       check(await p.evaluate(() => window.__chamouFs) > antes, 'recolher o painel pede tela cheia');
+    },
+  },
+  {
+    nome: 'Instalação: ícones novos, manifest e diagnóstico (inclusive site protegido por login)',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.goto(`${url}/`); await p.waitForTimeout(1500);
+      const m = await p.evaluate(async () => (await fetch('/manifest.webmanifest')).json());
+      check(m.icons.every((i) => /icon-v2-/.test(i.src)), 'manifest usa os ícones v2');
+      check(m.icons.some((i) => i.purpose === 'monochrome'), 'ícone monocromático do Android');
+      check(m.background_color === '#0F4A27', 'cor de fundo igual à da abertura');
+      for (const ic of m.icons) check(await p.evaluate(async (u) => (await fetch(u)).status, ic.src) === 200, `ícone ${ic.src}`);
+      check(await p.evaluate(() => document.querySelector('link[rel=apple-touch-icon]').getAttribute('href')) === '/apple-touch-icon-v2.png', 'apple-touch-icon v2');
+      // diagnóstico normal: tudo certo exceto "aberto como aplicativo"
+      await p.ir('/ajuda');
+      await p.getByText('Instalar e tirar a barra verde').click(); await p.waitForTimeout(300);
+      await p.getByText('Verificar a instalação').click(); await p.waitForTimeout(2500);
+      check(await p.getByText('Manifest acessível sem login').count() === 1, 'item do manifest');
+      check(await p.getByText(/Ícones 192 e 512 acessíveis/).count() === 1, 'item dos ícones');
+      check(await p.getByText(/Aberto como aplicativo/).count() === 1, 'item do modo');
+      check(await p.getByText(/protegido por login/).count() === 0, 'sem aviso de proteção quando está liberado');
+      // simula a Vercel Authentication: manifest e ícones respondem 401 sem login
+      await p.ctx.route(/manifest\.webmanifest|icon-v2-/, (r) => r.fulfill({ status: 401, contentType: 'text/html', body: 'Authentication Required' }));
+      await p.getByText('Verificar a instalação').click(); await p.waitForTimeout(2500);
+      check(await p.getByText(/protegido por login/).count() >= 1, 'explica a proteção da Vercel quando o manifest dá 401');
+    },
+  },
+  {
+    nome: 'Abertura animada: aparece e some, revelando o app',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url });
+      await p.goto(`${url}/`);
+      await p.waitForSelector('#gt-splash', { timeout: 3000 });
+      check(await p.locator('#gt-splash .gt-icone img').count() === 1, 'ícone na abertura');
+      const cor = await p.evaluate(() => getComputedStyle(document.getElementById('gt-splash')).backgroundImage);
+      check(/gradient/.test(cor), 'fundo verde em degradê (igual ao da abertura do Android)');
+      await p.waitForTimeout(2600);
+      check(await p.locator('#gt-splash').count() === 0, 'a abertura sai sozinha');
+      check(await p.evaluate(() => document.documentElement.classList.contains('gt-pronto')), 'app revelado');
+      check(await p.getByRole('tab', { name: 'Medir' }).count() === 1, 'app visível');
+      // com "reduzir movimento" não anima
+      const ctx = await browser.newContext({ reducedMotion: 'reduce' });
+      const q = await ctx.newPage(); await q.goto(`${url}/`); await q.waitForTimeout(1500);
+      const anim = await q.evaluate(() => { const el = document.querySelector('#gt-splash .gt-icone img'); return el ? getComputedStyle(el).animationName : 'removido'; });
+      check(anim === 'none' || anim === 'removido', `sem animação com reduzir movimento (${anim})`);
+      await ctx.close();
     },
   },
 ];

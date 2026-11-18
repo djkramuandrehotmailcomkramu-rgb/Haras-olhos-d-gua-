@@ -9,24 +9,39 @@
     <meta name="theme-color" content="#1F7A3E" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="GPSThomas" />
     <link rel="preload" href="/fonts/Inter_400Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
     <link rel="preload" href="/fonts/Inter_600SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
-    <link rel="preload" href="/icon-192.png" as="image" />
+    <link rel="preload" href="/icon-v2-192.png" as="image" />
     <style id="expo-reset">
       html, body { height: 100%; }
       body { overflow: hidden; }
       #root { display: flex; height: 100%; flex: 1; }
     </style>
-    <style>html,body{background:#F1F4EF;overscroll-behavior:none;scroll-behavior:smooth}@media (prefers-color-scheme:dark){html,body{background:#0A110D}}body{-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}@font-face{font-family:'Inter_400Regular';src:url(/fonts/Inter_400Regular.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_500Medium';src:url(/fonts/Inter_500Medium.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_600SemiBold';src:url(/fonts/Inter_600SemiBold.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_700Bold';src:url(/fonts/Inter_700Bold.woff2) format('woff2');font-display:swap}#gt-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#F1F4EF;font-family:Inter_700Bold,system-ui,sans-serif;color:#13201A;transition:opacity .25s}#gt-splash img{width:96px;height:96px;border-radius:22px}#gt-splash b{font-size:22px;letter-spacing:-.4px}@media (prefers-color-scheme:dark){#gt-splash{background:#0A110D;color:#EEF4EF}}</style>
+    <style>html,body{background:#F1F4EF;overscroll-behavior:none;scroll-behavior:smooth}@media (prefers-color-scheme:dark){html,body{background:#0A110D}}body{-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}@font-face{font-family:'Inter_400Regular';src:url(/fonts/Inter_400Regular.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_500Medium';src:url(/fonts/Inter_500Medium.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_600SemiBold';src:url(/fonts/Inter_600SemiBold.woff2) format('woff2');font-display:swap}@font-face{font-family:'Inter_700Bold';src:url(/fonts/Inter_700Bold.woff2) format('woff2');font-display:swap}#gt-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:radial-gradient(120% 90% at 50% 38%,#1F7A3E 0%,#0F4A27 62%,#0A3320 100%);font-family:Inter_700Bold,system-ui,sans-serif;color:#fff;transition:opacity .42s ease,transform .5s cubic-bezier(.2,.8,.2,1);will-change:opacity,transform}
+#gt-splash.saindo{opacity:0;transform:scale(1.06);pointer-events:none}
+#gt-splash .gt-icone{position:relative;width:112px;height:112px;display:flex;align-items:center;justify-content:center}
+#gt-splash .gt-icone img{width:112px;height:112px;border-radius:26px;box-shadow:0 14px 40px rgba(0,0,0,.38),0 2px 8px rgba(0,0,0,.25);animation:gt-pop .62s cubic-bezier(.2,1.25,.3,1) both}
+#gt-splash .gt-onda{position:absolute;inset:-6px;border-radius:32px;border:2px solid rgba(255,255,255,.55);opacity:0;animation:gt-onda 1.5s ease-out .35s infinite}
+#gt-splash .gt-onda.b{animation-delay:.95s}
+#gt-splash b{font-size:23px;letter-spacing:-.4px;animation:gt-sobe .55s ease .22s both}
+#gt-splash small{font:500 13px Inter_500Medium,system-ui,sans-serif;opacity:.78;margin-top:-10px;animation:gt-sobe .55s ease .34s both}
+@keyframes gt-pop{0%{opacity:0;transform:scale(.7) translateY(10px)}100%{opacity:1;transform:none}}
+@keyframes gt-onda{0%{opacity:.55;transform:scale(.96)}100%{opacity:0;transform:scale(1.55)}}
+@keyframes gt-sobe{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:none}}
+@keyframes gt-entrada{0%{opacity:0;transform:scale(.985)}100%{opacity:1;transform:none}}
+#root{opacity:0}
+html.gt-pronto #root{animation:gt-entrada .6s cubic-bezier(.2,.8,.2,1) both}
+@media (prefers-reduced-motion:reduce){#gt-splash,#gt-splash *{animation:none!important;transition:opacity .15s!important}#gt-splash.saindo{transform:none}html.gt-pronto #root{animation:none;opacity:1}}
+</style>
     <script>window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__gtInstalar=e;window.dispatchEvent(new CustomEvent('gt-pode-instalar'))});window.addEventListener('appinstalled',function(){window.__gtInstalar=null;window.dispatchEvent(new CustomEvent('gt-instalado'))});if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(reg){window.__gtReg=reg;function avisa(){window.dispatchEvent(new CustomEvent('gt-nova-versao'))}if(reg.waiting&&navigator.serviceWorker.controller)avisa();reg.addEventListener('updatefound',function(){var nw=reg.installing;if(!nw)return;nw.addEventListener('statechange',function(){if(nw.state==='installed'&&navigator.serviceWorker.controller)avisa()})});reg.update().catch(function(){});document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')reg.update().catch(function(){})})}).catch(function(){});var rec=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(rec||!window.__gtAtualizando)return;rec=true;location.reload()})})}</script>
   </head>
   <body>
-    <div id="gt-splash" role="status" aria-label="Carregando"><img src="/icon-192.png" width="96" height="96" alt="" /><b>GPSThomas</b></div>
+    <div id="gt-splash" role="status" aria-label="Carregando"><div class="gt-icone"><span class="gt-onda"></span><span class="gt-onda b"></span><img src="/icon-v2-192.png" width="112" height="112" alt="" /></div><b>GPSThomas</b><small>Medir · Dividir · Navegar</small></div>
     <noscript>Ative o JavaScript para usar o GPSThomas.</noscript>
     <div id="root"></div>
   </body>

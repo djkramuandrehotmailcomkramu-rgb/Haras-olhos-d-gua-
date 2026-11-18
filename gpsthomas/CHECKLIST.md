@@ -1,4 +1,4 @@
-# GPSThomas 1.1.0: checklist de entrega
+# GPSThomas 1.2.0: checklist de entrega
 
 Resultado de cada item na versão 1.0.0. `[x]` = verificado automaticamente aqui; `[~]` = verificado só em parte; `[ ]` = não dá para verificar neste ambiente (precisa do seu aparelho ou de serviço externo).
 
@@ -93,3 +93,10 @@ npm run typecheck && npm test
 npm run build:web && NODE_PATH=$(npm root -g) npm run e2e
 ```
 Publicação: Vercel (projeto `gpsthomas`, raiz `gpsthomas/`, `vercel.json` já configurado).
+
+## 1.2.0 — instalação, ícone e abertura
+- [x] Build instalável localmente (CDP `getInstallabilityErrors` vazio; manifest, SW, ícones 192/512/maskable/monochrome)
+- [x] Diagnóstico "Verificar a instalação" (detecta 401/HTML de site protegido por login)
+- [x] Ícone v2 versionado e abertura animada (e2e: 21/21; axe: 0 violações; tsc e jest 81/81 verdes)
+- [ ] **Pendente (Vercel):** desativar a proteção de login em produção (só pré-visualizações) para o Chrome conseguir baixar manifest/ícones
+- [ ] Não testado aqui: instalação em celular real e acesso público real à Vercel

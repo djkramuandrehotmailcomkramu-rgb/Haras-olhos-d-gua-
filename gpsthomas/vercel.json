@@ -2,6 +2,47 @@
   "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
   "installCommand": "npm install --legacy-peer-deps",
-  "rewrites": [{ "source": "/((?!_expo|assets|sw\\.js|manifest\\.webmanifest|icon-.*).*)", "destination": "/index.html" }],
-  "headers": [{ "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }]
+  "rewrites": [
+    {
+      "source": "/((?!_expo|assets|fonts|sw\\.js|manifest\\.webmanifest|robots\\.txt|favicon\\.ico|apple-touch-icon.*|icon-.*).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(icon-.*|apple-touch-icon.*|fonts/.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
 }

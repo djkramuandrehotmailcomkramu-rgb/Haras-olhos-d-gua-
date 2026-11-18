@@ -185,6 +185,7 @@ export default function MaisTela() {
                 onPress={async () => { if (telaCheia) await sairTelaCheia(); else if (!(await entrarTelaCheia())) mostrar('Seu navegador não permitiu a tela cheia.', 'erro'); }}
               />
             )}
+            {!instalado && <Botao titulo="Por que não instala? Verificar" variante="fantasma" onPress={() => router.push('/ajuda')} />}
             <Text style={[tipo.legenda, { color: t.textoSuave, lineHeight: 18 }]}>Na tela de medição, ao recolher o painel o app também entra em tela cheia. Para sair, use o gesto de voltar do celular.</Text>
           </Cartao>
         </>

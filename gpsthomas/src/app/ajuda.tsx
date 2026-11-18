@@ -13,6 +13,7 @@ import { useDados } from '../store/dados';
 import { usePrefs } from '../store/prefs';
 import { useSistema } from '../store/sistema';
 import { useToast } from '../store/toast';
+import { INSTRUCAO_INSTALAR, diagnosticoInstalacao, emStandalone, instalarApp, type ItemDiagnostico } from '../nav/tela';
 import { gerarBackup, nomeArquivoBackup } from '../io/backup';
 import { entregarArquivo } from '../io/arquivos';
 import { fonte, raio, tipo, useTema } from '../theme';
@@ -56,6 +57,10 @@ export default function Ajuda() {
   const marcarBackup = usePrefs((s) => s.marcarBackup);
   const { armazenamentoPersistente, novaVersao } = useSistema();
   const versao = VERSAO;
+  const [diag, setDiag] = useState<ItemDiagnostico[] | null>(null);
+  const [verificando, setVerificando] = useState(false);
+  const podeInstalar = useSistema((x) => x.podeInstalar);
+  const verDiagnostico = async () => { setVerificando(true); setDiag(await diagnosticoInstalacao()); setVerificando(false); };
 
   const verificar = async () => {
     if (Platform.OS !== 'web') { mostrar('Você está na versão mais recente.', 'ok'); return; }
@@ -101,6 +106,25 @@ export default function Ajuda() {
           <Item n="3">Crie o plano, cole as variedades (uma por linha) e, se quiser, defina a meta por variedade (ex.: 16 ha).</Item>
           <Item n="4">Toque em <Text style={{ fontFamily: fonte.semi }}>Marcar no campo</Text> (ou numa bandeirinha) para ser guiado até cada ponto das divisas. Ao chegar, o celular vibra; cravar a bandeirinha e tocar em "Bandeira colocada".</Item>
           <Item n="5">Gere o PDF do plano para imprimir ou exporte KML/GPX para a máquina.</Item>
+        </Secao>
+        <Secao titulo="Instalar e tirar a barra verde" icone="phone-portrait">
+          <P>A barra verde com o endereço no topo aparece quando o GPSThomas é aberto por um <Text style={{ fontFamily: fonte.semi }}>atalho comum</Text> do navegador. Instalado como aplicativo, ele abre em tela inteira, sem a barra.</P>
+          <Item n="1">Remova o atalho antigo do GPSThomas da tela inicial.</Item>
+          <Item n="2">Abra o endereço no Chrome, toque no menu ⋮ e em <Text style={{ fontFamily: fonte.semi }}>Instalar app</Text>. Se aparecer só "Adicionar à tela inicial", o site não está passando nos critérios: toque em Verificar abaixo.</Item>
+          <Item n="3">Abra pelo ícone novo. Para ver o ícone atualizado, é preciso instalar de novo.</Item>
+          <View style={{ gap: 8, marginTop: 4 }}>
+            <Botao titulo={verificando ? 'Verificando…' : 'Verificar a instalação'} variante="suave" carregando={verificando} onPress={verDiagnostico} />
+            {!emStandalone() && <Botao titulo={podeInstalar ? 'Instalar agora' : 'Como instalar'} onPress={async () => { const r = await instalarApp(); if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }} />}
+          </View>
+          {diag && diag.map((d) => (
+            <View key={d.id} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingVertical: 4 }}>
+              <Ionicons name={d.ok ? 'checkmark-circle' : 'close-circle'} size={21} color={d.ok ? t.ok : t.perigo} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: fonte.semi, fontSize: 14.5, color: t.texto }}>{d.titulo}</Text>
+                <Text style={{ fontFamily: fonte.regular, fontSize: 13, lineHeight: 18, color: d.ok ? t.textoSuave : t.perigo }}>{d.detalhe}</Text>
+              </View>
+            </View>
+          ))}
         </Secao>
         <Secao titulo="Rotas e navegação" icone="navigate">
           <P>Na aba Rotas, busque um endereço, cidade ou rodovia, escolha entre até 3 rotas e inicie. A voz avisa as curvas, o app recalcula se você sair do caminho e mostra a velocidade e o limite da via quando existe. Dentro da lavoura, use o guia das bandeirinhas (vai em linha reta até o ponto).</P>

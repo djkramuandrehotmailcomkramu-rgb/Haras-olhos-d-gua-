@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+- **Instalação do atalho corrigida na raiz:** o projeto na Vercel estava com *Deployment Protection* (login) e respondia 401 ao manifest, ao service worker e aos ícones, então o Chrome criava só um atalho comum (com a barra verde). Agora há **Ajuda → "Verificar a instalação"**, que testa HTTPS, manifest, ícones, service worker e modo de exibição e explica qualquer falha (inclusive site protegido por login).
+- **Ícone novo** (símbolo maior, sombra no chão, degradê verde-soja), com arquivos versionados `icon-v2-*` para o Android não reaproveitar o ícone antigo; versões maskable e monocromática; `id` do manifest novo (reinstale o app).
+- **Abertura animada sutil:** splash verde com o ícone surgindo, ondas suaves, título e saída com leve zoom/fade revelando o app; respeita "reduzir movimento".
+- Testes de ponta a ponta: 21 cenários (2 novos).
+- Para instalar: remova o atalho antigo, no Chrome use ⋮ → "Instalar app" e abra pelo ícone novo.
+
 ## 1.1.0
 - **Ajuste de precisão do ponto:** toque num ponto para selecioná-lo; uma **alça laranja aparece ao lado** (ligada por uma linha pontilhada) e você arrasta a alça sem cobrir o ponto com o dedo. Fator da alça **1×, ½× ou ¼×** (¼× move o ponto 4 vezes menos), **setas** para mover 0,5 m, 1 m ou 5 m, remover ponto e "Pronto". O mapa leva o ponto sozinho para a área livre (fora dos painéis); toques seguidos nas setas contam como um único "desfazer".
 - **Modo Mira:** uma cruz fixa no centro, o mapa anda por baixo e "Marcar no centro" põe o ponto exatamente ali, com prévia tracejada e da área enquanto você move o mapa.

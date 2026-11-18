@@ -18,10 +18,14 @@ export default function RaizLayout() {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     const el = document.getElementById('gt-splash');
-    if (!el) return;
-    el.style.opacity = '0';
-    const h = setTimeout(() => el.remove(), 280);
-    return () => clearTimeout(h);
+    // a abertura fica pelo menos ~0,9 s para a animação ser vista (e desaparece rápido se o app demorou)
+    const faltam = Math.max(0, 900 - (typeof performance !== 'undefined' ? performance.now() : 900));
+    const h1 = setTimeout(() => {
+      document.documentElement.classList.add('gt-pronto');
+      el?.classList.add('saindo');
+    }, faltam);
+    const h2 = setTimeout(() => el?.remove(), faltam + 560);
+    return () => { clearTimeout(h1); clearTimeout(h2); };
   }, []);
   if (!fontesProntas) return null;
 
