@@ -22,17 +22,17 @@ export const CSS_IMPRESSAO = `
 @page{size:A4;margin:12mm}
 #gt-impressao{display:none;font:12px/1.4 Helvetica,Arial,sans-serif;color:#13201A;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 #gt-impressao *{box-sizing:border-box}
-#gt-impressao .topo{background:#1F7A3E;color:#fff;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:flex-end}
+#gt-impressao .topo{background:#5B4FE0;color:#fff;padding:10px 14px;border-radius:6px;display:flex;justify-content:space-between;align-items:flex-end}
 #gt-impressao .topo b{font-size:20px}#gt-impressao .topo small{display:block;font-size:11px;opacity:.9}#gt-impressao .topo .dir{text-align:right;font-size:11px}
 #gt-impressao h1{font-size:18px;margin:12px 0 2px}#gt-impressao h2{font-size:13px;margin:14px 0 6px}
 #gt-impressao .res{color:#5F6B61;font-size:11px;margin:0 0 8px}
 #gt-impressao svg{width:100%;height:auto;display:block;border:1px solid #C8D0CA;border-radius:6px;background:#F4F7F3}
 #gt-impressao table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
-#gt-impressao th{background:#D7E7DC;text-align:left;padding:4px 6px}#gt-impressao td{padding:3px 6px}
+#gt-impressao th{background:#E4E1FA;text-align:left;padding:4px 6px}#gt-impressao td{padding:3px 6px}
 #gt-impressao tr:nth-child(even) td{background:#F6F8F6}#gt-impressao tr{break-inside:avoid}
 #gt-impressao .d{text-align:right;white-space:nowrap}
 #gt-impressao .leg{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:11px}#gt-impressao .leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-#gt-impressao .ok{color:#1F7A3E}#gt-impressao .at{color:#B46E00}
+#gt-impressao .ok{color:#1E8E4E}#gt-impressao .at{color:#B46E00}
 #gt-impressao a{color:#1F5AC8;text-decoration:none}
 #gt-impressao .pag{break-before:page}
 #gt-impressao .rod{color:#5F6B61;font-size:10px;margin-top:10px;border-top:1px solid #C8D0CA;padding-top:4px}

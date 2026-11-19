@@ -54,7 +54,7 @@ async function abrirNavegador() {
 }
 
 /** Página de celular com GPS simulado e mapas bloqueados (sem internet externa). */
-async function novaPagina(browser, { url, largura, altura, esquema = 'light', onboarding = true, agenteExtra = '', gps = { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 4 } } = {}) {
+async function novaPagina(browser, { url, largura, altura, esquema = 'light', onboarding = true, agenteExtra = '', tilesFalsos = false, gps = { latitude: BASE[1] + 5 / KY, longitude: BASE[0], accuracy: 4 } } = {}) {
   const ctx = await browser.newContext({
     ...devices['Pixel 7'],
     ...(agenteExtra ? { userAgent: `${devices['Pixel 7'].userAgent} ${agenteExtra}` } : {}),
@@ -67,7 +67,14 @@ async function novaPagina(browser, { url, largura, altura, esquema = 'light', on
   page.on('console', (m) => { if (m.type() === 'error' && !/tile|ERR_|Failed to load resource|net::/.test(m.text())) page.erros.push(m.text()); });
   page.on('dialog', (d) => d.accept());
   await page.addInitScript((ob) => localStorage.setItem('gpsthomas-prefs', JSON.stringify({ state: { onboardingVisto: ob, unidadeArea: 'ha', camada: 'mapa', vozLigada: false }, version: 1 })), onboarding);
-  await page.route(/tile\.openstreetmap|arcgisonline/, (r) => r.abort());
+  page.tilesPedidos = 0;
+  if (tilesFalsos) {
+    // blocos de mapa de mentira (PNG vermelho 1x1 com CORS), contando os pedidos que chegam à "internet"
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
+    await ctx.route(/tile\.openstreetmap|arcgisonline/, (r) => { page.tilesPedidos += 1; r.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: png }); });
+  } else {
+    await page.route(/tile\.openstreetmap|arcgisonline/, (r) => r.abort());
+  }
   page.ir = async (rota) => { await page.goto(`${url}${rota}`); await page.waitForTimeout(1800); };
   page.ctx = ctx;
   return page;

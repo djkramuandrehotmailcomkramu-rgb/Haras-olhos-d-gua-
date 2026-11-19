@@ -15,37 +15,38 @@ export type Paleta = {
 };
 
 export const paletas: Record<'claro' | 'escuro', Paleta> = {
+  // Visual inspirado no iOS: fundo cinza-azulado, cartões brancos, cor de destaque índigo (nada de verde "de agro").
   claro: {
-    fundo: '#F1F4EF',
+    fundo: '#F2F2F7',
     cartao: '#FFFFFF',
-    cartaoSuave: '#E8EDE6',
-    texto: '#13201A',
-    textoSuave: '#5B6B61',
-    linha: 'rgba(19,32,26,0.08)',
-    primaria: '#1F7A3E',
-    primariaSuave: 'rgba(31,122,62,0.12)',
+    cartaoSuave: '#EBEBF0',
+    texto: '#0E0E16',
+    textoSuave: '#68687A',
+    linha: 'rgba(60,60,80,0.16)',
+    primaria: '#5B4FE0',
+    primariaSuave: 'rgba(91,79,224,0.12)',
     sobrePrimaria: '#FFFFFF',
-    destaque: '#D99A00',
-    perigo: '#C73636',
+    destaque: '#FF9F0A',
+    perigo: '#D92D20',
     vidro: 'light',
-    vidroCor: 'rgba(255,255,255,0.82)',
-    gps: '#2F7DF6', terra: '#8B5E34', ok: '#166A38', atencao: '#9A6400', primariaTexto: '#17632F', sobrePerigo: '#FFFFFF',
+    vidroCor: 'rgba(250,250,254,0.80)',
+    gps: '#0A84FF', terra: '#8B5E34', ok: '#1E8E4E', atencao: '#B45309', primariaTexto: '#4A3FC7', sobrePerigo: '#FFFFFF',
   },
   escuro: {
-    fundo: '#0A110D',
-    cartao: '#151F19',
-    cartaoSuave: '#1D2A22',
-    texto: '#EEF4EF',
-    textoSuave: '#93A59A',
-    linha: 'rgba(238,244,239,0.10)',
-    primaria: '#3FB063',
-    primariaSuave: 'rgba(63,176,99,0.18)',
-    sobrePrimaria: '#06210F',
-    destaque: '#F2B73D',
-    perigo: '#F07070',
+    fundo: '#000000',
+    cartao: '#1C1C1E',
+    cartaoSuave: '#2C2C2E',
+    texto: '#F5F5F7',
+    textoSuave: '#9C9CAA',
+    linha: 'rgba(235,235,245,0.16)',
+    primaria: '#8F86FF',
+    primariaSuave: 'rgba(143,134,255,0.18)',
+    sobrePrimaria: '#0E0A3A',
+    destaque: '#FFB340',
+    perigo: '#FF6B6B',
     vidro: 'dark',
-    vidroCor: 'rgba(16,25,20,0.80)',
-    gps: '#5B9BFF', terra: '#C28A55', ok: '#3FB063', atencao: '#F2B73D', primariaTexto: '#3FB063', sobrePerigo: '#2B0A0A',
+    vidroCor: 'rgba(28,28,30,0.78)',
+    gps: '#5AA9FF', terra: '#C28A55', ok: '#34C759', atencao: '#FFB340', primariaTexto: '#A9A2FF', sobrePerigo: '#2B0A0A',
   },
 };
 
@@ -57,7 +58,7 @@ export function useTema(): Paleta {
 }
 
 export const espaco = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const raio = { sm: 10, md: 16, lg: 24, xl: 32, pilula: 999 };
+export const raio = { sm: 8, md: 12, lg: 16, xl: 24, pilula: 999 };
 
 export const fonte = {
   regular: 'Inter_400Regular',
@@ -67,11 +68,12 @@ export const fonte = {
   negrito: 'Inter_600SemiBold',
 };
 
+// Escala tipográfica no estilo do iOS (Inter fica o mais perto possível da fonte do iPhone na web/Android).
 export const tipo = {
-  tituloGrande: { fontFamily: fonte.negrito, fontSize: 34, letterSpacing: -1 },
-  titulo: { fontFamily: fonte.negrito, fontSize: 22, letterSpacing: -0.4 },
-  subtitulo: { fontFamily: fonte.semi, fontSize: 17, letterSpacing: -0.2 },
-  corpo: { fontFamily: fonte.regular, fontSize: 15 },
-  legenda: { fontFamily: fonte.media, fontSize: 12.5, letterSpacing: 0.2 },
+  tituloGrande: { fontFamily: fonte.negrito, fontSize: 34, letterSpacing: -0.9, lineHeight: 40 },
+  titulo: { fontFamily: fonte.negrito, fontSize: 22, letterSpacing: -0.4, lineHeight: 28 },
+  subtitulo: { fontFamily: fonte.negrito, fontSize: 17, letterSpacing: -0.3, lineHeight: 22 },
+  corpo: { fontFamily: fonte.regular, fontSize: 16, letterSpacing: -0.2, lineHeight: 22 },
+  legenda: { fontFamily: fonte.media, fontSize: 13, letterSpacing: -0.1 },
   numeroGrande: { fontFamily: fonte.media, fontSize: 40, letterSpacing: -1.2, fontVariant: ['tabular-nums'] as ('tabular-nums')[] },
 };

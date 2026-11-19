@@ -30,7 +30,7 @@ export async function montarPdfCampo({ plano, nomeTalhao, fazenda, talhoes }: Da
   const { jsPDF: PDF } = await import('jspdf');
   const doc = new PDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const W = 210, M = 14;
-  const verde: [number, number, number] = [31, 122, 62];
+  const verde: [number, number, number] = [91, 79, 224];
   const cinza: [number, number, number] = [95, 107, 97];
   const preto: [number, number, number] = [19, 32, 26];
 

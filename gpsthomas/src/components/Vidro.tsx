@@ -8,7 +8,7 @@ export function Vidro({ children, style, raioBorda = raio.lg }: { children: Reac
   const t = useTema();
   return (
     <View style={[{ borderRadius: raioBorda, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: t.linha }, style]}>
-      <BlurView intensity={55} tint={t.vidro} style={StyleSheet.absoluteFill} />
+      <BlurView intensity={60} tint={t.vidro} style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: t.vidroCor }]} />
       {children}
     </View>

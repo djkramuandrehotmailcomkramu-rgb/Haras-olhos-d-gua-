@@ -276,7 +276,7 @@ module.exports = [
       // sem internet: o app ainda abre
       await p.ctx.setOffline(true);
       await p.reload(); await p.waitForTimeout(2500);
-      check(await p.getByRole('tab', { name: 'Medir' }).count() === 1, 'app abre sem internet');
+      check(await p.getByRole('tab', { name: 'Mapa' }).count() === 1, 'app abre sem internet');
       check(await p.getByText(/Sem internet/).count() >= 1, 'avisa que está sem internet');
       await p.ctx.setOffline(false);
       await p.waitForTimeout(800);
@@ -420,11 +420,11 @@ module.exports = [
       const p = await novaPagina(browser, { url });
       await p.goto(`${url}/`); await p.waitForTimeout(1500);
       const m = await p.evaluate(async () => (await fetch('/manifest.webmanifest')).json());
-      check(m.icons.every((i) => /icon-v2-/.test(i.src)), 'manifest usa os ícones v2');
+      check(m.icons.every((i) => /icon-v3-/.test(i.src)), 'manifest usa os ícones v2');
       check(m.icons.some((i) => i.purpose === 'monochrome'), 'ícone monocromático do Android');
-      check(m.background_color === '#0F4A27', 'cor de fundo igual à da abertura');
+      check(m.background_color === '#2A2278', 'cor de fundo igual à da abertura');
       for (const ic of m.icons) check(await p.evaluate(async (u) => (await fetch(u)).status, ic.src) === 200, `ícone ${ic.src}`);
-      check(await p.evaluate(() => document.querySelector('link[rel=apple-touch-icon]').getAttribute('href')) === '/apple-touch-icon-v2.png', 'apple-touch-icon v2');
+      check(await p.evaluate(() => document.querySelector('link[rel=apple-touch-icon]').getAttribute('href')) === '/apple-touch-icon-v3.png', 'apple-touch-icon v2');
       // diagnóstico normal: tudo certo exceto "aberto como aplicativo"
       await p.ir('/ajuda');
       await p.getByText('Instalar e tirar a barra verde').click(); await p.waitForTimeout(300);
@@ -434,7 +434,7 @@ module.exports = [
       check(await p.getByText(/Aberto como aplicativo/).count() === 1, 'item do modo');
       check(await p.getByText(/protegido por login/).count() === 0, 'sem aviso de proteção quando está liberado');
       // simula a Vercel Authentication: manifest e ícones respondem 401 sem login
-      await p.ctx.route(/manifest\.webmanifest|icon-v2-/, (r) => r.fulfill({ status: 401, contentType: 'text/html', body: 'Authentication Required' }));
+      await p.ctx.route(/manifest\.webmanifest|icon-v3-/, (r) => r.fulfill({ status: 401, contentType: 'text/html', body: 'Authentication Required' }));
       await p.getByText('Verificar a instalação').click(); await p.waitForTimeout(2500);
       check(await p.getByText(/protegido por login/).count() >= 1, 'explica a proteção da Vercel quando o manifest dá 401');
     },
@@ -447,11 +447,11 @@ module.exports = [
       await p.waitForSelector('#gt-splash', { timeout: 3000 });
       check(await p.locator('#gt-splash .gt-icone img').count() === 1, 'ícone na abertura');
       const cor = await p.evaluate(() => getComputedStyle(document.getElementById('gt-splash')).backgroundImage);
-      check(/gradient/.test(cor), 'fundo verde em degradê (igual ao da abertura do Android)');
+      check(/gradient/.test(cor), 'fundo índigo em degradê (igual ao da abertura do Android)');
       await p.waitForTimeout(2600);
       check(await p.locator('#gt-splash').count() === 0, 'a abertura sai sozinha');
       check(await p.evaluate(() => document.documentElement.classList.contains('gt-pronto')), 'app revelado');
-      check(await p.getByRole('tab', { name: 'Medir' }).count() === 1, 'app visível');
+      check(await p.getByRole('tab', { name: 'Mapa' }).count() === 1, 'app visível');
       // com "reduzir movimento" não anima
       const ctx = await browser.newContext({ reducedMotion: 'reduce' });
       const q = await ctx.newPage(); await q.goto(`${url}/`); await q.waitForTimeout(1500);
@@ -625,6 +625,46 @@ module.exports = [
       check(await p.getByText(/ajuste do GPS 5,0 m a norte/).count() >= 1, 'mostra o ajuste do GPS aplicado (5,0 m ao norte)');
       const d1 = parseFloat((await p.getByLabel('Distância até o ponto').textContent()).replace('~', '').replace(/\./g, '').replace(',', '.'));
       check(Math.abs(d1 - d0) > 0.5, `a distância muda com o ajuste (${d0} -> ${d1})`);
+      check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
+    },
+  },
+  {
+    nome: 'Mapas offline: baixar os talhões e abrir o mapa sem internet',
+    async fn({ browser, url }) {
+      const p = await novaPagina(browser, { url, tilesFalsos: true });
+      await importarKml(p, url);
+      await p.ir('/mapas');
+      check(await p.getByText('Mapas offline').count() >= 1, 'tela de mapas offline');
+      await p.getByRole('button', { name: 'Mapa', exact: true }).click(); await p.waitForTimeout(400);
+      const resumo = await p.getByLabel('Resumo do download').textContent();
+      check(/\d[\d.]* blocos · cerca de/.test(resumo), `resumo do download: ${resumo}`);
+      await p.getByText('Baixar agora').click();
+      await p.getByText(/Mapa salvo/).first().waitFor({ timeout: 90000 });
+      const n = await p.evaluate(async () => (await (await caches.open('gpsthomas-tiles')).keys()).length);
+      check(n > 50, `blocos guardados no aparelho (${n})`);
+      check(await p.getByText(/Meus talhões · mapa/).count() >= 1, 'aparece em "Mapas salvos"');
+      check(await p.getByText(/completo/).count() >= 1, 'área marcada como completa');
+      // sem internet: o app e o mapa abrem com os blocos salvos
+      await p.ir('/'); await p.waitForTimeout(2500);
+      const antes = p.tilesPedidos;
+      await p.ctx.setOffline(true);
+      await p.goto(`${url}/`); await p.waitForTimeout(3500);
+      check(await p.getByRole('tab', { name: 'Mapa' }).count() === 1, 'o app abre sem internet');
+      const vermelhos = await p.evaluate(() => {
+        let ok = 0;
+        document.querySelectorAll('img.leaflet-tile-loaded').forEach((img) => {
+          try { const c = document.createElement('canvas'); c.width = 1; c.height = 1; const x = c.getContext('2d'); x.drawImage(img, 0, 0, 1, 1); const d = x.getImageData(0, 0, 1, 1).data; if (d[0] > 200 && d[3] > 200) ok += 1; } catch {}
+        });
+        return ok;
+      });
+      check(vermelhos > 0, `blocos do mapa vêm do cache sem internet (${vermelhos})`);
+      check(p.tilesPedidos === antes, 'nenhum pedido de mapa saiu para a internet');
+      await p.ctx.setOffline(false);
+      // remover libera os blocos
+      await p.ir('/mapas');
+      await p.getByLabel(/Remover Meus talhões/).click(); await p.waitForTimeout(1200);
+      const n2 = await p.evaluate(async () => (await (await caches.open('gpsthomas-tiles')).keys()).length);
+      check(n2 < n, `remover apaga os blocos (${n} -> ${n2})`);
       check(p.erros.length === 0, `sem erros no console: ${p.erros.join(' | ')}`);
     },
   },

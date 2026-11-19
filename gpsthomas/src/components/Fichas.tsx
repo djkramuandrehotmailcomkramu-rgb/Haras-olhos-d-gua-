@@ -13,7 +13,7 @@ export function Fichas({ opcoes, valor, onChange }: { opcoes: string[]; valor: s
           <Pressable
             key={o}
             onPress={() => { Haptics.selectionAsync(); onChange(o); }}
-            style={{ paddingHorizontal: 14, height: 36, borderRadius: raio.pilula, justifyContent: 'center', backgroundColor: ativo ? t.primaria : t.cartaoSuave }}
+            style={{ paddingHorizontal: 14, minHeight: 36, borderRadius: raio.pilula, justifyContent: 'center', backgroundColor: ativo ? t.primaria : t.cartaoSuave }}
           >
             <Text style={{ fontFamily: fonte.semi, fontSize: 14, color: ativo ? t.sobrePrimaria : t.texto }}>{o}</Text>
           </Pressable>

@@ -166,7 +166,10 @@ export type Comando =
 
 /** Estado de interface compartilhado entre telas (não persiste). */
 type SemN<T> = T extends unknown ? Omit<T, 'n'> : never;
-export const useUi = create<{ comando: Comando | null; enviar: (c: SemN<Comando>) => void; destino: { coord: Coord; nome: string; n: number } | null; irPara: (coord: Coord, nome: string) => void }>((set) => ({
+export type VistaMapa = { oeste: number; sul: number; leste: number; norte: number; zoom: number; centro: Coord };
+export const useUi = create<{ comando: Comando | null; enviar: (c: SemN<Comando>) => void; destino: { coord: Coord; nome: string; n: number } | null; irPara: (coord: Coord, nome: string) => void; vista: VistaMapa | null; definirVista: (v: VistaMapa) => void }>((set) => ({
+  vista: null,
+  definirVista: (vista) => set({ vista }),
   comando: null,
   destino: null,
   irPara: (coord, nome) => set({ destino: { coord, nome, n: Date.now() } }),

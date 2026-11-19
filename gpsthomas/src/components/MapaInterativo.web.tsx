@@ -4,22 +4,15 @@ import L from 'leaflet';
 import 'leaflet-rotate';
 import 'leaflet/dist/leaflet.css';
 import type { Coord } from '../geo/medidas';
-import type { PropsMapa } from './MapaInterativo.types';
+import type { BandeiraMapa, PropsMapa } from './MapaInterativo.types';
 import { svgVeiculo, type Veiculo } from './veiculos';
+import { CAMADAS, ZOOM_NATIVO_MAX } from '../mapa/camadas';
+import { useUi } from '../store/dados';
 
 const paraLL = (c: Coord): L.LatLngTuple => [c[1], c[0]];
 const deLL = (p: L.LatLng): Coord => [p.lng, p.lat];
 
-const CAMADAS = {
-  satelite: {
-    base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    rotulos: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-    attr: 'Imagens © Esri, Maxar, Earthstar Geographics',
-  },
-  mapa: { base: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', rotulos: null, attr: '© OpenStreetMap' },
-} as const;
-
-const VERDE = '#3FB063';
+const VERDE = '#7C6BFF'; // contorno em medição: violeta, que se destaca sobre o verde/marrom da lavoura
 const AMBAR = '#F2B73D';
 
 /** Marcador de vértice: círculo visível pequeno dentro de uma área de toque de 44 px. */
@@ -50,14 +43,118 @@ function centro(pts: Coord[]): Coord {
   return [pts.reduce((s, c) => s + c[0], 0) / n, pts.reduce((s, c) => s + c[1], 0) / n];
 }
 
-const CSS = '.gt-bussola{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(10,17,13,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}.gt-bussola svg{transition:transform .05s linear}.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+type Cand = { id: string; centro: L.LatLng; limites: L.LatLngBounds; titulo: string; sub?: string; clicavel: boolean };
+
+/** Tamanho (px) que a área ocupa no zoom atual. */
+function tamanhoPx(m: L.Map, b: L.LatLngBounds) {
+  const z = m.getZoom();
+  const a = m.project(b.getNorthWest(), z), c = m.project(b.getSouthEast(), z);
+  return { w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) };
+}
+
+function rotuloEl(titulo: string, sub: string | undefined, clicavel: boolean, compacto: boolean): HTMLElement {
+  const rot = document.createElement('div');
+  rot.style.cssText = `background:rgba(18,18,28,.84);color:#fff;border-radius:10px;padding:${compacto ? '3px 8px' : '4px 10px'};font:600 ${compacto ? 11 : 12}px Inter,system-ui,sans-serif;letter-spacing:-.1px;white-space:nowrap;width:max-content;text-align:center;transform:translate(-50%,-50%);box-shadow:0 1px 6px rgba(0,0,0,.35);${clicavel ? 'cursor:pointer;' : 'pointer-events:none;'}`;
+  const a = document.createElement('div'); a.textContent = titulo; rot.appendChild(a);
+  if (sub) { const b = document.createElement('div'); b.textContent = sub; b.style.cssText = 'font-weight:500;opacity:.75;font-size:10.5px;'; rot.appendChild(b); }
+  return rot;
+}
+
+function iconeBandeira(estado: BandeiraMapa['estado'], zoom: number): L.DivIcon {
+  const cor = estado === 'ok' ? '#34C759' : estado === 'atual' ? '#F2B73D' : '#9AA7A0';
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'width:44px;height:44px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;';
+  if (estado !== 'atual' && zoom < 16) {
+    // de longe: só um ponto (a bandeira inteira polui o mapa)
+    const d = zoom < 14 ? 10 : 14;
+    const c = document.createElement('div');
+    c.style.cssText = `width:${d}px;height:${d}px;border-radius:50%;background:${cor};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5);box-sizing:border-box;`;
+    caixa.appendChild(c);
+    return L.divIcon({ html: caixa, className: '', iconSize: [44, 44], iconAnchor: [22, 22] });
+  }
+  const tam = estado === 'atual' ? 34 : zoom >= 17 ? 26 : 20;
+  const bandeira = document.createElement('div');
+  bandeira.style.cssText = `position:absolute;left:12px;bottom:10px;width:${tam}px;height:${tam}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));`;
+  bandeira.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+  caixa.appendChild(bandeira);
+  return L.divIcon({ html: caixa, className: '', iconSize: [44, 44], iconAnchor: [12 + tam * (5 / 24), 44 - 10] });
+}
+
+function iconeGrupo(n: number): L.DivIcon {
+  const c = document.createElement('div');
+  c.style.cssText = 'width:34px;height:34px;border-radius:50%;background:#5B4FE0;color:#fff;border:2px solid #fff;font:700 13px Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.45);cursor:pointer;';
+  c.textContent = String(n);
+  return L.divIcon({ html: c, className: '', iconSize: [34, 34], iconAnchor: [17, 17] });
+}
+
+/**
+ * Desenha rótulos e bandeirinhas conforme o zoom: rótulos só quando cabem e sem se sobrepor,
+ * bandeirinhas perto umas das outras viram um número (toque para aproximar).
+ */
+function desenharLod(
+  m: L.Map, g: L.LayerGroup,
+  c: { talhoes: Cand[]; parcelas: Cand[]; bandeiras: BandeiraMapa[] },
+  aoBandeira: (id: string) => void, aoTalhao: (id: string) => void,
+) {
+  g.clearLayers();
+  const z = m.getZoom();
+  const ocupados: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  const livre = (cx: number, cy: number, w: number, h: number) => {
+    const r = { x0: cx - w / 2 - 5, y0: cy - h / 2 - 4, x1: cx + w / 2 + 5, y1: cy + h / 2 + 4 };
+    if (ocupados.some((o) => !(r.x1 < o.x0 || r.x0 > o.x1 || r.y1 < o.y0 || r.y0 > o.y1))) return false;
+    ocupados.push(r);
+    return true;
+  };
+
+  // 1) rótulos das partes do campo (têm prioridade) e depois dos talhões; os maiores primeiro
+  const lista = [
+    ...c.parcelas.map((x) => ({ x, tipo: 'parcela' as const })),
+    ...c.talhoes.map((x) => ({ x, tipo: 'talhao' as const })),
+  ].map((e) => ({ ...e, t: tamanhoPx(m, e.x.limites) })).sort((a, b) => (a.tipo === b.tipo ? b.t.w * b.t.h - a.t.w * a.t.h : a.tipo === 'parcela' ? -1 : 1));
+  for (const e of lista) {
+    if (e.tipo === 'talhao' && z < 12) continue;
+    if (e.t.w < 52 || e.t.h < 20) continue; // não cabe dentro do desenho
+    const pt = m.latLngToContainerPoint(e.x.centro);
+    const duas = !!e.x.sub && z >= 15 && e.t.h >= 44;
+    const w = Math.max(e.x.titulo.length * 6.6, (e.x.sub?.length ?? 0) * 6) + 20, h = duas ? 36 : 22;
+    if (!livre(pt.x, pt.y, w, h)) continue;
+    const mk = L.marker(e.x.centro, { icon: L.divIcon({ html: rotuloEl(e.x.titulo, duas ? e.x.sub : undefined, e.x.clicavel, !duas), className: '', iconSize: [0, 0] }), interactive: e.x.clicavel, keyboard: false }).addTo(g);
+    if (e.x.clicavel) mk.on('click', (ev) => { L.DomEvent.stopPropagation(ev); aoTalhao(e.x.id); });
+  }
+
+  // 2) bandeirinhas: a próxima ("atual") sempre aparece; as demais se agrupam quando perto
+  const celula = z >= 17 ? 0 : z >= 16 ? 30 : 38;
+  const grupos = new Map<string, BandeiraMapa[]>();
+  for (const b of c.bandeiras) {
+    if (b.estado === 'atual' || celula === 0) { grupos.set(`i:${b.id}`, [b]); continue; }
+    const p = m.project(L.latLng(b.coord[1], b.coord[0]), z);
+    const k = `${Math.floor(p.x / celula)}:${Math.floor(p.y / celula)}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), b]);
+  }
+  for (const membros of grupos.values()) {
+    if (membros.length === 1) {
+      const b = membros[0];
+      const mk = L.marker(L.latLng(b.coord[1], b.coord[0]), { icon: iconeBandeira(b.estado, z), interactive: true, zIndexOffset: b.estado === 'atual' ? 900 : 0, keyboard: false }).addTo(g);
+      mk.on('click', (ev) => { L.DomEvent.stopPropagation(ev); aoBandeira(b.id); });
+    } else {
+      const lat = membros.reduce((s, b) => s + b.coord[1], 0) / membros.length, lon = membros.reduce((s, b) => s + b.coord[0], 0) / membros.length;
+      const mk = L.marker([lat, lon], { icon: iconeGrupo(membros.length), interactive: true, keyboard: false }).addTo(g);
+      mk.on('click', (ev) => { L.DomEvent.stopPropagation(ev); m.fitBounds(L.latLngBounds(membros.map((b) => L.latLng(b.coord[1], b.coord[0]))), { padding: [70, 70], maxZoom: 18 }); });
+    }
+  }
+}
+
+const CSS = '.gt-bussola{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(10,17,13,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}.gt-girar{margin-top:52px}.gt-bussola svg{transition:transform .05s linear}.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
 
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
   const P = useRef(props);
   P.current = props;
   const mapa = useRef<L.Map | null>(null);
-  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; campo: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; fantasma: L.LayerGroup; pos: L.LayerGroup } | null>(null);
+  const grupos = useRef<{ base: L.LayerGroup; talhoes: L.LayerGroup; campo: L.LayerGroup; lod: L.LayerGroup; rotas: L.LayerGroup; rascunho: L.LayerGroup; fantasma: L.LayerGroup; pos: L.LayerGroup } | null>(null);
+  // rótulos e bandeirinhas são redesenhados conforme o zoom (sem sobrepor e agrupando as que estão perto)
+  const cand = useRef<{ talhoes: Cand[]; parcelas: Cand[]; bandeiras: BandeiraMapa[] }>({ talhoes: [], parcelas: [], bandeiras: [] });
+  const redesenhar = useRef<() => void>(() => {});
   const primeiraVez = useRef(true);
   const veic = useRef<{ mk: L.Marker; giro: HTMLDivElement; tipo: Veiculo } | null>(null);
   const ultimaSel = useRef<number | null>(null);
@@ -69,7 +166,7 @@ export function MapaInterativo(props: PropsMapa) {
     st.textContent = CSS;
     document.head.appendChild(st);
     // rotate/touchRotate (leaflet-rotate): gire o mapa com dois dedos (ou Ctrl + arrastar no computador).
-    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true, rotate: true, touchRotate: true, bearing: 0, rotateControl: false, shiftKeyRotate: false } as L.MapOptions).setView([-15.78, -47.93], 4);
+    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true, rotate: true, touchRotate: false, bearing: 0, rotateControl: false, shiftKeyRotate: false } as L.MapOptions).setView([-15.78, -47.93], 4);
     const mr = m as L.Map & { setBearing: (g: number) => void; getBearing: () => number };
     (window as any).__gtMapa = m;
     // Bússola: aparece quando o mapa está girado; tocar volta o norte para cima.
@@ -82,6 +179,26 @@ export function MapaInterativo(props: PropsMapa) {
     bussola.current = bus;
     L.DomEvent.disableClickPropagation(bus);
     bus.addEventListener('click', () => { mr.setBearing(0); });
+    // Girar com dois dedos fica desligado por padrão (girava sem querer ao dar zoom); o botão liga/desliga.
+    const gir = document.createElement('button');
+    gir.type = 'button';
+    gir.className = 'gt-bussola gt-girar';
+    gir.setAttribute('aria-label', 'Permitir girar o mapa com dois dedos');
+    gir.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>';
+    el.current.appendChild(gir);
+    L.DomEvent.disableClickPropagation(gir);
+    const tr = (m as any).touchRotate;
+    let girar = false;
+    try { girar = localStorage.getItem('gpsthomas-girar') === '1'; } catch {}
+    const aplicarGirar = () => {
+      if (tr) (girar ? tr.enable() : tr.disable());
+      gir.style.opacity = '1'; gir.style.pointerEvents = 'auto';
+      gir.style.background = girar ? 'rgba(91,79,224,.95)' : 'rgba(18,18,28,.78)';
+      gir.setAttribute('aria-pressed', String(girar));
+      if (!girar && Math.abs(mr.getBearing()) > 0.5) mr.setBearing(0);
+    };
+    gir.addEventListener('click', () => { girar = !girar; try { localStorage.setItem('gpsthomas-girar', girar ? '1' : '0'); } catch {} aplicarGirar(); });
+    aplicarGirar();
     const girou = () => {
       const g = mr.getBearing();
       bus.style.opacity = Math.abs(g) > 0.5 && Math.abs(g - 360) > 0.5 ? '1' : '0';
@@ -95,6 +212,7 @@ export function MapaInterativo(props: PropsMapa) {
       base: L.layerGroup().addTo(m),
       talhoes: L.layerGroup().addTo(m),
       campo: L.layerGroup().addTo(m),
+      lod: L.layerGroup().addTo(m),
       rotas: L.layerGroup().addTo(m),
       rascunho: L.layerGroup().addTo(m),
       fantasma: L.layerGroup().addTo(m),
@@ -105,12 +223,24 @@ export function MapaInterativo(props: PropsMapa) {
     const avisarCentro = () => { if (P.current.mira) P.current.onCentro?.(deLL(m.getCenter())); };
     m.on('move', () => { if (!P.current.mira || quadro) return; quadro = requestAnimationFrame(() => { quadro = 0; avisarCentro(); }); });
     m.on('moveend', avisarCentro);
+    const avisarVista = () => {
+      const b = m.getBounds();
+      const c = m.getCenter();
+      const v = { oeste: b.getWest(), sul: b.getSouth(), leste: b.getEast(), norte: b.getNorth(), zoom: m.getZoom(), centro: [c.lng, c.lat] as Coord };
+      useUi.getState().definirVista(v); // a tela "Mapas offline" usa a última região vista
+      P.current.onVista?.(v);
+    };
+    m.on('moveend', avisarVista);
+    m.whenReady(avisarVista);
     mapa.current = m;
+    redesenhar.current = () => desenharLod(m, grupos.current!.lod, cand.current, (id) => P.current.onBandeira?.(id), (id) => P.current.onTalhao(id));
+    m.on('zoomend', () => redesenhar.current());
     const ro = new ResizeObserver(() => m.invalidateSize());
     ro.observe(el.current);
     return () => {
       ro.disconnect();
       bus.remove();
+      gir.remove();
       st.remove();
       m.remove();
       mapa.current = null;
@@ -118,7 +248,7 @@ export function MapaInterativo(props: PropsMapa) {
   }, []);
 
   // a bússola fica logo abaixo do painel de cima
-  useEffect(() => { bussola.current?.style.setProperty('top', `${(props.margemTopo ?? 190) + 56}px`); }, [props.margemTopo]);
+  useEffect(() => { el.current?.style.setProperty('--gt-topo', `${(props.margemTopo ?? 190) + 56}px`); }, [props.margemTopo]);
 
   // camada de fundo
   useEffect(() => {
@@ -126,8 +256,8 @@ export function MapaInterativo(props: PropsMapa) {
     if (!g) return;
     g.base.clearLayers();
     const c = CAMADAS[props.camada];
-    L.tileLayer(c.base, { maxZoom: 20, maxNativeZoom: 19, attribution: c.attr, crossOrigin: true }).addTo(g.base);
-    if (c.rotulos) L.tileLayer(c.rotulos, { maxZoom: 20, maxNativeZoom: 19, opacity: 0.9, crossOrigin: true }).addTo(g.base);
+    L.tileLayer(c.base, { maxZoom: 20, maxNativeZoom: ZOOM_NATIVO_MAX, attribution: c.attr, crossOrigin: true }).addTo(g.base);
+    if (c.rotulos) L.tileLayer(c.rotulos, { maxZoom: 20, maxNativeZoom: ZOOM_NATIVO_MAX, opacity: 0.9, crossOrigin: true }).addTo(g.base);
   }, [props.camada]);
 
   // talhões salvos
@@ -135,23 +265,13 @@ export function MapaInterativo(props: PropsMapa) {
     const g = grupos.current;
     if (!g) return;
     g.talhoes.clearLayers();
+    cand.current.talhoes = [];
     for (const t of props.talhoes) {
       if (t.contorno.length < 3) continue;
       L.polygon(t.contorno.map(paraLL), { color: AMBAR, weight: 2, fillColor: AMBAR, fillOpacity: 0.16, interactive: false }).addTo(g.talhoes);
-      const rot = document.createElement('div');
-      rot.style.cssText = 'background:rgba(10,17,13,.82);color:#fff;border-radius:12px;padding:5px 10px;font:500 12px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;box-shadow:0 2px 8px rgba(0,0,0,.4);text-align:center;cursor:pointer;transform:translate(-50%,-50%);';
-      const n = document.createElement('div');
-      n.textContent = t.nome;
-      const r = document.createElement('div');
-      r.textContent = t.rotulo;
-      r.style.cssText = 'font-weight:500;opacity:.8;font-size:11px;';
-      rot.append(n, r);
-      const mk = L.marker(paraLL(centro(t.contorno)), { icon: L.divIcon({ html: rot, className: '', iconSize: [0, 0] }) }).addTo(g.talhoes);
-      mk.on('click', (e) => {
-        L.DomEvent.stopPropagation(e);
-        P.current.onTalhao(t.id);
-      });
+      cand.current.talhoes.push({ id: t.id, centro: L.latLng(paraLL(centro(t.contorno))), limites: L.latLngBounds(t.contorno.map(paraLL)), titulo: t.nome, sub: t.rotulo, clicavel: true });
     }
+    redesenhar.current();
     if (primeiraVez.current && props.talhoes.length) {
       primeiraVez.current = false;
       const todos = props.talhoes.flatMap((t) => t.contorno);
@@ -278,7 +398,7 @@ export function MapaInterativo(props: PropsMapa) {
       const giro = document.createElement('div');
       giro.className = 'gt-veic-giro';
       giro.style.cssText = 'width:64px;height:64px;';
-      giro.innerHTML = svgVeiculo(v.tipo, '#1F7A3E', 64);
+      giro.innerHTML = svgVeiculo(v.tipo, '#5B4FE0', 64);
       caixa.appendChild(giro);
       const mk = L.marker(paraLL(v.coord), { icon: L.divIcon({ html: caixa, className: 'gt-veic', iconSize: [64, 64], iconAnchor: [32, 32] }), interactive: false, zIndexOffset: 1000 }).addTo(mapa.current!);
       veic.current = { mk, giro, tipo: v.tipo };
@@ -292,20 +412,15 @@ export function MapaInterativo(props: PropsMapa) {
     const g = grupos.current;
     if (!g) return;
     g.campo.clearLayers();
+    cand.current.parcelas = [];
+    cand.current.bandeiras = props.bandeiras ?? [];
     for (const pc of props.parcelas ?? []) {
       for (const anel of pc.pedacos) {
         if (anel.length < 3) continue;
         L.polygon(anel.map(paraLL), { color: pc.cor, weight: 1.75, fillColor: pc.cor, fillOpacity: props.linhaGuia ? 0.2 : 0.38, interactive: false }).addTo(g.campo);
       }
       const todos = pc.pedacos.flat();
-      if (todos.length) {
-        const rot = document.createElement('div');
-        rot.style.cssText = 'background:rgba(10,17,13,.85);color:#fff;border-radius:10px;padding:4px 9px;font:500 11.5px Inter,system-ui,sans-serif;white-space:nowrap;width:max-content;text-align:center;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;';
-        const a = document.createElement('div'); a.textContent = pc.rotulo;
-        rot.appendChild(a);
-        if (pc.sub) { const b = document.createElement('div'); b.textContent = pc.sub; b.style.cssText = 'font-weight:500;opacity:.8;font-size:10.5px;'; rot.appendChild(b); }
-        L.marker(paraLL(centro(todos)), { icon: L.divIcon({ html: rot, className: '', iconSize: [0, 0] }), interactive: false }).addTo(g.campo);
-      }
+      if (todos.length) cand.current.parcelas.push({ id: pc.id, centro: L.latLng(paraLL(centro(todos))), limites: L.latLngBounds(todos.map(paraLL)), titulo: pc.rotulo, sub: pc.sub, clicavel: false });
     }
     if (props.rastro) {
       const { a: pa, b: pb } = props.rastro;
@@ -322,19 +437,7 @@ export function MapaInterativo(props: PropsMapa) {
       });
     }
     if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 3, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
-    for (const b of props.bandeiras ?? []) {
-      const cor = b.estado === 'ok' ? '#3FB063' : b.estado === 'atual' ? '#F2B73D' : '#9AA7A0';
-      const grande = b.estado === 'atual';
-      const tam = grande ? 32 : 24;
-      const caixa = document.createElement('div');
-      caixa.style.cssText = 'width:48px;height:48px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;';
-      const bandeira = document.createElement('div');
-      bandeira.style.cssText = `position:absolute;left:4px;bottom:6px;width:${tam}px;height:${tam}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));transition:transform .15s;`;
-      bandeira.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
-      caixa.appendChild(bandeira);
-      const mkb = L.marker(paraLL(b.coord), { icon: L.divIcon({ html: caixa, className: '', iconSize: [48, 48], iconAnchor: [4 + tam * (5 / 24), 48 - 6] }), interactive: true, zIndexOffset: grande ? 900 : 0, keyboard: false }).addTo(g.campo);
-      mkb.on('click', (e) => { L.DomEvent.stopPropagation(e); P.current.onBandeira?.(b.id); });
-    }
+    redesenhar.current();
   }, [props.parcelas, props.bandeiras, props.linhaGuia, props.rastro]);
 
   // rotas e destino

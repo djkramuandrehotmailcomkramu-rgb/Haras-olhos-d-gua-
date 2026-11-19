@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="fundo" x1="120" y1="0" x2="900" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3DBB6B"/><stop offset=".55" stop-color="#1F7A3E"/><stop offset="1" stop-color="#0F4A27"/>
+      <stop offset="0" stop-color="#8B7DFF"/><stop offset=".55" stop-color="#5B4FE0"/><stop offset="1" stop-color="#2A2278"/>
     </linearGradient>
     <radialGradient id="brilho" cx=".25" cy=".12" r=".75">
       <stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
@@ -10,7 +10,7 @@
       <stop offset="0" stop-color="#FFD166"/><stop offset="1" stop-color="#F0A01C"/>
     </linearGradient>
     <filter id="sombra" x="-30%" y="-30%" width="160%" height="170%">
-      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#04200F" flood-opacity=".45"/>
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#0B0830" flood-opacity=".45"/>
     </filter>
   </defs>
   <rect width="1024" height="1024" rx="232" fill="url(#fundo)"/>
@@ -32,7 +32,7 @@
     </g>
     <g filter="url(#sombra)" transform="translate(500 330)">
       <path d="M0 330 C -120 215, -150 150, -150 95 A150 150 0 1 1 150 95 C 150 150, 120 215, 0 330 Z" fill="url(#ambar)"/>
-      <circle cx="0" cy="95" r="58" fill="#14532D" />
+      <circle cx="0" cy="95" r="58" fill="#2A2278" />
       <circle cx="0" cy="95" r="22" fill="#fff"/>
     </g>
   </g>

@@ -10,7 +10,7 @@ export const VEICULOS: { id: Veiculo; rotulo: string }[] = [
 const VIDRO = '#10261A';
 
 /** Desenho do veículo visto de cima, de frente para o topo (norte). Mesmo desenho no mapa e nos menus. */
-export function svgVeiculo(tipo: Veiculo, cor = '#1F7A3E', tamanho = 64): string {
+export function svgVeiculo(tipo: Veiculo, cor = '#5B4FE0', tamanho = 64): string {
   const halo = `<circle cx="32" cy="32" r="30" fill="${cor}" fill-opacity=".16"/>`;
   const sombra = `<ellipse cx="33" cy="36" rx="15" ry="26" fill="#000" fill-opacity=".22"/>`;
   let corpo = '';

@@ -4,7 +4,7 @@ import { areaM2 } from './medidas';
 import { formatarNumeroBR } from './numero';
 import type { BandeiraCampo, ConfigCampo, ConfigJunto, ParteCampo, PlanoCampo, Talhao } from '../store/dados';
 
-export const CORES_VARIEDADE = ['#3FB063', '#F2B73D', '#5B9BFF', '#E5484D', '#B07CFF', '#FF8A5B', '#2EC4B6', '#C28A55', '#E86AB5', '#8FA39A', '#7DD3FC', '#FDE047'];
+export const CORES_VARIEDADE = ['#7C6BFF', '#F2B73D', '#2EC4B6', '#E5484D', '#5B9BFF', '#FF8A5B', '#34C759', '#C28A55', '#E86AB5', '#8FA39A', '#7DD3FC', '#FDE047'];
 
 export type ConfigTalhao = ConfigCampo;
 

@@ -38,6 +38,7 @@ export default function RaizLayout() {
         <Stack.Screen name="talhao/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
         <Stack.Screen name="campo/[id]" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
         <Stack.Screen name="campo/novo" options={{ animation: 'slide_from_bottom', animationDuration: 380 }} />
+        <Stack.Screen name="mapas" options={{ animation: 'slide_from_right', animationDuration: 360 }} />
         <Stack.Screen name="ajuda" options={{ animation: 'slide_from_right', animationDuration: 360 }} />
       </Stack>
       <Toast />

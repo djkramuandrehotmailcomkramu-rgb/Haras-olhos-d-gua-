@@ -24,11 +24,11 @@ function svg({ fundo, escala = 1, mono = false }) {
   const campoFill = mono ? '#FFFFFF' : '#FFFFFF';
   const campoOp = mono ? 0.28 : 0.2;
   const pino = mono ? '#FFFFFF' : 'url(#ambar)';
-  const miolo = mono ? '#000000' : '#14532D';
+  const miolo = mono ? '#000000' : '#2A2278';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="fundo" x1="120" y1="0" x2="900" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3DBB6B"/><stop offset=".55" stop-color="#1F7A3E"/><stop offset="1" stop-color="#0F4A27"/>
+      <stop offset="0" stop-color="#8B7DFF"/><stop offset=".55" stop-color="#5B4FE0"/><stop offset="1" stop-color="#2A2278"/>
     </linearGradient>
     <radialGradient id="brilho" cx=".25" cy=".12" r=".75">
       <stop offset="0" stop-color="#fff" stop-opacity=".32"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
@@ -37,7 +37,7 @@ function svg({ fundo, escala = 1, mono = false }) {
       <stop offset="0" stop-color="#FFD166"/><stop offset="1" stop-color="#F0A01C"/>
     </linearGradient>
     <filter id="sombra" x="-30%" y="-30%" width="160%" height="170%">
-      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#04200F" flood-opacity=".45"/>
+      <feDropShadow dx="0" dy="16" stdDeviation="16" flood-color="#0B0830" flood-opacity=".45"/>
     </filter>
   </defs>
   ${bg}
@@ -68,11 +68,11 @@ const saidas = [
   ['assets/android-icon-monochrome.png', 1024, { fundo: 'nenhum', escala: 0.82, mono: true }, true],
   ['assets/favicon.png', 96, { fundo: 'arredondado', escala: 1 }, true],
   // web: nomes com versão (v2) para o celular trocar o ícone antigo
-  ['public/icon-v2-192.png', 192, { fundo: 'arredondado', escala: 1 }, true],
-  ['public/icon-v2-512.png', 512, { fundo: 'arredondado', escala: 1 }, true],
-  ['public/icon-v2-maskable-512.png', 512, { fundo: 'quadrado', escala: 0.8 }, false],
-  ['public/icon-v2-monochrome-512.png', 512, { fundo: 'nenhum', escala: 0.8, mono: true }, true],
-  ['public/apple-touch-icon-v2.png', 180, { fundo: 'quadrado', escala: 1 }, false],
+  ['public/icon-v3-192.png', 192, { fundo: 'arredondado', escala: 1 }, true],
+  ['public/icon-v3-512.png', 512, { fundo: 'arredondado', escala: 1 }, true],
+  ['public/icon-v3-maskable-512.png', 512, { fundo: 'quadrado', escala: 0.8 }, false],
+  ['public/icon-v3-monochrome-512.png', 512, { fundo: 'nenhum', escala: 0.8, mono: true }, true],
+  ['public/apple-touch-icon-v3.png', 180, { fundo: 'quadrado', escala: 1 }, false],
 ];
 
 (async () => {

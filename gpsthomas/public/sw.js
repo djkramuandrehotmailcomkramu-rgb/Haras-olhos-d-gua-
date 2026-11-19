@@ -1,5 +1,7 @@
-const V = 'gpsthomas-v5';
+const V = 'gpsthomas-v6';
 const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
+// PNG transparente 1x1
+const VAZIO = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='), (ch) => ch.charCodeAt(0));
 
 // Não pula a espera sozinho: o app mostra "Nova versão disponível" e o usuário decide quando atualizar.
 self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
@@ -16,11 +18,17 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Mapas: cache primeiro, assim as áreas já vistas abrem sem internet.
+  // Mapas: cache primeiro (inclui os mapas baixados em "Mapas offline"). Sem internet e sem o bloco salvo, devolve um bloco vazio
+  // para o mapa não mostrar erro.
   if (TILES.some((h) => url.hostname.endsWith(h))) {
     e.respondWith(
       caches.open('gpsthomas-tiles').then((c) =>
-        c.match(req).then((hit) => hit || fetch(req).then((r) => { if (r.ok || r.type === 'opaque') c.put(req, r.clone()); return r; }).catch(() => hit)),
+        c.match(req, { ignoreVary: true }).then((hit) =>
+          hit ||
+          fetch(req)
+            .then((r) => { if (r.ok) c.put(req, r.clone()); return r; })
+            .catch(() => new Response(VAZIO, { status: 200, headers: { 'content-type': 'image/png' } })),
+        ),
       ),
     );
     return;

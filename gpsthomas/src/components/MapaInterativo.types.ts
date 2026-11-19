@@ -48,6 +48,8 @@ export type PropsMapa = {
   onSelecionar?: (indice: number | null) => void;
   /** Quanto o ponto anda para cada pixel que a alça anda: 1 = igual, 0,25 = quatro vezes mais fino. */
   fatorAlca?: number;
+  /** Avisa a região visível do mapa (para baixar mapas offline dela). */
+  onVista?: (v: { oeste: number; sul: number; leste: number; norte: number; zoom: number; centro: Coord }) => void;
   /** Modo mira: o centro do mapa é o alvo; avisa o centro a cada movimento. */
   mira?: boolean;
   onCentro?: (c: Coord) => void;
