@@ -61,10 +61,10 @@ function rotuloEl(titulo: string, sub: string | undefined, clicavel: boolean, co
 }
 
 function iconeBandeira(estado: BandeiraMapa['estado'], zoom: number): L.DivIcon {
-  const cor = estado === 'ok' ? '#34C759' : estado === 'atual' ? '#F2B73D' : '#9AA7A0';
+  const cor = estado === 'ok' ? '#34C759' : estado === 'aqui' ? '#00E0C6' : estado === 'atual' ? '#F2B73D' : '#9AA7A0';
   const caixa = document.createElement('div');
   caixa.style.cssText = 'width:44px;height:44px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;';
-  if (estado !== 'atual' && zoom < 16) {
+  if (estado !== 'atual' && estado !== 'aqui' && zoom < 16) {
     // de longe: só um ponto (a bandeira inteira polui o mapa)
     const d = zoom < 14 ? 10 : 14;
     const c = document.createElement('div');
@@ -72,7 +72,7 @@ function iconeBandeira(estado: BandeiraMapa['estado'], zoom: number): L.DivIcon 
     caixa.appendChild(c);
     return L.divIcon({ html: caixa, className: '', iconSize: [44, 44], iconAnchor: [22, 22] });
   }
-  const tam = estado === 'atual' ? 34 : zoom >= 17 ? 26 : 20;
+  const tam = estado === 'aqui' ? 44 : estado === 'atual' ? 34 : zoom >= 17 ? 26 : 20;
   const bandeira = document.createElement('div');
   bandeira.style.cssText = `position:absolute;left:12px;bottom:10px;width:${tam}px;height:${tam}px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55));`;
   bandeira.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%"><path d="M5 2 V22" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 3 H19 L15.5 7.5 L19 12 H6 Z" fill="${cor}" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
@@ -126,7 +126,7 @@ function desenharLod(
   const celula = z >= 17 ? 0 : z >= 16 ? 30 : 38;
   const grupos = new Map<string, BandeiraMapa[]>();
   for (const b of c.bandeiras) {
-    if (b.estado === 'atual' || celula === 0) { grupos.set(`i:${b.id}`, [b]); continue; }
+    if (b.estado === 'atual' || b.estado === 'aqui' || celula === 0) { grupos.set(`i:${b.id}`, [b]); continue; }
     const p = m.project(L.latLng(b.coord[1], b.coord[0]), z);
     const k = `${Math.floor(p.x / celula)}:${Math.floor(p.y / celula)}`;
     grupos.set(k, [...(grupos.get(k) ?? []), b]);
@@ -134,7 +134,7 @@ function desenharLod(
   for (const membros of grupos.values()) {
     if (membros.length === 1) {
       const b = membros[0];
-      const mk = L.marker(L.latLng(b.coord[1], b.coord[0]), { icon: iconeBandeira(b.estado, z), interactive: true, zIndexOffset: b.estado === 'atual' ? 900 : 0, keyboard: false }).addTo(g);
+      const mk = L.marker(L.latLng(b.coord[1], b.coord[0]), { icon: iconeBandeira(b.estado, z), interactive: true, zIndexOffset: b.estado === 'atual' || b.estado === 'aqui' ? 900 : 0, keyboard: false }).addTo(g);
       mk.on('click', (ev) => { L.DomEvent.stopPropagation(ev); aoBandeira(b.id); });
     } else {
       const lat = membros.reduce((s, b) => s + b.coord[1], 0) / membros.length, lon = membros.reduce((s, b) => s + b.coord[0], 0) / membros.length;
@@ -166,7 +166,7 @@ export function MapaInterativo(props: PropsMapa) {
     st.textContent = CSS;
     document.head.appendChild(st);
     // rotate/touchRotate (leaflet-rotate): gire o mapa com dois dedos (ou Ctrl + arrastar no computador).
-    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true, rotate: true, touchRotate: false, bearing: 0, rotateControl: false, shiftKeyRotate: false } as L.MapOptions).setView([-15.78, -47.93], 4);
+    const m = L.map(el.current, { zoomControl: false, attributionControl: true, maxZoom: 20, tap: true, rotate: true, touchRotate: true, bearing: 0, rotateControl: false, shiftKeyRotate: false } as L.MapOptions).setView([-15.78, -47.93], 4);
     const mr = m as L.Map & { setBearing: (g: number) => void; getBearing: () => number };
     (window as any).__gtMapa = m;
     // Bússola: aparece quando o mapa está girado; tocar volta o norte para cima.
@@ -183,13 +183,13 @@ export function MapaInterativo(props: PropsMapa) {
     const gir = document.createElement('button');
     gir.type = 'button';
     gir.className = 'gt-girar';
-    gir.setAttribute('aria-label', 'Permitir girar o mapa com dois dedos');
+    gir.setAttribute('aria-label', 'Ligar ou desligar o giro do mapa com dois dedos');
     gir.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>';
     el.current.appendChild(gir);
     L.DomEvent.disableClickPropagation(gir);
     const tr = (m as any).touchRotate;
-    let girar = false;
-    try { girar = localStorage.getItem('gpsthomas-girar') === '1'; } catch {}
+    let girar = true;
+    try { girar = localStorage.getItem('gpsthomas-girar') !== '0'; } catch {}
     const aplicarGirar = () => {
       if (tr) (girar ? tr.enable() : tr.disable());
       gir.style.opacity = '1'; gir.style.pointerEvents = 'auto';
@@ -437,6 +437,24 @@ export function MapaInterativo(props: PropsMapa) {
       });
     }
     if (props.linhaGuia) L.polyline(props.linhaGuia.map(paraLL), { color: '#F2B73D', weight: 3, dashArray: '2 9', lineCap: 'round', interactive: false }).addTo(g.campo);
+    if (props.linhaGuia && props.linhaGuia.length === 2) {
+      // seta grande saindo de você em direção à bandeirinha (a ponta aponta o caminho)
+      const [de, para] = props.linhaGuia.map((c) => L.latLng(paraLL(c)));
+      const m0 = mapa.current;
+      if (m0) {
+        const pa = m0.latLngToContainerPoint(de), pb = m0.latLngToContainerPoint(para);
+        const dist = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+        if (dist > 70) {
+          const f = Math.min(0.5, 60 / dist);
+          const pos = L.latLng(de.lat + (para.lat - de.lat) * f, de.lng + (para.lng - de.lng) * f);
+          const ang = Math.atan2(pb.x - pa.x, -(pb.y - pa.y)) * 180 / Math.PI;
+          const seta = document.createElement('div');
+          seta.style.cssText = `width:44px;height:44px;transform:rotate(${ang}deg);filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));`;
+          seta.innerHTML = '<svg viewBox="0 0 24 24" width="44" height="44"><path d="M12 2 L21 20 L12 15.5 L3 20 Z" fill="#F2B73D" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+          L.marker(pos, { icon: L.divIcon({ html: seta, className: '', iconSize: [44, 44], iconAnchor: [22, 22] }), interactive: false, keyboard: false }).addTo(g.campo);
+        }
+      }
+    }
     redesenhar.current();
   }, [props.parcelas, props.bandeiras, props.linhaGuia, props.rastro]);
 

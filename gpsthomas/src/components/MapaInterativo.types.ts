@@ -6,7 +6,7 @@ import type { Veiculo } from './veiculos';
 export type TalhaoMapa = { id: string; nome: string; rotulo: string; contorno: Coord[] };
 
 export type ParcelaMapa = { id: string; pedacos: Coord[][]; cor: string; rotulo: string; sub?: string };
-export type BandeiraMapa = { id: string; coord: Coord; estado: 'pendente' | 'atual' | 'ok'; rotulo: string };
+export type BandeiraMapa = { id: string; coord: Coord; estado: 'pendente' | 'atual' | 'aqui' | 'ok'; rotulo: string };
 
 export type PropsMapa = {
   talhoes: TalhaoMapa[];

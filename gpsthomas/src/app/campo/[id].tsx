@@ -61,6 +61,7 @@ export default function CampoTela() {
   const [mapaCheio, setMapaCheio] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [calibrandoBussola, setCalibrandoBussola] = useState(false);
+  const [ajustesAbertos, setAjustesAbertos] = useState(false);
   const [calibGpsAberto, setCalibGpsAberto] = useState(false);
   const [coordTxt, setCoordTxt] = useState({ lat: '', lon: '' });
   const [chegada, setChegada] = useState<EstadoChegada>({ dentro: false, seguidos: 0 });
@@ -142,6 +143,7 @@ export default function CampoTela() {
   useEffect(() => { if (guia) setChegada((c) => atualizarChegada(c, guia.distanciaM, precisao)); }, [guia?.distanciaM, precisao]);
   useEffect(() => { setChegada({ dentro: false, seguidos: 0 }); }, [alvo?.id]);
   const nessePonto = chegada.dentro && !!guia && guia.distanciaM <= 5;
+  const aqui = !!guia && precisaoOk && guia.distanciaM < 1; // menos de 1 m: cor diferente
 
   // Já deixa o GPS ligado ao abrir o plano (se o aparelho já deu permissão) para ele estabilizar antes do guia
   useEffect(() => {
@@ -294,7 +296,7 @@ export default function CampoTela() {
       onTalhao={() => {}}
       parcelas={parcelas}
       rastro={plano.junto?.linhaAB && plano.junto.usarLinhaAB ? plano.junto.linhaAB : null}
-      bandeiras={plano.bandeiras.map((b) => ({ id: b.id, coord: b.coord, estado: b.colocada ? 'ok' : guiando && alvo?.id === b.id ? 'atual' : 'pendente', rotulo: b.rotulo }))}
+      bandeiras={plano.bandeiras.map((b) => ({ id: b.id, coord: b.coord, estado: b.colocada ? 'ok' : guiando && alvo?.id === b.id ? (aqui ? 'aqui' : 'atual') : 'pendente', rotulo: b.rotulo }))}
       linhaGuia={guiando && alvo && posGuia ? [posGuia.coord, alvo.coord] : null}
       onBandeira={(idB) => { Haptics.selectionAsync(); setSelecionada(idB); }}
     />
@@ -308,7 +310,7 @@ export default function CampoTela() {
       <View style={{ flex: 1, backgroundColor: t.fundo }}>
         {mapa}
         <Animated.View entering={FadeInUp.duration(300)} style={{ position: 'absolute', top: ins.top + 10, left: 14, right: 14, zIndex: 10, gap: 8 }}>
-          <View style={{ backgroundColor: nessePonto ? t.ok : t.primaria, borderRadius: raio.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
+          <View style={{ backgroundColor: aqui ? '#00A896' : nessePonto ? t.ok : t.primaria, borderRadius: raio.lg, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 16, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
               {nessePonto ? <Ionicons name="flag" size={34} color="#fff" /> : giro == null ? <Ionicons name="walk" size={36} color="#fff" /> : <SetaGuia giro={giro} />}
             </View>
@@ -317,7 +319,7 @@ export default function CampoTela() {
                 {guia ? `${precisaoOk ? '' : '~'}${guia.distanciaM < 100 ? guia.distanciaM.toFixed(1).replace('.', ',') : Math.round(guia.distanciaM)} m` : '—'}
               </Text>
               <Text numberOfLines={2} style={{ fontFamily: fonte.semi, fontSize: 15.5, color: '#fff', opacity: 0.95 }}>
-                {!gps.pos ? 'Buscando sinal de GPS…' : !precisaoOk ? `Aguardando GPS preciso (±${Math.round(precisao ?? 0)} m)` : nessePonto ? 'Chegou! Coloque a bandeirinha' : textoGiro(giro)}
+                {!gps.pos ? 'Buscando sinal de GPS…' : !precisaoOk ? `Aguardando GPS preciso (±${Math.round(precisao ?? 0)} m)` : aqui ? 'Aqui! Menos de 1 m: cravar a bandeirinha' : nessePonto ? 'Chegou! Coloque a bandeirinha' : textoGiro(giro)}
               </Text>
             </View>
           </View>
@@ -332,6 +334,16 @@ export default function CampoTela() {
               </View>
             </Vidro>
           )}
+          <Pressable onPress={() => setAjustesAbertos((v) => !v)} accessibilityRole="button" accessibilityLabel="Ajustes e calibração" style={{ alignSelf: 'flex-start' }}>
+            <Vidro raioBorda={raio.pilula}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: precisao == null ? t.textoSuave : precisao <= 8 ? t.ok : precisao <= 15 ? t.atencao : t.perigo }} />
+                <Text accessibilityLabel="Situação do GPS" style={{ fontFamily: fonte.semi, fontSize: 12.5, color: t.texto }}>{precisao == null ? 'GPS buscando…' : `GPS ±${Math.round(precisao)} m`}</Text>
+                <Ionicons name={ajustesAbertos ? 'chevron-up' : 'options-outline'} size={15} color={t.textoSuave} />
+              </View>
+            </Vidro>
+          </Pressable>
+          {(ajustesAbertos || calibrandoBussola) && (
           <Vidro raioBorda={raio.md}>
             <View style={{ padding: 10, gap: 8 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -354,7 +366,8 @@ export default function CampoTela() {
               )}
             </View>
           </Vidro>
-          {precisao != null && precisao > 8 && (
+          )}
+          {precisao != null && precisao > PRECISAO_MAX_GUIA_M && (
             <Vidro raioBorda={raio.md}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10 }}>
                 <Ionicons name="warning" size={18} color={t.atencao} />

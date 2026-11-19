@@ -165,7 +165,7 @@ module.exports = [
         const lat = BASE[1] + 5 / KY + (alvo[1] - (BASE[1] + 5 / KY)) * f + i * 1e-8, lon = BASE[0] + (alvo[0] - BASE[0]) * f;
         await p.ctx.setGeolocation({ latitude: lat, longitude: lon, accuracy: 4 }); await p.waitForTimeout(1100);
       }
-      check(await p.getByText(/Chegou! Coloque/).count() >= 1, 'avisou que chegou');
+      check(await p.getByText(/Chegou! Coloque|Aqui! Menos de 1 m/).count() >= 1, 'avisou que chegou');
       await p.getByText('Bandeira colocada ✓').click(); await p.waitForTimeout(700);
       check((await estado(p)).campos[0].bandeiras.filter((b) => b.colocada).length === 1, '1 bandeirinha colocada');
     },
@@ -603,7 +603,7 @@ module.exports = [
       check(await p.getByText(/Aguardando GPS preciso/).count() === 0, 'depois de fixos bons o guia libera');
       check(await p.getByLabel('Situação do GPS').count() === 1, 'mostra a situação do GPS');
       const chip = await p.getByLabel('Situação do GPS').textContent();
-      check(/GPS ±\d+ m · (pronto|estabilizando)/.test(chip), `situação: ${chip}`);
+      check(/GPS ±\d+ m/.test(chip), `situação: ${chip}`);
       // bússola: leitura magnética que, com a declinação, aponta exatamente para o alvo => "Siga em frente"
       const dx = (alvo[0] - BASE[0]) * KX, dy = (alvo[1] - lat0) * KY;
       const rumoAlvo = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
@@ -611,6 +611,7 @@ module.exports = [
         for (let i = 0; i < n2; i++) { const e = new Event('deviceorientationabsolute'); Object.assign(e, { alpha: (360 - h) % 360, beta: 75, gamma: 0, absolute: true }); window.dispatchEvent(e); }
       }, [rumoMag, n]);
       await mandar(0, 3); await p.waitForTimeout(400);
+      await p.getByRole('button', { name: 'Ajustes e calibração' }).click(); await p.waitForTimeout(300);
       const txtDesvio = await p.getByText(/bússola -?\d+°/).first().textContent();
       const decl = parseInt(/bússola (-?\d+)°/.exec(txtDesvio)[1], 10);
       await mandar(((rumoAlvo - decl) % 360 + 360) % 360);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.2
+- **Guia mais limpo:** as opções de calibrar bússola e GPS ficam recolhidas num botão pequeno ("GPS ±x m"); o aviso de calibração some sozinho ao terminar.
+- **Giro com dois dedos de volta ligado** (há um botão para desligar).
+- **Seta no mapa** saindo de você em direção à bandeirinha escolhida.
+- **A menos de 1 m** a bandeirinha no mapa e o painel mudam de cor (turquesa) e avisam "Aqui!".
+
 ## 1.9.1
 - **Campo de sementes: o mapa não "volta" mais o zoom.** Ao dar zoom com os dedos nas bandeirinhas, o mapa reenquadrava o campo inteiro a cada atualização do GPS; agora só reenquadra quando você pede.
 
