@@ -478,7 +478,8 @@ export function MapaInterativo(props: PropsMapa) {
     if (!c || !m) return;
     if (c.tipo === 'voar') m.flyTo(paraLL(c.coord), c.zoom ?? 18, { duration: 0.8 });
     else if (c.pontos.length) m.fitBounds(L.latLngBounds(c.pontos.map(paraLL)), { paddingTopLeft: [50, 150], paddingBottomRight: [50, 330], maxZoom: 18 });
-  }, [props.comando]);
+    // só executa quando o comando é novo (número n); antes qualquer re-render do GPS refazia o enquadramento e o zoom "voltava"
+  }, [props.comando?.n]);
 
   return (
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>

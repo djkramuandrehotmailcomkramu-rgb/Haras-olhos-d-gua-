@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.9.1
+- **Campo de sementes: o mapa não "volta" mais o zoom.** Ao dar zoom com os dedos nas bandeirinhas, o mapa reenquadrava o campo inteiro a cada atualização do GPS; agora só reenquadra quando você pede.
+
 ## 1.9.0
 - **Mapas offline:** novo botão de nuvem no mapa (e em Mais ▸ Ajustes). Baixe a região da fazenda (ou só os talhões) em satélite ou ruas, com estimativa de tamanho, progresso, pausa e nova tentativa; o mapa abre sem internet com o que foi baixado. Armazenamento persistente pedido ao navegador. Gerencia e apaga áreas salvas.
 - **Mapa mais limpo:** rótulos de talhões e partes só aparecem quando cabem e sem se sobrepor; as bandeirinhas de longe viram pontos e as que estão perto viram um número (toque para aproximar); a próxima bandeirinha do guia sempre aparece. O giro com dois dedos vem desligado (botão para ligar).
