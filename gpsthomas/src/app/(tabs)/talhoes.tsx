@@ -5,6 +5,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Tela } from '../../components/Tela';
 import { Cartao } from '../../components/Cartao';
+import { Grupo, Linha } from '../../components/Lista';
+import { Segmentos } from '../../components/Segmentos';
 import { Ilustracao } from '../../components/Ilustracao';
 import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
@@ -20,6 +22,7 @@ export default function TalhoesTela() {
   const campos = useDados((s) => s.campos);
   const [busca, setBusca] = useState('');
   const [limite, setLimite] = useState(30);
+  const [aba, setAba] = useState('Talhões');
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -36,35 +39,30 @@ export default function TalhoesTela() {
 
   return (
     <Tela titulo="Talhões" subtitulo={talhoes.length ? `${talhoes.length} áreas · ${formatarArea(totalM2, unidade)} no total` : 'Suas áreas medidas, por fazenda e safra'}>
-      {talhoes.length > 0 && (
+      {aba === 'Talhões' && talhoes.length > 0 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: t.cartao, borderRadius: raio.pilula, paddingHorizontal: 14, height: 44, gap: 8 }}>
           <Ionicons name="search" size={18} color={t.textoSuave} />
           <TextInput value={busca} onChangeText={setBusca} placeholder="Buscar talhão, fazenda ou cultura" placeholderTextColor={t.textoSuave} style={{ flex: 1, fontFamily: fonte.regular, fontSize: 15, color: t.texto, outlineWidth: 0 } as any} />
         </View>
       )}
 
-      {talhoes.length > 0 && (
-        <View style={{ gap: 10 }}>
-          <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>CAMPOS DE SEMENTES</Text>
-          {campos.map((c) => (
-            <Pressable key={c.id} onPress={() => router.push(`/campo/${c.id}`)}>
-              <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <View style={{ width: 46, height: 46, borderRadius: raio.md, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="flag" size={22} color={t.primaria} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text numberOfLines={1} style={[tipo.subtitulo, { color: t.texto }]}>{c.nome}</Text>
-                  <Text style={[tipo.corpo, { color: t.textoSuave }]}>{c.partes.length} partes · {c.bandeiras.filter((b) => b.colocada).length}/{c.bandeiras.length} bandeiras</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={t.textoSuave} />
-              </Cartao>
-            </Pressable>
-          ))}
-          <Botao titulo="Novo campo de sementes" variante="suave" icone={<Ionicons name="flag-outline" size={19} color={t.primaria} />} onPress={() => router.push('/campo/novo')} />
-        </View>
+      <Segmentos opcoes={['Talhões', 'Campos de sementes']} valor={aba} onChange={setAba} />
+
+      {aba === 'Campos de sementes' && (
+        <>
+          <Grupo>
+            {campos.map((c) => (
+              <Linha key={c.id} titulo={c.nome} subtitulo={`${c.partes.length} partes · ${c.bandeiras.filter((b) => b.colocada).length}/${c.bandeiras.length} bandeiras`} icone="flag" onPress={() => router.push(`/campo/${c.id}`)} />
+            ))}
+            <Linha titulo="Novo campo de sementes" icone="add" corIcone="#8E8E93" onPress={() => router.push('/campo/novo')} />
+          </Grupo>
+          <Grupo>
+            <Linha titulo="Medições salvas" subtitulo="Distâncias e áreas medidas no mapa" icone="analytics" corIcone="#FF9F0A" onPress={() => router.push('/medicoes')} />
+          </Grupo>
+        </>
       )}
 
-      {talhoes.length === 0 && (
+      {aba === 'Talhões' && talhoes.length === 0 && (
         <Cartao style={{ alignItems: 'center', gap: 10, paddingVertical: 36 }}>
           <Ilustracao tamanho={150} />
           <Text style={[tipo.subtitulo, { color: t.texto }]}>Nenhum talhão ainda</Text>
@@ -73,31 +71,14 @@ export default function TalhoesTela() {
         </Cartao>
       )}
 
-      {porFazenda.map(([fazenda, lista], gi) => (
-        <View key={fazenda} style={{ gap: 10 }}>
-          <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>{fazenda.toUpperCase()}</Text>
-          {lista.map((x, i) => (
-            <View key={x.id}>
-              <Pressable onPress={() => router.push(`/talhao/${x.id}`)}>
-                <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <View style={{ width: 46, height: 46, borderRadius: raio.md, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="leaf" size={22} color={t.primaria} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[tipo.subtitulo, { color: t.texto }]} numberOfLines={1}>{x.nome}</Text>
-                    <Text style={[tipo.corpo, { color: t.textoSuave }]} numberOfLines={1}>{x.cultura} · safra {x.safra}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontFamily: fonte.negrito, fontSize: 17, color: t.primaria }}>{formatarArea(areaM2(x.contorno), unidade)}</Text>
-                    <Ionicons name="chevron-forward" size={16} color={t.textoSuave} />
-                  </View>
-                </Cartao>
-              </Pressable>
-            </View>
+      {aba === 'Talhões' && porFazenda.map(([fazenda, lista]) => (
+        <Grupo key={fazenda} titulo={fazenda}>
+          {lista.map((x) => (
+            <Linha key={x.id} titulo={x.nome} subtitulo={`${x.cultura} · safra ${x.safra}`} icone="leaf" valor={formatarArea(areaM2(x.contorno), unidade)} onPress={() => router.push(`/talhao/${x.id}`)} />
           ))}
-        </View>
+        </Grupo>
       ))}
-      {filtrados.length > limite && <Botao titulo={`Mostrar mais (${filtrados.length - limite})`} variante="suave" onPress={() => setLimite((l) => l + 30)} />}
+      {aba === 'Talhões' && filtrados.length > limite && <Botao titulo={`Mostrar mais (${filtrados.length - limite})`} variante="suave" onPress={() => setLimite((l) => l + 30)} />}
       {talhoes.length > 0 && filtrados.length === 0 && <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>Nenhum talhão encontrado para "{busca}".</Text>}
     </Tela>
   );

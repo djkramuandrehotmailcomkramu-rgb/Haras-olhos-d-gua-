@@ -144,7 +144,7 @@ function desenharLod(
   }
 }
 
-const CSS = '.gt-bussola{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(10,17,13,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}.gt-girar{margin-top:52px}.gt-bussola svg{transition:transform .05s linear}.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
+const CSS = '.gt-bussola{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(10,17,13,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}.gt-bussola,.gt-girar{position:absolute;z-index:1000;left:12px;top:var(--gt-topo,230px);width:44px;height:44px;border-radius:50%;border:.5px solid rgba(255,255,255,.28);background:rgba(18,18,28,.78);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:opacity .25s ease,background .2s ease}.gt-girar{margin-top:52px}.gt-bussola svg{transition:transform .05s linear}.gt-alca:active{cursor:grabbing}.gt-veic{transition:transform .9s linear!important}.gt-veic-giro{transition:transform .6s ease-out}.leaflet-bottom.leaflet-right{margin-bottom:86px}.leaflet-control-attribution{font:500 9.5px Inter,system-ui,sans-serif!important;background:rgba(0,0,0,.5)!important;color:#fff!important;border-radius:8px 0 0 8px;padding:2px 8px!important}.leaflet-container{font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}';
 
 export function MapaInterativo(props: PropsMapa) {
   const el = useRef<HTMLDivElement>(null);
@@ -182,7 +182,7 @@ export function MapaInterativo(props: PropsMapa) {
     // Girar com dois dedos fica desligado por padrão (girava sem querer ao dar zoom); o botão liga/desliga.
     const gir = document.createElement('button');
     gir.type = 'button';
-    gir.className = 'gt-bussola gt-girar';
+    gir.className = 'gt-girar';
     gir.setAttribute('aria-label', 'Permitir girar o mapa com dois dedos');
     gir.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>';
     el.current.appendChild(gir);

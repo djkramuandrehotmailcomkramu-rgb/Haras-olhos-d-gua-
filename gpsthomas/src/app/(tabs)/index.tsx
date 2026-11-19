@@ -20,6 +20,7 @@ import { useDados, useUi, type Comando } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { useNumeroAnimado } from '../../hooks/animacao';
+import { useOnline } from '../../hooks/online';
 import { fonte, raio, tipo, useTema } from '../../theme';
 
 type Modo = 'caminhar' | 'marcar' | 'mira' | 'linha';
@@ -50,11 +51,13 @@ function deslocar(c: Coord, dx: number, dy: number): Coord {
 const CICLO: UnidadeArea[] = ['ha', 'alqPaulista', 'alqMineiro', 'alqGoiano', 'alqBaiano', 'm2'];
 const mmss = (seg: number) => `${String(Math.floor(seg / 60)).padStart(2, '0')}:${String(seg % 60).padStart(2, '0')}`;
 
-function BotaoRedondo({ icone, onPress, ativo, desabilitado }: { icone: keyof typeof Ionicons.glyphMap; onPress: () => void; ativo?: boolean; desabilitado?: boolean }) {
+function BotaoRedondo({ icone, onPress, ativo, desabilitado, rotulo }: { icone: keyof typeof Ionicons.glyphMap; onPress: () => void; ativo?: boolean; desabilitado?: boolean; rotulo?: string }) {
   const t = useTema();
   return (
     <Pressable
       disabled={desabilitado}
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       style={({ pressed }) => ({ opacity: desabilitado ? 0.35 : 1, transform: [{ scale: pressed ? 0.92 : 1 }] })}
     >
@@ -205,6 +208,7 @@ export default function MapaTela() {
     setFuturo(futuro.slice(0, -1));
   };
 
+  const online = useOnline();
   const areaAnim = useNumeroAnimado(area);
   const compAnim = useNumeroAnimado(comprimento);
   const prec = gps.pos?.precisaoM ?? null;
@@ -215,7 +219,7 @@ export default function MapaTela() {
     : pontos.length === 0
     ? modo === 'caminhar' ? 'Toque em Iniciar e caminhe pelo contorno da área' : modo === 'marcar' ? 'Toque no mapa para marcar o primeiro ponto' : mira ? 'Arraste o mapa até o canto e toque em Marcar no centro' : 'Toque no mapa para começar a medir a distância'
     : poligono && pontos.length < 3 ? `Marque mais ${3 - pontos.length} ${3 - pontos.length === 1 ? 'ponto' : 'pontos'} para formar a área`
-    : podeSalvar && !caminhando ? 'Toque num ponto para ajustar com precisão, ou em Salvar' : null;
+    : null;
   const resumo = poligono ? `${formatarArea(area, unidadeArea)} · perímetro ${formatarDistancia(perimetro)}` : `Distância ${formatarDistancia(comprimento)}`;
   const grande = poligono ? formatarArea(areaAnim, unidadeArea) : formatarDistancia(compAnim);
   const [valorGrande, ...unid] = grande.split(' ');
@@ -284,7 +288,7 @@ export default function MapaTela() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: gps.ligado ? corPrec : t.textoSuave }} />
                 <Text style={[tipo.legenda, { color: gps.ligado ? corPrec : t.textoSuave }]}>
-                  {gps.ligado ? (prec != null ? `GPS ±${Math.round(prec)} m · ${nomePrec}` : 'GPS buscando…') : 'GPS desligado'}
+                  {gps.ligado ? (prec != null ? `GPS ±${Math.round(prec)} m · ${nomePrec}` : 'GPS buscando…') : 'GPS desligado'}{!online ? ' · offline' : ''}
                 </Text>
               </View>
             </View>
@@ -306,10 +310,15 @@ export default function MapaTela() {
       <Animated.View entering={FadeInUp.delay(100).duration(400)} style={{ position: 'absolute', right: 14, top: ins.top + 160, gap: 9, zIndex: 10 }}>
         <BotaoRedondo icone="locate" onPress={localizar} ativo={gps.ligado} />
         <BotaoRedondo icone={camada === 'satelite' ? 'map' : 'earth'} onPress={() => definirCamada(camada === 'satelite' ? 'mapa' : 'satelite')} />
+        <BotaoRedondo icone="cloud-download-outline" rotulo="Mapas offline" onPress={() => router.push('/mapas')} />
         <BotaoRedondo icone="scan" onPress={() => { const todos = (pontos.length ? pontos : talhoes.flatMap((x) => x.contorno)); if (todos.length) setComando({ n: Date.now(), tipo: 'ajustar', pontos: todos }); }} />
-        <BotaoRedondo icone="arrow-undo" onPress={desfazer} desabilitado={historico.length === 0} />
-        <BotaoRedondo icone="arrow-redo" onPress={refazer} desabilitado={futuro.length === 0} />
-        <BotaoRedondo icone="trash" onPress={limpar} desabilitado={pontos.length === 0} />
+        {(pontos.length > 0 || historico.length > 0 || futuro.length > 0) && (
+          <>
+            <BotaoRedondo icone="arrow-undo" onPress={desfazer} desabilitado={historico.length === 0} />
+            <BotaoRedondo icone="arrow-redo" onPress={refazer} desabilitado={futuro.length === 0} />
+            <BotaoRedondo icone="trash" onPress={limpar} desabilitado={pontos.length === 0} />
+          </>
+        )}
       </Animated.View>
 
       {/* Ajuste fino do ponto selecionado */}

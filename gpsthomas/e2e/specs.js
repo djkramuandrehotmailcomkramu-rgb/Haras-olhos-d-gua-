@@ -219,8 +219,10 @@ module.exports = [
       await dl.saveAs(arq);
       const b = JSON.parse(fs.readFileSync(arq, 'utf8'));
       check(b.app === 'GPSThomas' && b.dados.talhoes.length === 2, 'backup com 2 talhões');
+      await p.getByRole('button', { name: 'Sistema', exact: true }).click(); await p.waitForTimeout(300);
       await p.getByText('Apagar todos os dados').click(); await p.waitForTimeout(600);
       check((await estado(p)).talhoes.length === 0, 'dados apagados');
+      await p.getByRole('button', { name: 'Arquivos', exact: true }).click(); await p.waitForTimeout(300);
       const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.getByText('Restaurar de um backup').click()]);
       await fc.setFiles(arq); await p.waitForTimeout(900);
       check((await estado(p)).talhoes.length === 2, 'dados restaurados');
@@ -393,6 +395,7 @@ module.exports = [
       const p = await novaPagina(browser, { url });
       await p.addInitScript(() => { window.__chamouFs = 0; Element.prototype.requestFullscreen = function () { window.__chamouFs += 1; return Promise.resolve(); }; });
       await p.ir('/mais');
+      await p.getByRole('button', { name: 'Sistema', exact: true }).click(); await p.waitForTimeout(300);
       check(await p.getByText('TELA E INSTALAÇÃO').count() === 1, 'bloco Tela e instalação');
       check(await p.getByText(/barra verde/).count() >= 1, 'explica a barra verde');
       await p.getByText('Tela cheia (esconde as barras)').click(); await p.waitForTimeout(400);

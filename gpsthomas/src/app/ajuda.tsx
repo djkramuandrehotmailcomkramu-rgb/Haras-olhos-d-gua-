@@ -91,11 +91,16 @@ export default function Ajuda() {
 
         <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>COMO USAR</Text>
         <Secao titulo="Medir uma área" icone="walk">
-          <Item n="1">Abra a aba <Text style={{ fontFamily: fonte.semi }}>Medir</Text> e escolha o modo: <Text style={{ fontFamily: fonte.semi }}>Caminhar</Text> (o GPS grava o contorno enquanto você anda), <Text style={{ fontFamily: fonte.semi }}>Marcar</Text> (toque nos cantos no mapa) ou <Text style={{ fontFamily: fonte.semi }}>Distância</Text> (linha aberta).</Item>
+          <Item n="1">Abra a aba <Text style={{ fontFamily: fonte.semi }}>Mapa</Text> e escolha o modo: <Text style={{ fontFamily: fonte.semi }}>Caminhar</Text> (o GPS grava o contorno enquanto você anda), <Text style={{ fontFamily: fonte.semi }}>Marcar</Text> (toque nos cantos no mapa) ou <Text style={{ fontFamily: fonte.semi }}>Distância</Text> (linha aberta).</Item>
           <Item n="2">A área, o perímetro e a precisão do GPS aparecem no topo. Toque no valor para trocar a unidade (hectare, alqueires, m²).</Item>
           <Item n="3">Arraste os pontos para ajustar. Use desfazer e refazer na lateral. Toque em <Text style={{ fontFamily: fonte.semi }}>Salvar</Text> e escolha talhão ou só medição.</Item>
           <Item n="4">Quer ver o mapa limpo? Arraste a alça do painel para baixo.</Item>
-          <Item n="5"><Text style={{ fontFamily: fonte.semi }}>Girar o mapa:</Text> gire com dois dedos para ver o terreno de qualquer lado. A bússola aparece ao lado; toque nela para voltar o norte para cima.</Item>
+          <Item n="5"><Text style={{ fontFamily: fonte.semi }}>Girar o mapa:</Text> o giro com dois dedos vem desligado (para não girar sem querer ao dar zoom). Toque no botão de girar, ao lado, para ligar. A bússola aparece quando o mapa está girado; toque nela para voltar o norte para cima.</Item>
+        </Secao>
+        <Secao titulo="Mapas offline (para a roça sem sinal)" icone="cloud-download">
+          <Item n="1">Com internet (Wi-Fi), abra o <Text style={{ fontFamily: fonte.semi }}>Mapa</Text> e deixe na tela a região da fazenda. Toque no botão de nuvem (<Text style={{ fontFamily: fonte.semi }}>Mapas offline</Text>).</Item>
+          <Item n="2">Escolha <Text style={{ fontFamily: fonte.semi }}>Região na tela</Text> ou <Text style={{ fontFamily: fonte.semi }}>Meus talhões</Text>, o tipo de mapa (satélite ou ruas) e o nível de detalhe. Veja o tamanho e toque em <Text style={{ fontFamily: fonte.semi }}>Baixar</Text>. Deixe a tela ligada até terminar.</Item>
+          <Item n="3">Na roça, o mapa abre com o que foi baixado, mesmo sem internet. O GPS funciona sem internet; já a busca de endereço e as rotas por estrada precisam de sinal. Baixe com folga: o que não foi baixado aparece em branco.</Item>
         </Secao>
         <Secao titulo="Importar o KML da fazenda" icone="download">
           <Item n="1">Em <Text style={{ fontFamily: fonte.semi }}>Mais</Text>, escreva o nome da fazenda e toque em Importar. Aceita KML, KMZ, GeoJSON e GPX.</Item>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+- **Mapas offline:** novo botão de nuvem no mapa (e em Mais ▸ Ajustes). Baixe a região da fazenda (ou só os talhões) em satélite ou ruas, com estimativa de tamanho, progresso, pausa e nova tentativa; o mapa abre sem internet com o que foi baixado. Armazenamento persistente pedido ao navegador. Gerencia e apaga áreas salvas.
+- **Mapa mais limpo:** rótulos de talhões e partes só aparecem quando cabem e sem se sobrepor; as bandeirinhas de longe viram pontos e as que estão perto viram um número (toque para aproximar); a próxima bandeirinha do guia sempre aparece. O giro com dois dedos vem desligado (botão para ligar).
+- **Interface no estilo iPhone:** listas agrupadas, controles segmentados, barra de abas com 4 itens, fonte Inter (a mais próxima da SF), cantos e bordas finas. A cor verde foi trocada por **índigo** (ícone, abertura, mapa, impressão e PDF).
+- **Menos rolagem:** Mais virou 3 abas (Arquivos, Ajustes, Sistema); Talhões ganhou abas (Talhões, Campos de sementes) com linhas compactas; o mapa só mostra desfazer/refazer/limpar quando há pontos e dispensa dicas repetidas.
+
 ## 1.8.0
 - **Volta ao PWA:** o APK (casca Android) foi **abandonado e removido** (instalação com conflitos, impressão e downloads instáveis). O app é o PWA instalado pelo Chrome (⋮ → Instalar app); a impressão e os downloads usam o navegador. Se você ainda tem o APK, desinstale.
 - **GPS mais fiel andando:** o filtro agora é um Kalman de posição + velocidade: não fica "atrasado" ao caminhar (antes o ponto ficava ~3 m para trás e cortava curvas), suaviza o ruído parado e estima velocidade e rumo quando o navegador não informa (a seta do guia usa esse rumo).

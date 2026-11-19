@@ -7,6 +7,8 @@ import { VERSAO } from '../../versao';
 import { Tela } from '../../components/Tela';
 import { Campo } from '../../components/Campo';
 import { Cartao } from '../../components/Cartao';
+import { Grupo, Linha } from '../../components/Lista';
+import { Segmentos } from '../../components/Segmentos';
 import { Botao } from '../../components/Botao';
 import { useDados } from '../../store/dados';
 import { usePrefs } from '../../store/prefs';
@@ -36,6 +38,7 @@ export default function MaisTela() {
   const { unidadeArea, definirUnidadeArea, veiculo, definirVeiculo, ultimoBackupMs, marcarBackup } = usePrefs();
   const viagens = useDados((x) => x.viagens);
   const { talhoes, medicoes, campos, adicionarTalhao, adicionarMedicao, limparTudo } = useDados();
+  const [aba, setAba] = useState('Arquivos');
   const [msg, setMsg] = useState<string | null>(null);
   const [fazendaImport, setFazendaImport] = useState('');
   const [resumo, setResumo] = useState<{ nome: string; m2: number }[]>([]);
@@ -89,7 +92,11 @@ export default function MaisTela() {
   };
 
   return (
-    <Tela titulo="Mais" subtitulo="Arquivos, unidades e ajustes">
+    <Tela titulo="Mais" subtitulo="Arquivos, ajustes e sistema">
+      <Segmentos opcoes={['Arquivos', 'Ajustes', 'Sistema']} valor={aba} onChange={setAba} />
+
+      {aba === 'Arquivos' && (
+        <>
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>ARQUIVOS</Text>
       <Cartao style={{ gap: 12 }}>
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Traga áreas do Google Earth, QGIS ou do monitor da máquina e leve suas medições para eles.</Text>
@@ -114,6 +121,26 @@ export default function MaisTela() {
         </View>
       </Cartao>
 
+      <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>BACKUP E SEGURANÇA</Text>
+      <Cartao style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name={precisaBackup ? 'warning' : 'shield-checkmark'} size={19} color={precisaBackup ? t.atencao : t.ok} />
+          <Text style={[tipo.corpo, { color: t.texto, flex: 1 }]}>
+            {ultimoBackupMs ? `Último backup: ${new Date(ultimoBackupMs).toLocaleDateString('pt-BR')}` : vazio ? 'Seus dados ficam só neste aparelho.' : 'Você ainda não fez backup. Seus dados ficam só neste aparelho.'}
+          </Text>
+        </View>
+        <Botao titulo="Baixar backup completo" variante="suave" desabilitado={vazio && !ultimoBackupMs} icone={<Ionicons name="cloud-download" size={19} color={t.primaria} />} onPress={baixarBackup} />
+        <Botao titulo="Restaurar de um backup" variante="fantasma" icone={<Ionicons name="cloud-upload" size={19} color={t.primaria} />} onPress={restaurar} />
+      </Cartao>
+
+        </>
+      )}
+
+      {aba === 'Ajustes' && (
+        <>
+          <Grupo titulo="Mapas">
+            <Linha titulo="Mapas offline" subtitulo="Baixe a região da fazenda para usar sem internet" icone="cloud-download" corIcone="#5B4FE0" onPress={() => router.push('/mapas')} />
+          </Grupo>
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>MEU VEÍCULO</Text>
       <Cartao style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 10 }}>
         {VEICULOS.map((v) => {
@@ -160,6 +187,12 @@ export default function MaisTela() {
         })}
       </Cartao>
 
+          
+        </>
+      )}
+
+      {aba === 'Sistema' && (
+        <>
       {Platform.OS === 'web' && (
         <>
           <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>TELA E INSTALAÇÃO</Text>
@@ -191,36 +224,16 @@ export default function MaisTela() {
         </>
       )}
 
-      <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>BACKUP E SEGURANÇA</Text>
-      <Cartao style={{ gap: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Ionicons name={precisaBackup ? 'warning' : 'shield-checkmark'} size={19} color={precisaBackup ? t.atencao : t.ok} />
-          <Text style={[tipo.corpo, { color: t.texto, flex: 1 }]}>
-            {ultimoBackupMs ? `Último backup: ${new Date(ultimoBackupMs).toLocaleDateString('pt-BR')}` : vazio ? 'Seus dados ficam só neste aparelho.' : 'Você ainda não fez backup. Seus dados ficam só neste aparelho.'}
-          </Text>
-        </View>
-        <Botao titulo="Baixar backup completo" variante="suave" desabilitado={vazio && !ultimoBackupMs} icone={<Ionicons name="cloud-download" size={19} color={t.primaria} />} onPress={baixarBackup} />
-        <Botao titulo="Restaurar de um backup" variante="fantasma" icone={<Ionicons name="cloud-upload" size={19} color={t.primaria} />} onPress={restaurar} />
-      </Cartao>
-
-      <Pressable onPress={() => router.push('/ajuda')} accessibilityRole="button" accessibilityLabel="Ajuda e sobre">
-        <Cartao style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: t.primariaSuave, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="help-circle" size={22} color={t.primaria} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: fonte.semi, fontSize: 16, color: t.texto }}>Ajuda e sobre</Text>
-            <Text style={[tipo.legenda, { color: t.textoSuave }]}>Guia rápido, precisão do GPS e privacidade</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={17} color={t.textoSuave} />
-        </Cartao>
-      </Pressable>
-
+          <Grupo>
+            <Linha titulo="Ajuda e sobre" subtitulo="Guia rápido, precisão do GPS e privacidade" icone="help-circle" corIcone="#0A84FF" onPress={() => router.push('/ajuda')} />
+          </Grupo>
       <Text style={[tipo.legenda, { color: t.textoSuave, marginLeft: 6 }]}>DADOS</Text>
       <Cartao style={{ gap: 10 }}>
         <Text style={[tipo.corpo, { color: t.textoSuave }]}>Tudo fica salvo neste aparelho. Exporte um arquivo para fazer backup.</Text>
         <Botao titulo="Apagar todos os dados" variante="perigo" desabilitado={vazio} onPress={() => confirmar('Apagar todos os talhões e medições deste aparelho?', limparTudo)} />
       </Cartao>
+        </>
+      )}
       <Text style={[tipo.legenda, { color: t.textoSuave, textAlign: 'center', marginTop: 4, lineHeight: 18 }]}>Imagens de satélite © Esri, Maxar, Earthstar Geographics · Mapa, busca e rotas © colaboradores do OpenStreetMap (Nominatim, OSRM)</Text>
       <Text style={[tipo.corpo, { color: t.textoSuave, textAlign: 'center' }]}>GPSThomas · versão {VERSAO}</Text>
     </Tela>

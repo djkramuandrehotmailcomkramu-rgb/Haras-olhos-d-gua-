@@ -6,7 +6,7 @@ import { fonte, useTema } from '../theme';
 export function Segmentos({ opcoes, valor, onChange }: { opcoes: string[]; valor: string; onChange: (v: string) => void }) {
   const t = useTema();
   return (
-    <View role="tablist" style={{ flexDirection: 'row', backgroundColor: t.cartaoSuave, borderRadius: 10, padding: 2 }}>
+    <View role="group" style={{ flexDirection: 'row', backgroundColor: t.cartaoSuave, borderRadius: 10, padding: 2 }}>
       {opcoes.map((o) => {
         const ativo = o === valor;
         return (

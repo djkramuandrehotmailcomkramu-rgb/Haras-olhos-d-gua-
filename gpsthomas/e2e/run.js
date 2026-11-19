@@ -16,7 +16,7 @@ const specs = require('./specs');
       console.log(`  ✓ ${s.nome} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
     } catch (e) {
       falhas += 1;
-      console.log(`  ✕ ${s.nome}\n      ${e.message.split('\n')[0]}`);
+      console.log(`  ✕ ${s.nome}\n      ${e.message.split('\n').slice(0,6).join(' | ')}`);
     }
   }
   await browser.close();
