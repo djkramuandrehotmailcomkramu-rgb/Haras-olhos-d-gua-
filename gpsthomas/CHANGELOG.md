@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.3
+- **Botão Instalar sempre à mão:** no mapa (lateral) e no topo de Mais, enquanto o app não estiver instalado.
+- **Offline mais garantido:** ao instalar, o app já guarda a página e todos os arquivos (JS, fontes, ícones); Mais mostra "Uso offline: Pronto" e o atalho para Mapas offline.
+
 ## 1.9.2
 - **Guia mais limpo:** as opções de calibrar bússola e GPS ficam recolhidas num botão pequeno ("GPS ±x m"); o aviso de calibração some sozinho ao terminar.
 - **Giro com dois dedos de volta ligado** (há um botão para desligar).

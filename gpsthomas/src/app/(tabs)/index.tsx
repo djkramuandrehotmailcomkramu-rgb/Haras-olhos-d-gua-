@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -21,6 +21,8 @@ import { usePrefs } from '../../store/prefs';
 import { useToast } from '../../store/toast';
 import { useNumeroAnimado } from '../../hooks/animacao';
 import { useOnline } from '../../hooks/online';
+import { useSistema } from '../../store/sistema';
+import { INSTRUCAO_INSTALAR, instalarApp } from '../../nav/tela';
 import { fonte, raio, tipo, useTema } from '../../theme';
 
 type Modo = 'caminhar' | 'marcar' | 'mira' | 'linha';
@@ -209,6 +211,7 @@ export default function MapaTela() {
   };
 
   const online = useOnline();
+  const { instalado, podeInstalar } = useSistema();
   const areaAnim = useNumeroAnimado(area);
   const compAnim = useNumeroAnimado(comprimento);
   const prec = gps.pos?.precisaoM ?? null;
@@ -310,6 +313,9 @@ export default function MapaTela() {
       <Animated.View entering={FadeInUp.delay(100).duration(400)} style={{ position: 'absolute', right: 14, top: ins.top + 160, gap: 9, zIndex: 10 }}>
         <BotaoRedondo icone="locate" onPress={localizar} ativo={gps.ligado} />
         <BotaoRedondo icone={camada === 'satelite' ? 'map' : 'earth'} onPress={() => definirCamada(camada === 'satelite' ? 'mapa' : 'satelite')} />
+        {Platform.OS === 'web' && !instalado && (
+          <BotaoRedondo icone="download" rotulo="Instalar o aplicativo" onPress={async () => { const r = await instalarApp(); if (r === 'aceito') mostrar('Instalando… abra pelo ícone na tela inicial.', 'ok'); else if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }} ativo={podeInstalar} />
+        )}
         <BotaoRedondo icone="cloud-download-outline" rotulo="Mapas offline" onPress={() => router.push('/mapas')} />
         <BotaoRedondo icone="scan" onPress={() => { const todos = (pontos.length ? pontos : talhoes.flatMap((x) => x.contorno)); if (todos.length) setComando({ n: Date.now(), tipo: 'ajustar', pontos: todos }); }} />
         {(pontos.length > 0 || historico.length > 0 || futuro.length > 0) && (

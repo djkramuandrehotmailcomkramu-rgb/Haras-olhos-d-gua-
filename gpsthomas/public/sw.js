@@ -1,7 +1,25 @@
-const V = 'gpsthomas-v6';
+const V = 'gpsthomas-v7';
 const TILES = ['tile.openstreetmap.org', 'arcgisonline.com'];
 // PNG transparente 1x1
 const VAZIO = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII='), (ch) => ch.charCodeAt(0));
+
+// Ao instalar, já guarda a página inicial e todos os arquivos do app (JS, fontes, ícones) para abrir sem internet na roça.
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    (async () => {
+      try {
+        const c = await caches.open(V);
+        const r = await fetch('/', { cache: 'reload' });
+        if (!r.ok) return;
+        const html = await r.clone().text();
+        await c.put('/', r);
+        const urls = new Set(['/manifest.webmanifest', '/fonts/Inter_400Regular.woff2', '/fonts/Inter_500Medium.woff2', '/fonts/Inter_600SemiBold.woff2', '/fonts/Inter_700Bold.woff2']);
+        for (const m of html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css|png|ico|woff2|webmanifest))"/g)) urls.add(m[1]);
+        await Promise.all([...urls].map((u) => fetch(u).then((x) => (x.ok ? c.put(u, x) : null)).catch(() => null)));
+      } catch {}
+    })(),
+  );
+});
 
 // Não pula a espera sozinho: o app mostra "Nova versão disponível" e o usuário decide quando atualizar.
 self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });

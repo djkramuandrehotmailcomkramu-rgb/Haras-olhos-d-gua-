@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +45,13 @@ export default function MaisTela() {
   const [importando, setImportando] = useState(false);
   const { instalado, podeInstalar, telaCheia } = useSistema();
   const mostrar = useToast((s) => s.mostrar);
+  const [offlinePronto, setOfflinePronto] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof caches === 'undefined') return;
+    (async () => {
+      try { setOfflinePronto(!!(await caches.match('/')) && !!navigator.serviceWorker?.controller); } catch { setOfflinePronto(false); }
+    })();
+  }, []);
 
   const importar = async () => {
     setImportando(true);
@@ -93,6 +100,15 @@ export default function MaisTela() {
 
   return (
     <Tela titulo="Mais" subtitulo="Arquivos, ajustes e sistema">
+      {Platform.OS === 'web' && (
+        <Grupo>
+          {!instalado && (
+            <Linha titulo="Instalar o aplicativo" subtitulo={podeInstalar ? 'Toque para instalar na tela inicial' : 'Toque para ver como instalar'} icone="download" corIcone="#5B4FE0" acessibilidade="Instalar o aplicativo" onPress={async () => { const r = await instalarApp(); if (r === 'aceito') mostrar('Instalando… abra o app pelo ícone novo na tela inicial.', 'ok'); else if (r === 'indisponivel') mostrar(INSTRUCAO_INSTALAR, 'info'); }} />
+          )}
+          <Linha titulo="Uso offline" subtitulo={offlinePronto ? 'O aplicativo abre sem internet. Baixe os mapas da fazenda em Mapas offline.' : 'Abra o app uma vez com internet e aguarde; depois ele abre sem sinal.'} icone={offlinePronto ? 'checkmark-circle' : 'cloud-offline'} corIcone={offlinePronto ? '#34C759' : '#FF9F0A'} valor={offlinePronto ? 'Pronto' : 'Aguardando'} />
+          <Linha titulo="Mapas offline" subtitulo="Baixar a região da fazenda" icone="cloud-download" corIcone="#5B4FE0" onPress={() => router.push('/mapas')} />
+        </Grupo>
+      )}
       <Segmentos opcoes={['Arquivos', 'Ajustes', 'Sistema']} valor={aba} onChange={setAba} />
 
       {aba === 'Arquivos' && (

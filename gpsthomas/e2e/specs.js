@@ -403,7 +403,7 @@ module.exports = [
       // pedido de instalação disponível: o botão chama o prompt do navegador
       await p.evaluate(() => { window.__prompts = 0; window.__gtInstalar = { prompt() { window.__prompts += 1; }, userChoice: Promise.resolve({ outcome: 'accepted' }) }; window.dispatchEvent(new CustomEvent('gt-pode-instalar')); });
       await p.waitForTimeout(500);
-      await p.getByText('Instalar o aplicativo').click(); await p.waitForTimeout(500);
+      await p.getByText('Instalar o aplicativo').first().click(); await p.waitForTimeout(500);
       check(await p.evaluate(() => window.__prompts) === 1, 'abriu o pedido de instalação');
       // banner no mapa (depois de ~5 s, fora do modo instalado)
       await p.evaluate(() => localStorage.removeItem('x'));
